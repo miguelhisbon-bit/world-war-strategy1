@@ -34,7 +34,7 @@
         <div class="loading-subtitle">REAL-TIME STRATEGY</div>
         <div class="loading-status" id="loadingStatus">Loading global map...</div>
         <div class="loading-bar"><div id="loadingProgress"></div></div>
-        <div class="loading-tip" id="loadingTip">TIP: Click any country to view its territory and states.</div>
+        <div class="loading-tip" id="loadingTip">TIP: Click any country to zoom & view states</div>
     </div>
 </div>
 
@@ -55,7 +55,7 @@
             <span id="countryFlag">🇧🇩</span>
             <span id="countryName">Bangladesh</span>
         </div>
-        <div class="resources">
+        <div class="resources" id="resourceBar">
             <div class="resource"><span>💰</span><b id="money">12500</b></div>
             <div class="resource"><span>🛢️</span><b id="oil">850</b></div>
             <div class="resource"><span>⚙️</span><b id="steel">1250</b></div>
@@ -64,8 +64,8 @@
         </div>
         <div class="date-control">
             <div id="gameDate">1940 • JAN 01</div>
-            <button id="pauseBtn">Ⅱ</button>
-            <button id="speedBtn">1×</button>
+            <button id="pauseBtn" title="Pause">⏸</button>
+            <button id="speedBtn" title="Speed">1×</button>
         </div>
     </header>
 
@@ -120,14 +120,15 @@
     </section>
 
     <!-- BOTTOM TOUCH COMMAND -->
-    <div id="touchHint"><span>👆</span>Tap a unit to select • Tap terrain to move • Click country to view</div>
+    <div id="touchHint"><span>👆</span>Tap a unit to select • Tap terrain to move • Click country to zoom</div>
 
     <!-- CAMERA CONTROLS -->
     <div id="cameraControls">
-        <button id="zoomIn">＋</button>
-        <button id="zoomOut">−</button>
-        <button id="resetCamera">⌖</button>
-        <button id="topDown" style="font-size:12px;">⬇</button>
+        <button id="zoomIn" title="Zoom In">＋</button>
+        <button id="zoomOut" title="Zoom Out">−</button>
+        <button id="resetCamera" title="Reset View">⌖</button>
+        <button id="topDown" title="Top View" style="font-size:12px;">⬇</button>
+        <button id="zoomToCountry" title="Zoom to Selected Country" style="font-size:14px;">🎯</button>
     </div>
 
     <!-- MINIMAP -->
@@ -157,7 +158,6 @@
             <div class="panel-kicker">SELECT NATION</div>
             <h2>Choose Your Country</h2>
             <div class="country-grid">
-                <!-- Muslim Countries -->
                 <button class="country-card" data-country="BANGLADESH"><span>🇧🇩</span><b>Bangladesh</b><small>South Asia • 8 States</small></button>
                 <button class="country-card" data-country="PAKISTAN"><span>🇵🇰</span><b>Pakistan</b><small>South Asia • 7 States</small></button>
                 <button class="country-card" data-country="TURKEY"><span>🇹🇷</span><b>Turkey</b><small>Eurasia • 8 States</small></button>
@@ -167,7 +167,6 @@
                 <button class="country-card" data-country="PALESTINE"><span>🇵🇸</span><b>Palestine</b><small>Middle East • 6 States</small></button>
                 <button class="country-card" data-country="INDONESIA"><span>🇮🇩</span><b>Indonesia</b><small>SE Asia • 8 States</small></button>
                 <button class="country-card" data-country="AFGHANISTAN"><span>🇦🇫</span><b>Afghanistan</b><small>Central Asia • 8 States</small></button>
-                <!-- Major Powers -->
                 <button class="country-card" data-country="INDIA"><span>🇮🇳</span><b>India</b><small>South Asia • 8 States</small></button>
                 <button class="country-card" data-country="USA"><span>🇺🇸</span><b>United States</b><small>North America • 8 States</small></button>
                 <button class="country-card" data-country="CHINA"><span>🇨🇳</span><b>China</b><small>East Asia • 8 States</small></button>
@@ -196,7 +195,7 @@
             <div>
                 <div class="panel-kicker">FIELD MANUAL</div>
                 <h2 id="tutorialTitle">Welcome, Commander</h2>
-                <p id="tutorialText">Select a military unit and command it across the battlefield. Click any country to view its territory.</p>
+                <p id="tutorialText">Click any country to zoom in and view its states. Select a military unit and command it across the battlefield.</p>
             </div>
             <button id="tutorialNext">NEXT</button>
         </div>
