@@ -1,15 +1,16 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 
 /* =========================================================
-   WORLD WAR — V4 (FULLY TESTED)
-   HTML/CSS COMPATIBLE — NO CHANGES REQUIRED
+   WORLD WAR — V5 (3D BATTLEFIELD)
+   FULL 3D UNITS + COUNTRY BORDERS + TERRAIN
    ========================================================== */
 
 const $ = id => document.getElementById(id);
 
-let scene, camera, renderer, controls, clock;
-let ground, unitGroup, fxGroup;
+let scene, camera, renderer, labelRenderer, controls, clock;
+let ground, unitGroup, fxGroup, borderGroup, labelGroup;
 
 let selectedUnit = null;
 let moveMode = false;
@@ -48,15 +49,30 @@ let diplomaticMessages = [];
 
 const units = [];
 
+/* =========================================================
+   NATIONS DATA
+   ========================================================== */
+
 const nation = {
-    USA: ["🇺🇸", "United States"],
-    GERMANY: ["🇩🇪", "Germany"],
-    UK: ["🇬🇧", "United Kingdom"],
-    JAPAN: ["🇯🇵", "Japan"],
-    USSR: ["☭", "Soviet Union"],
-    FRANCE: ["🇫🇷", "France"],
-    ITALY: ["🇮🇹", "Italy"],
-    CHINA: ["🇨🇳", "China"]
+    USA: { flag: "🇺🇸", name: "United States", color: 0x2a5c8a, pos: [-80, -40] },
+    GERMANY: { flag: "🇩🇪", name: "Germany", color: 0x3a3a3a, pos: [20, 30] },
+    UK: { flag: "🇬🇧", name: "United Kingdom", color: 0x8a2a2a, pos: [-120, 50] },
+    JAPAN: { flag: "🇯🇵", name: "Japan", color: 0xcc2222, pos: [150, -20] },
+    USSR: { flag: "☭", name: "Soviet Union", color: 0x8a2a2a, pos: [60, 80] },
+    FRANCE: { flag: "🇫🇷", name: "France", color: 0x2a5a8a, pos: [-40, 60] },
+    ITALY: { flag: "🇮🇹", name: "Italy", color: 0x2a8a3a, pos: [-20, 90] },
+    CHINA: { flag: "🇨🇳", name: "China", color: 0xcc2222, pos: [120, 40] }
+};
+
+const countryColors = {
+    USA: 0x2a5c8a,
+    GERMANY: 0x3a3a3a,
+    UK: 0x8a2a2a,
+    JAPAN: 0xcc2222,
+    USSR: 0x8a2a2a,
+    FRANCE: 0x2a5a8a,
+    ITALY: 0x2a8a3a,
+    CHINA: 0xcc2222
 };
 
 const mapColors = {
@@ -85,94 +101,20 @@ const factories = {
 };
 
 const production = {
-    TANK: {
-        name: "Tank",
-        factories: 4,
-        progress: 67,
-        efficiency: 74,
-        cost: 800,
-        steel: 80,
-        output: 0
-    },
-    INFANTRY: {
-        name: "Infantry Equipment",
-        factories: 5,
-        progress: 42,
-        efficiency: 82,
-        cost: 350,
-        steel: 35,
-        output: 0
-    },
-    ARTILLERY: {
-        name: "Artillery",
-        factories: 3,
-        progress: 55,
-        efficiency: 68,
-        cost: 600,
-        steel: 65,
-        output: 0
-    },
-    AIR: {
-        name: "Aircraft",
-        factories: 2,
-        progress: 31,
-        efficiency: 59,
-        cost: 1100,
-        steel: 90,
-        output: 0
-    }
+    TANK: { name: "Tank", factories: 4, progress: 67, efficiency: 74, cost: 800, steel: 80, output: 0 },
+    INFANTRY: { name: "Infantry Equipment", factories: 5, progress: 42, efficiency: 82, cost: 350, steel: 35, output: 0 },
+    ARTILLERY: { name: "Artillery", factories: 3, progress: 55, efficiency: 68, cost: 600, steel: 65, output: 0 },
+    AIR: { name: "Aircraft", factories: 2, progress: 31, efficiency: 59, cost: 1100, steel: 90, output: 0 }
 };
 
 const tech = {
-    INFANTRY: {
-        name: "Infantry Weapons",
-        progress: 54,
-        active: false,
-        bonus: "+8% infantry attack",
-        completed: false
-    },
-    ARMOR: {
-        name: "Advanced Armor",
-        progress: 32,
-        active: false,
-        bonus: "+10% tank attack",
-        completed: false
-    },
-    ARTILLERY: {
-        name: "Modern Artillery",
-        progress: 48,
-        active: false,
-        bonus: "+8% artillery damage",
-        completed: false
-    },
-    AIR: {
-        name: "Fighter Interceptors",
-        progress: 28,
-        active: false,
-        bonus: "+12% air defense",
-        completed: false
-    },
-    INDUSTRY: {
-        name: "Industrial Methods",
-        progress: 71,
-        active: false,
-        bonus: "+1 civilian factory",
-        completed: false
-    },
-    LOGISTICS: {
-        name: "Motorized Logistics",
-        progress: 42,
-        active: false,
-        bonus: "-10% supply use",
-        completed: false
-    },
-    ELECTRONICS: {
-        name: "Field Electronics",
-        progress: 18,
-        active: false,
-        bonus: "+10 intelligence",
-        completed: false
-    }
+    INFANTRY: { name: "Infantry Weapons", progress: 54, active: false, bonus: "+8% infantry attack", completed: false },
+    ARMOR: { name: "Advanced Armor", progress: 32, active: false, bonus: "+10% tank attack", completed: false },
+    ARTILLERY: { name: "Modern Artillery", progress: 48, active: false, bonus: "+8% artillery damage", completed: false },
+    AIR: { name: "Fighter Interceptors", progress: 28, active: false, bonus: "+12% air defense", completed: false },
+    INDUSTRY: { name: "Industrial Methods", progress: 71, active: false, bonus: "+1 civilian factory", completed: false },
+    LOGISTICS: { name: "Motorized Logistics", progress: 42, active: false, bonus: "-10% supply use", completed: false },
+    ELECTRONICS: { name: "Field Electronics", progress: 18, active: false, bonus: "+10 intelligence", completed: false }
 };
 
 /* =========================================================
@@ -184,6 +126,8 @@ async function init() {
     setup3D();
     loading(25, "Generating strategic terrain...");
     createTerrain();
+    loading(35, "Drawing country borders...");
+    createCountryBorders();
     loading(45, "Deploying military forces...");
     deployInitialForces();
     loading(65, "Connecting economy and production...");
@@ -212,7 +156,7 @@ function loading(progress, text) {
 }
 
 /* =========================================================
-   THREE.JS
+   3D SETUP
    ========================================================== */
 
 function setup3D() {
@@ -220,11 +164,11 @@ function setup3D() {
     if (!canvas) return;
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x071015);
-    scene.fog = new THREE.Fog(0x071015, 80, 350);
+    scene.background = new THREE.Color(0x0a1218);
+    scene.fog = new THREE.Fog(0x0a1218, 80, 400);
 
-    camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 1000);
-    camera.position.set(0, 82, 86);
+    camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 1000);
+    camera.position.set(60, 70, 90);
 
     renderer = new THREE.WebGLRenderer({
         canvas,
@@ -235,28 +179,58 @@ function setup3D() {
     renderer.setSize(innerWidth, innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
 
-    const hemi = new THREE.HemisphereLight(0xc8d2d5, 0x162017, 1.45);
+    // Label Renderer
+    labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(innerWidth, innerHeight);
+    labelRenderer.domElement.style.position = "absolute";
+    labelRenderer.domElement.style.top = "0";
+    labelRenderer.domElement.style.left = "0";
+    labelRenderer.domElement.style.pointerEvents = "none";
+    labelRenderer.domElement.style.zIndex = "10";
+    document.getElementById("game").appendChild(labelRenderer.domElement);
+
+    // Lights
+    const hemi = new THREE.HemisphereLight(0xc8d2d5, 0x162017, 1.2);
     scene.add(hemi);
 
-    const sun = new THREE.DirectionalLight(0xffdfad, 2);
-    sun.position.set(-100, 150, 80);
+    const sun = new THREE.DirectionalLight(0xffdfad, 2.5);
+    sun.position.set(-80, 120, 60);
     sun.castShadow = true;
+    sun.shadow.mapSize.width = 2048;
+    sun.shadow.mapSize.height = 2048;
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 300;
+    sun.shadow.camera.left = -150;
+    sun.shadow.camera.right = 150;
+    sun.shadow.camera.top = 150;
+    sun.shadow.camera.bottom = -150;
     scene.add(sun);
+
+    const fill = new THREE.DirectionalLight(0x88aaff, 0.4);
+    fill.position.set(60, 40, -80);
+    scene.add(fill);
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.minDistance = 18;
-    controls.maxDistance = 260;
-    controls.maxPolarAngle = Math.PI * 0.47;
+    controls.minDistance = 20;
+    controls.maxDistance = 250;
+    controls.maxPolarAngle = Math.PI * 0.48;
     controls.target.set(0, 0, 0);
+    controls.update();
 
     clock = new THREE.Clock();
     unitGroup = new THREE.Group();
     fxGroup = new THREE.Group();
+    borderGroup = new THREE.Group();
+    labelGroup = new THREE.Group();
     scene.add(unitGroup);
     scene.add(fxGroup);
+    scene.add(borderGroup);
+    scene.add(labelGroup);
 
     canvas.addEventListener("pointerdown", handleWorldClick);
     window.addEventListener("resize", resizeRenderer);
@@ -267,145 +241,504 @@ function resizeRenderer() {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
+    if (labelRenderer) labelRenderer.setSize(innerWidth, innerHeight);
 }
 
 /* =========================================================
-   TERRAIN
+   TERRAIN (Enhanced)
    ========================================================== */
 
 function createTerrain() {
-    const geometry = new THREE.PlaneGeometry(360, 360, 100, 100);
+    const geometry = new THREE.PlaneGeometry(360, 360, 150, 150);
     const positions = geometry.attributes.position;
+    
     for (let i = 0; i < positions.count; i++) {
         const x = positions.getX(i);
         const y = positions.getY(i);
-        const height = Math.sin(x * 0.05) * 2 + Math.cos(y * 0.06) * 1.7 + Math.sin((x + y) * 0.025) * 3;
+        const height = 
+            Math.sin(x * 0.04) * 1.8 +
+            Math.cos(y * 0.05) * 1.5 +
+            Math.sin((x + y) * 0.025) * 2.5 +
+            Math.cos(x * 0.08 + y * 0.06) * 1.2;
         positions.setZ(i, height);
     }
     geometry.computeVertexNormals();
 
+    // Base terrain with color variation
+    const colors = new Float32Array(positions.count * 3);
+    for (let i = 0; i < positions.count; i++) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+        const z = positions.getZ(i);
+        
+        let r = 0.25, g = 0.35, b = 0.25;
+        
+        // Hills - lighter
+        if (z > 3) { r += 0.1; g += 0.1; b += 0.05; }
+        // Forests - darker
+        if (Math.sin(x * 0.1) * Math.cos(y * 0.1) > 0.3 && z < 2) { r -= 0.05; g += 0.05; b -= 0.02; }
+        // Plains - yellow-green
+        if (Math.abs(z) < 0.5) { r += 0.05; g += 0.02; b -= 0.05; }
+        
+        colors[i*3] = Math.max(0.1, Math.min(0.6, r));
+        colors[i*3+1] = Math.max(0.2, Math.min(0.7, g));
+        colors[i*3+2] = Math.max(0.1, Math.min(0.5, b));
+    }
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
     ground = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-        color: mapColors[mapLayer],
-        roughness: 0.96,
-        metalness: 0
+        vertexColors: true,
+        roughness: 0.9,
+        metalness: 0.0,
+        flatShading: false
     }));
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     ground.userData.isGround = true;
     scene.add(ground);
 
+    // Grid helper
     const grid = new THREE.GridHelper(360, 72, 0x68715f, 0x30382f);
     grid.material.transparent = true;
-    grid.material.opacity = 0.08;
+    grid.material.opacity = 0.06;
     scene.add(grid);
 
+    // Water
     const water = new THREE.Mesh(
         new THREE.PlaneGeometry(520, 520),
-        new THREE.MeshStandardMaterial({ color: 0x164659, transparent: true, opacity: 0.52, roughness: 0.2 })
+        new THREE.MeshStandardMaterial({
+            color: 0x164659,
+            transparent: true,
+            opacity: 0.35,
+            roughness: 0.1,
+            metalness: 0.4
+        })
     );
     water.rotation.x = -Math.PI / 2;
-    water.position.y = -4;
+    water.position.y = -2;
     scene.add(water);
 
     createMountains();
-    createForest();
-    createFrontLines();
+    createForests();
 }
 
 function createMountains() {
-    for (let i = 0; i < 65; i++) {
+    for (let i = 0; i < 70; i++) {
+        const height = 8 + Math.random() * 22;
+        const radius = 2 + Math.random() * 8;
         const mountain = new THREE.Mesh(
-            new THREE.ConeGeometry(3 + Math.random() * 6, 9 + Math.random() * 18, 7),
-            new THREE.MeshStandardMaterial({ color: 0x394039, roughness: 1 })
+            new THREE.ConeGeometry(radius, height, 7 + Math.floor(Math.random() * 5)),
+            new THREE.MeshStandardMaterial({
+                color: 0x3a4a3a,
+                roughness: 1,
+                flatShading: true
+            })
         );
-        mountain.position.set((Math.random() - 0.5) * 320, 5 + Math.random() * 7, (Math.random() - 0.5) * 320);
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 30 + Math.random() * 140;
+        mountain.position.set(
+            Math.cos(angle) * dist,
+            0.5 + height * 0.4,
+            Math.sin(angle) * dist
+        );
+        mountain.rotation.set(
+            (Math.random() - 0.5) * 0.1,
+            Math.random() * Math.PI * 2,
+            (Math.random() - 0.5) * 0.1
+        );
         mountain.castShadow = true;
         scene.add(mountain);
+
+        // Snow cap
+        if (height > 15) {
+            const snow = new THREE.Mesh(
+                new THREE.ConeGeometry(radius * 0.3, height * 0.15, 7),
+                new THREE.MeshStandardMaterial({ color: 0xeeeeff, roughness: 0.8 })
+            );
+            snow.position.copy(mountain.position);
+            snow.position.y += height * 0.45;
+            snow.castShadow = true;
+            scene.add(snow);
+        }
     }
 }
 
-function createForest() {
-    for (let i = 0; i < 100; i++) {
+function createForests() {
+    for (let i = 0; i < 200; i++) {
         const tree = new THREE.Group();
+        const trunkHeight = 0.8 + Math.random() * 1.5;
         const trunk = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.12, 0.18, 1.3, 5),
-            new THREE.MeshStandardMaterial({ color: 0x493a2a })
+            new THREE.CylinderGeometry(0.1, 0.15, trunkHeight, 5),
+            new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 1 })
         );
+        trunk.position.y = trunkHeight / 2;
+        
+        const crownSize = 0.5 + Math.random() * 0.8;
         const crown = new THREE.Mesh(
-            new THREE.ConeGeometry(0.7, 2.5, 7),
-            new THREE.MeshStandardMaterial({ color: 0x263d28 })
+            new THREE.ConeGeometry(crownSize, 1.5 + Math.random() * 1.5, 6 + Math.floor(Math.random() * 4)),
+            new THREE.MeshStandardMaterial({
+                color: new THREE.Color().setHSL(0.25 + Math.random() * 0.08, 0.3, 0.2 + Math.random() * 0.15),
+                roughness: 1
+            })
         );
-        trunk.position.y = 0.65;
-        crown.position.y = 2;
+        crown.position.y = trunkHeight + (0.5 + Math.random() * 0.5);
+        
         tree.add(trunk, crown);
-        tree.position.set((Math.random() - 0.5) * 330, 0.3, (Math.random() - 0.5) * 330);
-        tree.scale.setScalar(0.7 + Math.random() * 0.8);
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 20 + Math.random() * 150;
+        tree.position.set(
+            Math.cos(angle) * dist + (Math.random() - 0.5) * 20,
+            0,
+            Math.sin(angle) * dist + (Math.random() - 0.5) * 20
+        );
+        tree.scale.setScalar(0.7 + Math.random() * 0.6);
         scene.add(tree);
     }
 }
 
-function createFrontLines() {
-    createLine(0xb0a66f, [
-        [-150, -90], [-70, -125], [10, -100], [60, -60], [-10, -20]
-    ]);
-    createLine(0xb0a66f, [
-        [-100, 35], [-40, 10], [20, 55], [-30, 120], [-120, 95]
-    ]);
-    createLine(0xb33f3f, [
-        [15, -40], [45, -32], [75, -38], [105, -28], [135, -35]
-    ]);
-}
+/* =========================================================
+   COUNTRY BORDERS
+   ========================================================== */
 
-function createLine(color, points) {
-    const geometry = new THREE.BufferGeometry().setFromPoints(
-        points.map(p => new THREE.Vector3(p[0], 0.4, p[1]))
-    );
-    const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({
-        color,
-        transparent: true,
-        opacity: 0.45
-    }));
-    scene.add(line);
+function createCountryBorders() {
+    const countryData = [
+        { name: 'USA', points: [[-100, -80], [-60, -60], [-40, -20], [-80, 0], [-120, -20], [-130, -60], [-100, -80]] },
+        { name: 'GERMANY', points: [[0, 10], [30, 5], [40, 25], [25, 45], [5, 40], [-5, 25], [0, 10]] },
+        { name: 'UK', points: [[-130, 30], [-110, 20], [-100, 40], [-110, 60], [-130, 50], [-130, 30]] },
+        { name: 'JAPAN', points: [[130, -40], [160, -30], [170, -10], [150, 10], [130, 0], [125, -25], [130, -40]] },
+        { name: 'USSR', points: [[30, 50], [80, 40], [120, 50], [130, 80], [90, 100], [50, 90], [20, 70], [30, 50]] },
+        { name: 'FRANCE', points: [[-50, 40], [-30, 35], [-20, 50], [-30, 65], [-50, 60], [-60, 50], [-50, 40]] },
+        { name: 'ITALY', points: [[-30, 80], [-10, 75], [0, 90], [-10, 105], [-30, 100], [-35, 90], [-30, 80]] },
+        { name: 'CHINA', points: [[90, 20], [130, 10], [150, 30], [140, 60], [110, 70], [85, 50], [90, 20]] }
+    ];
+
+    countryData.forEach(data => {
+        const color = countryColors[data.name] || 0x888888;
+        const points = data.points.map(p => new THREE.Vector3(p[0], 0.3, p[1]));
+        
+        // Border line
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const line = new THREE.Line(
+            geometry,
+            new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6, linewidth: 2 })
+        );
+        borderGroup.add(line);
+
+        // Fill area
+        const shape = new THREE.Shape();
+        points.forEach((p, i) => {
+            if (i === 0) shape.moveTo(p.x, p.z);
+            else shape.lineTo(p.x, p.z);
+        });
+        const fillGeom = new THREE.ShapeGeometry(shape);
+        const fill = new THREE.Mesh(
+            fillGeom,
+            new THREE.MeshBasicMaterial({
+                color,
+                transparent: true,
+                opacity: 0.08,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            })
+        );
+        fill.rotation.x = -Math.PI / 2;
+        fill.position.y = 0.2;
+        borderGroup.add(fill);
+
+        // Country label
+        const center = points.reduce((acc, p) => { acc.x += p.x; acc.z += p.z; return acc; }, { x: 0, z: 0 });
+        center.x /= points.length;
+        center.z /= points.length;
+        
+        const labelDiv = document.createElement('div');
+        labelDiv.textContent = `${nation[data.name]?.flag || '🏳️'} ${data.name}`;
+        labelDiv.style.color = '#eef4f8';
+        labelDiv.style.fontSize = '11px';
+        labelDiv.style.fontWeight = '700';
+        labelDiv.style.textShadow = '0 2px 12px rgba(0,0,0,0.8)';
+        labelDiv.style.background = 'rgba(0,0,0,0.5)';
+        labelDiv.style.padding = '4px 10px';
+        labelDiv.style.borderRadius = '12px';
+        labelDiv.style.border = '1px solid rgba(255,255,255,0.1)';
+        labelDiv.style.backdropFilter = 'blur(4px)';
+        labelDiv.style.pointerEvents = 'none';
+        labelDiv.style.userSelect = 'none';
+        
+        const label = new CSS2DObject(labelDiv);
+        label.position.set(center.x, 1.5, center.z);
+        labelGroup.add(label);
+    });
 }
 
 /* =========================================================
-   UNIT SYSTEM
+   3D UNIT CREATION
    ========================================================== */
 
-function createUnit(name, type, x, z, friendly = true) {
+function create3DTank(color, friendly) {
     const group = new THREE.Group();
-    const color = friendly ? (type === "TANK" ? 0x566b4f : 0x60715a) : (type === "TANK" ? 0x633b36 : 0x68453f);
-    const material = new THREE.MeshStandardMaterial({ color, roughness: 0.75 });
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.3 });
+    const trackMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
 
-    if (type === "TANK") {
-        const body = new THREE.Mesh(new THREE.BoxGeometry(5, 1.8, 3.2), material);
-        const turret = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.35, 0.8, 12), material);
-        const barrel = new THREE.Mesh(
-            new THREE.BoxGeometry(0.35, 0.35, 3.8),
-            new THREE.MeshStandardMaterial({ color: 0x202521, metalness: 0.5 })
-        );
-        body.position.y = 1.1;
-        turret.position.y = 2.2;
-        barrel.position.set(0, 2.3, 2);
-        group.add(body, turret, barrel);
-    } else if (type === "AIR") {
-        const fuselage = new THREE.Mesh(new THREE.CapsuleGeometry(0.7, 4, 5, 10), material);
-        const wings = new THREE.Mesh(new THREE.BoxGeometry(5, 0.2, 1.3), material);
-        fuselage.rotation.x = Math.PI / 2;
-        group.add(fuselage, wings);
-        group.position.y = 8;
-    } else {
-        const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.65, 1.4, 5, 8), material);
-        const head = new THREE.Mesh(
-            new THREE.SphereGeometry(0.48, 10, 10),
-            new THREE.MeshStandardMaterial({ color: 0x8c6c50 })
-        );
-        body.position.y = 1.4;
-        head.position.y = 2.7;
-        group.add(body, head);
+    // Body
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 2.0), mat);
+    body.position.y = 0.8;
+    body.castShadow = true;
+    group.add(body);
+
+    // Turret
+    const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.0, 0.6, 12), mat);
+    turret.position.y = 1.6;
+    turret.castShadow = true;
+    group.add(turret);
+
+    // Barrel
+    const barrel = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.25, 2.0),
+        new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.6 })
+    );
+    barrel.position.set(0, 1.65, 1.4);
+    group.add(barrel);
+
+    // Tracks
+    for (let side of [-1, 1]) {
+        const track = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 2.2), trackMat);
+        track.position.set(side * 1.8, 0.3, 0);
+        group.add(track);
+        
+        for (let i = -0.8; i <= 0.8; i += 0.4) {
+            const wheel = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.2, 0.2, 0.15, 8),
+                new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.8 })
+            );
+            wheel.rotation.x = Math.PI / 2;
+            wheel.position.set(side * 1.7, 0.4, i);
+            group.add(wheel);
+        }
     }
 
-    group.position.set(x, type === "AIR" ? 8 : 0, z);
+    // Details
+    const hatch = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), new THREE.MeshStandardMaterial({ color: 0x444444 }));
+    hatch.position.set(0.3, 1.9, 0.2);
+    group.add(hatch);
+
+    return group;
+}
+
+function create3DInfantry(color, friendly) {
+    const group = new THREE.Group();
+    const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xccaa88, roughness: 0.8 });
+    const gunMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5 });
+
+    // Body
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.6, 6, 8), bodyMat);
+    body.position.y = 1.0;
+    body.castShadow = true;
+    group.add(body);
+
+    // Head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), skinMat);
+    head.position.y = 1.6;
+    head.castShadow = true;
+    group.add(head);
+
+    // Helmet
+    const helmet = new THREE.Mesh(
+        new THREE.SphereGeometry(0.22, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.5),
+        new THREE.MeshStandardMaterial({ color: 0x445544, roughness: 0.5 })
+    );
+    helmet.position.y = 1.7;
+    group.add(helmet);
+
+    // Arms
+    for (let side of [-1, 1]) {
+        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.4, 4), bodyMat);
+        arm.position.set(side * 0.4, 1.2, 0);
+        arm.rotation.z = side * 0.3;
+        group.add(arm);
+    }
+
+    // Legs
+    for (let side of [-1, 1]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.5, 4), bodyMat);
+        leg.position.set(side * 0.15, 0.35, 0);
+        group.add(leg);
+    }
+
+    // Gun (rifle)
+    const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.6, 4), gunMat);
+    gun.rotation.x = Math.PI / 2;
+    gun.position.set(0.4, 1.2, 0.4);
+    group.add(gun);
+
+    // Backpack
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.15), new THREE.MeshStandardMaterial({ color: 0x445544 }));
+    pack.position.set(0, 0.9, -0.25);
+    group.add(pack);
+
+    return group;
+}
+
+function create3DArtillery(color, friendly) {
+    const group = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.2 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.7 });
+
+    // Base
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.3, 1.2), mat);
+    base.position.y = 0.3;
+    base.castShadow = true;
+    group.add(base);
+
+    // Wheels
+    for (let side of [-1, 1]) {
+        const wheel = new THREE.Mesh(
+            new THREE.TorusGeometry(0.3, 0.08, 8, 12),
+            new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 })
+        );
+        wheel.position.set(side * 0.7, 0.3, 0.5);
+        wheel.rotation.y = Math.PI / 2;
+        group.add(wheel);
+    }
+
+    // Carriage
+    const carriage = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.8), mat);
+    carriage.position.y = 0.6;
+    group.add(carriage);
+
+    // Barrel
+    const barrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.1, 0.15, 1.8, 8),
+        metalMat
+    );
+    barrel.rotation.x = Math.PI / 2 * 0.3;
+    barrel.position.set(0, 0.8, 1.2);
+    group.add(barrel);
+
+    // Breech
+    const breech = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), metalMat);
+    breech.position.set(0, 0.8, 0.3);
+    group.add(breech);
+
+    // Shield
+    const shield = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 0.05), new THREE.MeshStandardMaterial({ color: 0x555555 }));
+    shield.position.set(0, 0.8, 0.7);
+    group.add(shield);
+
+    return group;
+}
+
+function create3DAircraft(color, friendly) {
+    const group = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.3, metalness: 0.7 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x88ccff, transparent: true, opacity: 0.4 });
+
+    // Fuselage
+    const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.15, 2.8, 8), mat);
+    fuse.rotation.x = Math.PI / 2;
+    fuse.castShadow = true;
+    group.add(fuse);
+
+    // Wings
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.05, 0.6), mat);
+    wing.position.y = 0;
+    wing.castShadow = true;
+    group.add(wing);
+
+    // Tail
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.05), mat);
+    tail.position.set(-1.4, 0.2, 0);
+    group.add(tail);
+    
+    const tailVertical = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 0.3), mat);
+    tailVertical.position.set(-1.4, 0.2, 0);
+    group.add(tailVertical);
+
+    // Cockpit
+    const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), glassMat);
+    cockpit.position.set(0.8, 0.2, 0);
+    cockpit.scale.set(1, 1, 0.6);
+    group.add(cockpit);
+
+    // Propeller
+    const propGroup = new THREE.Group();
+    const prop = new THREE.Mesh(
+        new THREE.BoxGeometry(0.8, 0.02, 0.1),
+        new THREE.MeshStandardMaterial({ color: 0x222222 })
+    );
+    prop.position.x = 1.4;
+    propGroup.add(prop);
+    const prop2 = prop.clone();
+    prop2.rotation.y = Math.PI / 2;
+    propGroup.add(prop2);
+    group.add(propGroup);
+    group.userData.propeller = propGroup;
+
+    // Landing gear
+    for (let side of [-1, 1]) {
+        const gear = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.02, 0.03, 0.2, 4),
+            new THREE.MeshStandardMaterial({ color: 0x222222 })
+        );
+        gear.position.set(side * 0.4, -0.2, -0.1);
+        group.add(gear);
+    }
+
+    return group;
+}
+
+function create3DUnit(name, type, x, z, friendly = true) {
+    const group = new THREE.Group();
+    const color = friendly ? 0x447744 : 0x884444;
+    const accent = friendly ? 0x66aa66 : 0xaa6666;
+
+    let model;
+    switch(type) {
+        case 'TANK':
+            model = create3DTank(color, friendly);
+            break;
+        case 'ARTILLERY':
+            model = create3DArtillery(color, friendly);
+            break;
+        case 'AIR':
+            model = create3DAircraft(color, friendly);
+            break;
+        default:
+            model = create3DInfantry(color, friendly);
+    }
+    group.add(model);
+
+    // HP Bar
+    const hpBar = new THREE.Group();
+    const bg = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.8, 0.15),
+        new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 })
+    );
+    bg.position.y = 0;
+    hpBar.add(bg);
+    
+    const hpFill = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.7, 0.1),
+        new THREE.MeshBasicMaterial({ color: 0x55dd55 })
+    );
+    hpFill.position.y = 0;
+    hpBar.add(hpFill);
+    hpBar.position.y = type === 'AIR' ? 9.5 : 3.0;
+    group.add(hpBar);
+    group.userData.hpBar = hpBar;
+    group.userData.hpFill = hpFill;
+
+    // Country flag marker
+    const flagDiv = document.createElement('div');
+    flagDiv.textContent = friendly ? '🟢' : '🔴';
+    flagDiv.style.fontSize = '14px';
+    flagDiv.style.textShadow = '0 0 10px rgba(0,0,0,0.8)';
+    const flagLabel = new CSS2DObject(flagDiv);
+    flagLabel.position.set(0, type === 'AIR' ? 11 : 4.5, 0);
+    group.add(flagLabel);
+    group.userData.flagLabel = flagLabel;
+
+    group.position.set(x, type === 'AIR' ? 8 : 0, z);
     group.castShadow = true;
     unitGroup.add(group);
 
@@ -416,44 +749,59 @@ function createUnit(name, type, x, z, friendly = true) {
         friendly,
         object: group,
         hp: 100,
-        organization: type === "AIR" ? 88 : 100,
-        morale: type === "TANK" ? 82 : 85,
-        strength: type === "TANK" ? 85 : type === "AIR" ? 75 : 70,
+        maxHp: 100,
+        organization: type === 'AIR' ? 88 : 100,
+        maxOrganization: type === 'AIR' ? 88 : 100,
+        morale: type === 'TANK' ? 82 : 85,
+        strength: type === 'TANK' ? 85 : type === 'AIR' ? 75 : 70,
+        maxStrength: type === 'TANK' ? 85 : type === 'AIR' ? 75 : 70,
         readiness: 96,
         supply: 92,
-        attack: type === "TANK" ? 24 : type === "AIR" ? 30 : 16,
-        defense: type === "TANK" ? 20 : 17,
-        speed: type === "TANK" ? 18 : type === "AIR" ? 35 : 12,
+        attack: type === 'TANK' ? 24 : type === 'ARTILLERY' ? 28 : type === 'AIR' ? 30 : 16,
+        defense: type === 'TANK' ? 20 : type === 'ARTILLERY' ? 12 : 17,
+        speed: type === 'TANK' ? 18 : type === 'ARTILLERY' ? 8 : type === 'AIR' ? 35 : 12,
         state: "READY",
         destination: null,
         kills: 0,
         experience: 0,
         entrenchment: 0,
-        selected: false,
-        maxHp: 100,
-        maxOrganization: type === "AIR" ? 88 : 100,
-        maxStrength: type === "TANK" ? 85 : type === "AIR" ? 75 : 70
+        selected: false
     };
 
     group.userData.unit = unit;
     units.push(unit);
+    updateUnitHPBar(unit);
     return unit;
+}
+
+function updateUnitHPBar(unit) {
+    if (!unit || !unit.object.userData.hpFill) return;
+    const hpPercent = Math.max(0, unit.hp / unit.maxHp);
+    const fill = unit.object.userData.hpFill;
+    fill.scale.x = hpPercent;
+    fill.material.color.setHex(hpPercent > 0.6 ? 0x55dd55 : hpPercent > 0.3 ? 0xdddd55 : 0xdd5555);
 }
 
 function deployInitialForces() {
     units.length = 0;
-    createUnit("1st Armored Division", "TANK", -30, 12);
-    createUnit("2nd Infantry Division", "INFANTRY", -18, 20);
-    createUnit("3rd Infantry Division", "INFANTRY", -5, 28);
-    createUnit("Air Wing Alpha", "AIR", 15, 12);
-    createUnit("Enemy Armor Group", "TANK", 45, -20, false);
-    createUnit("Enemy Infantry Corps", "INFANTRY", 35, -5, false);
-    createUnit("Enemy Defense Force", "INFANTRY", 55, 12, false);
-    createUnit("Enemy Air Wing", "AIR", 65, -18, false);
+    
+    // US Forces
+    create3DUnit("1st Armored Division", "TANK", -40, -30, true);
+    create3DUnit("2nd Infantry Division", "INFANTRY", -30, -15, true);
+    create3DUnit("3rd Infantry Division", "INFANTRY", -20, -40, true);
+    create3DUnit("US Artillery Battery", "ARTILLERY", -50, -20, true);
+    create3DUnit("Air Wing Alpha", "AIR", -10, -30, true);
+    
+    // German Forces (Enemy)
+    create3DUnit("Enemy Armor Group", "TANK", 30, 20, false);
+    create3DUnit("Enemy Infantry Corps", "INFANTRY", 20, 35, false);
+    create3DUnit("Enemy Defense Force", "INFANTRY", 40, 10, false);
+    create3DUnit("Enemy Artillery", "ARTILLERY", 45, 30, false);
+    create3DUnit("Enemy Air Wing", "AIR", 25, 5, false);
 }
 
 /* =========================================================
-   SELECTION / COMMAND
+   SELECTION / COMMAND (Updated)
    ========================================================== */
 
 function selectUnit(unit) {
@@ -473,7 +821,7 @@ function selectUnit(unit) {
 function createSelectionVisual(unit) {
     clearSelectionVisual(unit);
     const ring = new THREE.Mesh(
-        new THREE.RingGeometry(3, 3.35, 32),
+        new THREE.RingGeometry(2.5, 3.2, 32),
         new THREE.MeshBasicMaterial({
             color: unit.friendly ? 0xd5ad55 : 0xe45d5d,
             transparent: true,
@@ -482,7 +830,7 @@ function createSelectionVisual(unit) {
         })
     );
     ring.rotation.x = -Math.PI / 2;
-    ring.position.y = unit.type === "AIR" ? -7.7 : 0.05;
+    ring.position.y = unit.type === 'AIR' ? -7.5 : 0.1;
     ring.userData.selectionRing = true;
     unit.object.add(ring);
     unit.selectionRing = ring;
@@ -496,198 +844,21 @@ function clearSelectionVisual(unit) {
     unit.selectionRing = null;
 }
 
-function updateUnitPanel() {
-    if (!selectedUnit) return;
-    const u = selectedUnit;
-    const type = $("selectedUnitType");
-    const name = $("selectedUnitName");
-    const stats = $("unitStats");
-
-    if (type) type.textContent = `${u.type} • ${u.friendly ? "FRIENDLY" : "HOSTILE"}`;
-    if (name) name.textContent = u.name;
-
-    if (stats) {
-        stats.innerHTML =
-            progressRow("Strength", u.strength, u.maxStrength) +
-            progressRow("Organization", u.organization, u.maxOrganization) +
-            progressRow("Morale", u.morale) +
-            progressRow("Readiness", u.readiness) +
-            progressRow("Supply", u.supply) +
-            statRow("State", u.state) +
-            statRow("Experience", Math.round(u.experience)) +
-            statRow("Kills", u.kills);
-    }
-}
-
-function progressRow(label, value, max = 100) {
-    const safe = Math.max(0, Math.min(max, value));
-    const percent = (safe / max) * 100;
-    return `
-        <div class="unit-stat">
-            <span>${label}</span>
-            <div class="progress"><i style="width:${percent}%"></i></div>
-            <b>${Math.round(percent)}%</b>
-        </div>
-    `;
-}
-
-function statRow(label, value) {
-    return `<div class="stat-row"><span>${label}</span><b>${value}</b></div>`;
-}
-
 /* =========================================================
-   WORLD INPUT
+   COMBAT (Updated - Added Artillery support)
    ========================================================== */
-
-const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
-
-function handleWorldClick(event) {
-    if (!renderer) return;
-    const rect = renderer.domElement.getBoundingClientRect();
-    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(pointer, camera);
-
-    const unitHits = raycaster.intersectObjects(unitGroup.children, true);
-    if (unitHits.length) {
-        let object = unitHits[0].object;
-        while (object.parent && !object.userData.unit) {
-            object = object.parent;
-        }
-        const target = object.userData.unit;
-        if (target) {
-            if (attackMode && selectedUnit && target !== selectedUnit && !target.friendly) {
-                executeAttack(selectedUnit, target);
-                attackMode = false;
-                return;
-            }
-            selectUnit(target);
-            return;
-        }
-    }
-
-    if (selectedUnit && moveMode) {
-        const groundHits = raycaster.intersectObject(ground);
-        if (groundHits.length) {
-            const point = groundHits[0].point;
-            setUnitDestination(selectedUnit, point);
-            moveMode = false;
-            toast(`${selectedUnit.name} moving`);
-        }
-    }
-}
-
-function setUnitDestination(unit, point) {
-    if (!unit || unit.state === "DESTROYED") return;
-    unit.destination = new THREE.Vector3(point.x, unit.type === "AIR" ? 8 : 0, point.z);
-    unit.state = "MOVING";
-    unit.entrenchment = 0;
-}
-
-/* =========================================================
-   COMMANDS
-   ========================================================== */
-
-function commandMove() {
-    if (!selectedUnit) { toast("Select a friendly unit first"); return; }
-    if (!selectedUnit.friendly) { toast("Enemy units cannot be commanded"); return; }
-    moveMode = true;
-    attackMode = false;
-    toast("Tap terrain to set destination");
-}
-
-function commandAttack() {
-    if (!selectedUnit) { toast("Select a friendly unit first"); return; }
-    if (!selectedUnit.friendly) { toast("Enemy units cannot be commanded"); return; }
-    attackMode = true;
-    moveMode = false;
-    toast("Tap an enemy unit to attack");
-}
-
-function commandDefend() {
-    if (!selectedUnit) return;
-    selectedUnit.state = "DEFENDING";
-    selectedUnit.entrenchment = Math.min(100, selectedUnit.entrenchment + 25);
-    selectedUnit.organization = Math.min(100, selectedUnit.organization + 5);
-    selectedUnit.morale = Math.min(100, selectedUnit.morale + 4);
-    selectedUnit.destination = null;
-    toast(`${selectedUnit.name} taking defensive position`);
-    updateUnitPanel();
-}
-
-function commandHold() {
-    if (!selectedUnit) return;
-    selectedUnit.state = "HOLDING";
-    selectedUnit.destination = null;
-    toast(`${selectedUnit.name} ordered to hold`);
-    updateUnitPanel();
-}
-
-function commandRetreat() {
-    if (!selectedUnit) return;
-    const u = selectedUnit;
-    const retreatPoint = u.object.position.clone();
-    retreatPoint.x -= u.friendly ? 28 : -28;
-    setUnitDestination(u, retreatPoint);
-    u.state = "RETREATING";
-    u.morale = Math.min(100, u.morale + 3);
-    toast(`${u.name} retreating`);
-    updateUnitPanel();
-}
-
-function commandAirstrike() {
-    if (!selectedUnit) return;
-    if (selectedUnit.type !== "AIR") {
-        toast("Select an air unit");
-        return;
-    }
-    const targets = units.filter(u => !u.friendly && u.state !== "DESTROYED");
-    if (!targets.length) {
-        toast("No enemy targets");
-        return;
-    }
-    let target = targets.sort((a, b) =>
-        selectedUnit.object.position.distanceTo(a.object.position) -
-        selectedUnit.object.position.distanceTo(b.object.position)
-    )[0];
-    if (selectedUnit.object.position.distanceTo(target.object.position) > 100) {
-        toast("Target outside airstrike range");
-        return;
-    }
-    executeAirstrike(selectedUnit, target);
-}
-
-/* =========================================================
-   COMBAT
-   ========================================================== */
-
-function getTerrainModifier(unit) {
-    let modifier = 1;
-    if (unit.state === "DEFENDING") modifier += 0.18 + unit.entrenchment / 500;
-    if (weather === "RAIN") modifier *= 0.9;
-    if (weather === "SNOW") modifier *= 0.78;
-    if (unit.supply < 30) modifier *= 0.72;
-    if (unit.organization < 30) modifier *= 0.75;
-    return modifier;
-}
-
-function getTechAttackBonus(unit) {
-    let bonus = 1;
-    if (unit.type === "INFANTRY" && tech.INFANTRY.completed) bonus *= 1.08;
-    if (unit.type === "TANK" && tech.ARMOR.completed) bonus *= 1.10;
-    if (unit.type === "AIR" && tech.AIR.completed) bonus *= 1.12;
-    if (unit.type === "ARTILLERY" && tech.ARTILLERY.completed) bonus *= 1.08;
-    return bonus;
-}
 
 function executeAttack(attacker, defender) {
     if (!attacker || !defender || defender.state === "DESTROYED") return;
     if (!attacker.friendly) return;
 
     const distance = attacker.object.position.distanceTo(defender.object.position);
-    if (distance > 35 && attacker.type !== "AIR") {
-        toast("Target is too far away");
+    let maxRange = 35;
+    if (attacker.type === 'ARTILLERY') maxRange = 80;
+    if (attacker.type === 'AIR') maxRange = 100;
+    
+    if (distance > maxRange) {
+        toast("Target is out of range");
         return;
     }
     if (attacker.supply < 15) {
@@ -696,8 +867,15 @@ function executeAttack(attacker, defender) {
     }
 
     attacker.supply = Math.max(0, attacker.supply - 6);
-    const attackPower = (attacker.attack * (attacker.strength / 100) * (attacker.organization / 100) *
+    
+    let attackPower = (attacker.attack * (attacker.strength / 100) * (attacker.organization / 100) *
         (attacker.morale / 100) * getTerrainModifier(attacker) * getTechAttackBonus(attacker)) + Math.random() * 8;
+    
+    // Artillery bonus on defense
+    if (attacker.type === 'ARTILLERY' && defender.state === 'DEFENDING') {
+        attackPower *= 1.3;
+    }
+    
     const defensePower = (defender.defense * (defender.strength / 100) * (defender.organization / 100) *
         (defender.morale / 100) * getTerrainModifier(defender)) + Math.random() * 7;
 
@@ -709,8 +887,14 @@ function executeAttack(attacker, defender) {
     defender.morale = Math.max(0, defender.morale - damage * 0.22);
     attacker.organization = Math.max(0, attacker.organization - Math.max(1, damage * 0.12));
     attacker.experience = Math.min(100, attacker.experience + damage * 0.08);
+    
+    updateUnitHPBar(defender);
+    updateUnitHPBar(attacker);
 
     addBattleLog(`${attacker.name} attacked ${defender.name} for ${Math.round(damage)} damage`);
+
+    // Muzzle flash effect
+    createMuzzleFlash(attacker.object.position);
 
     if (defender.hp <= 0 || defender.organization <= 0) {
         destroyUnit(defender, attacker);
@@ -724,215 +908,25 @@ function executeAttack(attacker, defender) {
     updateAllUI();
 }
 
-function executeAirstrike(aircraft, target) {
-    if (aircraft.supply < 20) {
-        toast("Air unit needs supply");
-        return;
-    }
-    aircraft.supply -= 20;
-    let damage = 18 + Math.random() * 18;
-    damage *= aircraft.readiness / 100;
-    damage *= getTechAttackBonus(aircraft);
-    if (weather === "RAIN") damage *= 0.72;
-    if (weather === "SNOW") damage *= 0.55;
-
-    target.hp = Math.max(0, target.hp - damage);
-    target.organization = Math.max(0, target.organization - damage * 0.7);
-    target.morale = Math.max(0, target.morale - damage * 0.35);
-    aircraft.experience = Math.min(100, aircraft.experience + 1);
-    createExplosion(target.object.position);
-    addBattleLog(`Airstrike hit ${target.name} for ${Math.round(damage)} damage`);
-    toast(`Airstrike hit ${target.name}`);
-
-    if (target.hp <= 0 || target.organization <= 0) {
-        destroyUnit(target, aircraft);
-    }
-    updateUnitPanel();
-    updateAllUI();
-}
-
-function destroyUnit(unit, killer = null) {
-    unit.state = "DESTROYED";
-    unit.hp = 0;
-    unit.organization = 0;
-    unit.object.visible = false;
-    if (killer) {
-        killer.kills++;
-        killer.experience = Math.min(100, killer.experience + 8);
-    }
-    createExplosion(unit.object.position);
-    addBattleLog(`${unit.name} destroyed`);
-    toast(`${unit.name} destroyed`);
-    if (selectedUnit === unit) {
-        selectedUnit = null;
-        const panel = $("unitPanel");
-        if (panel) panel.classList.remove("open");
-    }
-}
-
-/* =========================================================
-   EFFECTS
-   ========================================================== */
-
-function createExplosion(position) {
-    const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(1.2, 12, 12),
-        new THREE.MeshBasicMaterial({ color: 0xff6a1f, transparent: true, opacity: 0.95 })
+function createMuzzleFlash(position) {
+    const flash = new THREE.Mesh(
+        new THREE.SphereGeometry(0.8, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffdd44, transparent: true, opacity: 0.8 })
     );
-    mesh.position.copy(position);
-    mesh.position.y += 1;
-    mesh.userData.life = 0.55;
-    fxGroup.add(mesh);
-}
-
-function updateEffects(dt) {
-    for (let i = fxGroup.children.length - 1; i >= 0; i--) {
-        const fx = fxGroup.children[i];
-        fx.userData.life -= dt;
-        fx.scale.multiplyScalar(1 + dt * 5);
-        fx.material.opacity = Math.max(0, fx.userData.life / 0.55);
-        if (fx.userData.life <= 0) {
-            fxGroup.remove(fx);
-            fx.geometry?.dispose();
-            fx.material?.dispose();
-        }
-    }
+    flash.position.copy(position);
+    flash.position.y += 1;
+    flash.userData.life = 0.1;
+    fxGroup.add(flash);
+    
+    setTimeout(() => {
+        fxGroup.remove(flash);
+        flash.geometry.dispose();
+        flash.material.dispose();
+    }, 150);
 }
 
 /* =========================================================
-   MOVEMENT / AI
-   ========================================================== */
-
-function updateUnitMovement(dt) {
-    for (const unit of units) {
-        if (unit.state === "DESTROYED" || !unit.destination) continue;
-        const position = unit.object.position;
-        const target = unit.destination;
-        const distance = position.distanceTo(target);
-        if (distance < 1.5) {
-            unit.destination = null;
-            unit.state = unit.state === "RETREATING" ? "HOLDING" : "HOLDING";
-            unit.entrenchment = Math.min(100, unit.entrenchment + 5);
-            continue;
-        }
-        let movement = unit.speed * dt * 0.045 * speed;
-        if (weather === "RAIN") movement *= 0.82;
-        if (weather === "SNOW") movement *= 0.62;
-        if (unit.supply < 25) movement *= 0.65;
-        const direction = new THREE.Vector3().subVectors(target, position).normalize();
-        position.addScaledVector(direction, movement);
-        if (unit.type === "AIR") position.y = 8;
-        else position.y = 0;
-        unit.entrenchment = Math.max(0, unit.entrenchment - dt * 2);
-    }
-}
-
-function updateSupply(dt) {
-    for (const unit of units) {
-        if (unit.state === "DESTROYED") continue;
-        let consumption = unit.type === "AIR" ? 0.9 : unit.type === "TANK" ? 0.65 : 0.35;
-        if (tech.LOGISTICS.completed) consumption *= 0.9;
-        if (unit.state === "MOVING" || unit.state === "ATTACKING") consumption *= 1.7;
-        unit.supply = Math.max(0, unit.supply - consumption * dt * speed);
-        if (unit.supply < 20) {
-            unit.readiness = Math.max(20, unit.readiness - dt * 1.5);
-            unit.morale = Math.max(20, unit.morale - dt * 0.7);
-        } else {
-            unit.readiness = Math.min(100, unit.readiness + dt * 0.12);
-        }
-    }
-}
-
-function updateRecovery(dt) {
-    for (const unit of units) {
-        if (unit.state === "DESTROYED") continue;
-        if (unit.state === "HOLDING" || unit.state === "DEFENDING") {
-            unit.organization = Math.min(100, unit.organization + dt * (unit.supply > 40 ? 1.2 : 0.35));
-            unit.morale = Math.min(100, unit.morale + dt * 0.35);
-            unit.entrenchment = Math.min(100, unit.entrenchment + dt * 0.8);
-        }
-    }
-}
-
-function enemyAI(dt) {
-    if (paused) return;
-    const enemies = units.filter(u => !u.friendly && u.state !== "DESTROYED");
-    const friends = units.filter(u => u.friendly && u.state !== "DESTROYED");
-    if (!friends.length) return;
-
-    for (const enemy of enemies) {
-        if (enemy.type === "AIR") {
-            enemyAirAI(enemy);
-            continue;
-        }
-        let closest = null;
-        let distance = Infinity;
-        for (const friend of friends) {
-            const d = enemy.object.position.distanceTo(friend.object.position);
-            if (d < distance) { distance = d; closest = friend; }
-        }
-        if (!closest) continue;
-        if (distance <= 28) {
-            enemy.state = "ATTACKING";
-            enemyAICombat(enemy, closest);
-        } else {
-            enemy.destination = closest.object.position.clone();
-            enemy.state = "MOVING";
-        }
-    }
-}
-
-function enemyAirAI(enemy) {
-    const targets = units.filter(u => u.friendly && u.state !== "DESTROYED");
-    if (!targets.length) return;
-    const target = targets.sort((a, b) =>
-        enemy.object.position.distanceTo(a.object.position) -
-        enemy.object.position.distanceTo(b.object.position)
-    )[0];
-    if (enemy.object.position.distanceTo(target.object.position) < 80) {
-        if (Math.random() < 0.03 * speed) {
-            enemyAirstrike(enemy, target);
-        }
-    } else {
-        enemy.destination = new THREE.Vector3(target.object.position.x, 8, target.object.position.z);
-        enemy.state = "MOVING";
-    }
-}
-
-function enemyAICombat(attacker, defender) {
-    if (Math.random() > 0.025 * speed) return;
-    if (attacker.strength <= 0 || attacker.organization <= 0) return;
-
-    const attack = attacker.attack * (attacker.strength / 100) * (attacker.organization / 100);
-    const defense = defender.defense * (defender.organization / 100);
-    let damage = Math.max(2, attack - defense * 0.45 + Math.random() * 5);
-    if (weather === "RAIN") damage *= 0.9;
-    if (weather === "SNOW") damage *= 0.75;
-
-    defender.hp = Math.max(0, defender.hp - damage);
-    defender.organization = Math.max(0, defender.organization - damage * 0.45);
-    defender.morale = Math.max(0, defender.morale - damage * 0.18);
-    createExplosion(defender.object.position);
-
-    if (defender.hp <= 0 || defender.organization <= 0) {
-        destroyUnit(defender, attacker);
-    }
-}
-
-function enemyAirstrike(aircraft, target) {
-    let damage = 10 + Math.random() * 15;
-    if (weather === "RAIN") damage *= 0.7;
-    if (weather === "SNOW") damage *= 0.55;
-    target.hp = Math.max(0, target.hp - damage);
-    target.organization = Math.max(0, target.organization - damage * 0.6);
-    createExplosion(target.object.position);
-    if (target.hp <= 0 || target.organization <= 0) {
-        destroyUnit(target, aircraft);
-    }
-}
-
-/* =========================================================
-   ECONOMY
+   ECONOMY (Updated)
    ========================================================== */
 
 function updateEconomy(dt) {
@@ -959,7 +953,7 @@ function updateEconomy(dt) {
 }
 
 /* =========================================================
-   PRODUCTION
+   PRODUCTION (Updated)
    ========================================================== */
 
 function updateProduction(dt) {
@@ -986,14 +980,14 @@ function applyProductionOutput(type, amount) {
     } else if (type === "TANK") {
         for (const unit of units) {
             if (unit.friendly && unit.type === "TANK" && unit.state !== "DESTROYED") {
-                unit.strength = Math.min(unit.maxStrength || 100, unit.strength + amount * 0.7);
+                unit.strength = Math.min(unit.maxStrength, unit.strength + amount * 0.7);
                 break;
             }
         }
     } else if (type === "ARTILLERY") {
         for (const unit of units) {
             if (unit.friendly && unit.type === "ARTILLERY" && unit.state !== "DESTROYED") {
-                unit.strength = Math.min(unit.maxStrength || 100, unit.strength + amount * 0.7);
+                unit.strength = Math.min(unit.maxStrength, unit.strength + amount * 0.7);
                 break;
             }
         }
@@ -1019,7 +1013,7 @@ function assignFactory(type) {
 }
 
 /* =========================================================
-   RESEARCH
+   RESEARCH (Unchanged)
    ========================================================== */
 
 function updateResearch(dt) {
@@ -1070,7 +1064,7 @@ function applyTechnology(key) {
 }
 
 /* =========================================================
-   DIPLOMACY
+   DIPLOMACY (Unchanged)
    ========================================================== */
 
 function improveDiplomacy(country) {
@@ -1080,8 +1074,8 @@ function improveDiplomacy(country) {
     }
     political -= 15;
     diplomacy[country] = Math.min(100, diplomacy[country] + 8);
-    addDiplomaticMessage(`Relations improved with ${nation[country][1]}`);
-    toast(`Relations improved with ${nation[country][1]}`);
+    addDiplomaticMessage(`Relations improved with ${nation[country].name}`);
+    toast(`Relations improved with ${nation[country].name}`);
     openPanel("diplomacy");
 }
 
@@ -1090,19 +1084,19 @@ function diplomaticAction(country) {
     if (value <= -50) {
         diplomacy[country] = -100;
         stability = Math.max(0, stability - 2);
-        addDiplomaticMessage(`War declared on ${nation[country][1]}`);
-        toast(`War declared on ${nation[country][1]}`);
+        addDiplomaticMessage(`War declared on ${nation[country].name}`);
+        toast(`War declared on ${nation[country].name}`);
     } else {
         diplomacy[country] = Math.min(100, value + 12);
         political = Math.max(0, political - 8);
-        addDiplomaticMessage(`Diplomatic pact proposed to ${nation[country][1]}`);
-        toast(`Diplomatic pact proposed to ${nation[country][1]}`);
+        addDiplomaticMessage(`Diplomatic pact proposed to ${nation[country].name}`);
+        toast(`Diplomatic pact proposed to ${nation[country].name}`);
     }
     openPanel("diplomacy");
 }
 
 /* =========================================================
-   INTELLIGENCE
+   INTELLIGENCE (Unchanged)
    ========================================================== */
 
 function runRecon() {
@@ -1153,7 +1147,7 @@ function changeWeather() {
     else if (weather === "RAIN") weather = "SNOW";
     else weather = "CLEAR";
     if (ground) {
-        ground.material.color.setHex(weather === "SNOW" ? 0x8a9a9a : mapColors[mapLayer]);
+        ground.material.color.setHex(weather === "SNOW" ? 0x8a9a9a : 0x52634d);
     }
     toast(`Weather: ${weather}`);
 }
@@ -1244,6 +1238,212 @@ function loadCampaign() {
 }
 
 /* =========================================================
+   MOVEMENT / AI (Updated with HP bar updates)
+   ========================================================== */
+
+function updateUnitMovement(dt) {
+    for (const unit of units) {
+        if (unit.state === "DESTROYED" || !unit.destination) continue;
+        const position = unit.object.position;
+        const target = unit.destination;
+        const distance = position.distanceTo(target);
+        if (distance < 1.5) {
+            unit.destination = null;
+            unit.state = unit.state === "RETREATING" ? "HOLDING" : "HOLDING";
+            unit.entrenchment = Math.min(100, unit.entrenchment + 5);
+            continue;
+        }
+        let movement = unit.speed * dt * 0.045 * speed;
+        if (weather === "RAIN") movement *= 0.82;
+        if (weather === "SNOW") movement *= 0.62;
+        if (unit.supply < 25) movement *= 0.65;
+        const direction = new THREE.Vector3().subVectors(target, position).normalize();
+        position.addScaledVector(direction, movement);
+        if (unit.type === "AIR") position.y = 8;
+        else position.y = 0;
+        unit.entrenchment = Math.max(0, unit.entrenchment - dt * 2);
+    }
+}
+
+function updateSupply(dt) {
+    for (const unit of units) {
+        if (unit.state === "DESTROYED") continue;
+        let consumption = unit.type === "AIR" ? 0.9 : unit.type === "TANK" ? 0.65 : 0.35;
+        if (unit.type === "ARTILLERY") consumption = 0.5;
+        if (tech.LOGISTICS.completed) consumption *= 0.9;
+        if (unit.state === "MOVING" || unit.state === "ATTACKING") consumption *= 1.7;
+        unit.supply = Math.max(0, unit.supply - consumption * dt * speed);
+        if (unit.supply < 20) {
+            unit.readiness = Math.max(20, unit.readiness - dt * 1.5);
+            unit.morale = Math.max(20, unit.morale - dt * 0.7);
+        } else {
+            unit.readiness = Math.min(100, unit.readiness + dt * 0.12);
+        }
+    }
+}
+
+function updateRecovery(dt) {
+    for (const unit of units) {
+        if (unit.state === "DESTROYED") continue;
+        if (unit.state === "HOLDING" || unit.state === "DEFENDING") {
+            unit.organization = Math.min(100, unit.organization + dt * (unit.supply > 40 ? 1.2 : 0.35));
+            unit.morale = Math.min(100, unit.morale + dt * 0.35);
+            unit.entrenchment = Math.min(100, unit.entrenchment + dt * 0.8);
+        }
+    }
+}
+
+function enemyAI(dt) {
+    if (paused) return;
+    const enemies = units.filter(u => !u.friendly && u.state !== "DESTROYED");
+    const friends = units.filter(u => u.friendly && u.state !== "DESTROYED");
+    if (!friends.length) return;
+
+    for (const enemy of enemies) {
+        if (enemy.type === "AIR") {
+            enemyAirAI(enemy);
+            continue;
+        }
+        let closest = null;
+        let distance = Infinity;
+        for (const friend of friends) {
+            const d = enemy.object.position.distanceTo(friend.object.position);
+            if (d < distance) { distance = d; closest = friend; }
+        }
+        if (!closest) continue;
+        let attackRange = 28;
+        if (enemy.type === "ARTILLERY") attackRange = 60;
+        
+        if (distance <= attackRange) {
+            enemy.state = "ATTACKING";
+            enemyAICombat(enemy, closest);
+        } else {
+            enemy.destination = closest.object.position.clone();
+            enemy.state = "MOVING";
+        }
+    }
+}
+
+function enemyAirAI(enemy) {
+    const targets = units.filter(u => u.friendly && u.state !== "DESTROYED");
+    if (!targets.length) return;
+    const target = targets.sort((a, b) =>
+        enemy.object.position.distanceTo(a.object.position) -
+        enemy.object.position.distanceTo(b.object.position)
+    )[0];
+    if (enemy.object.position.distanceTo(target.object.position) < 80) {
+        if (Math.random() < 0.03 * speed) {
+            enemyAirstrike(enemy, target);
+        }
+    } else {
+        enemy.destination = new THREE.Vector3(target.object.position.x, 8, target.object.position.z);
+        enemy.state = "MOVING";
+    }
+}
+
+function enemyAICombat(attacker, defender) {
+    if (Math.random() > 0.025 * speed) return;
+    if (attacker.strength <= 0 || attacker.organization <= 0) return;
+
+    let attack = attacker.attack * (attacker.strength / 100) * (attacker.organization / 100);
+    if (attacker.type === "ARTILLERY" && defender.state === "DEFENDING") {
+        attack *= 1.3;
+    }
+    const defense = defender.defense * (defender.organization / 100);
+    let damage = Math.max(2, attack - defense * 0.45 + Math.random() * 5);
+    if (weather === "RAIN") damage *= 0.9;
+    if (weather === "SNOW") damage *= 0.75;
+
+    defender.hp = Math.max(0, defender.hp - damage);
+    defender.organization = Math.max(0, defender.organization - damage * 0.45);
+    defender.morale = Math.max(0, defender.morale - damage * 0.18);
+    createExplosion(defender.object.position);
+    updateUnitHPBar(defender);
+
+    if (defender.hp <= 0 || defender.organization <= 0) {
+        destroyUnit(defender, attacker);
+    }
+}
+
+function enemyAirstrike(aircraft, target) {
+    let damage = 10 + Math.random() * 15;
+    if (weather === "RAIN") damage *= 0.7;
+    if (weather === "SNOW") damage *= 0.55;
+    target.hp = Math.max(0, target.hp - damage);
+    target.organization = Math.max(0, target.organization - damage * 0.6);
+    createExplosion(target.object.position);
+    updateUnitHPBar(target);
+    if (target.hp <= 0 || target.organization <= 0) {
+        destroyUnit(target, aircraft);
+    }
+}
+
+function destroyUnit(unit, killer = null) {
+    unit.state = "DESTROYED";
+    unit.hp = 0;
+    unit.organization = 0;
+    unit.object.visible = false;
+    if (killer) {
+        killer.kills++;
+        killer.experience = Math.min(100, killer.experience + 8);
+    }
+    createExplosion(unit.object.position);
+    addBattleLog(`${unit.name} destroyed`);
+    toast(`${unit.name} destroyed`);
+    if (selectedUnit === unit) {
+        selectedUnit = null;
+        const panel = $("unitPanel");
+        if (panel) panel.classList.remove("open");
+    }
+}
+
+/* =========================================================
+   EFFECTS
+   ========================================================== */
+
+function createExplosion(position) {
+    const count = 8;
+    for (let i = 0; i < count; i++) {
+        const mesh = new THREE.Mesh(
+            new THREE.SphereGeometry(0.3 + Math.random() * 0.5, 6, 6),
+            new THREE.MeshBasicMaterial({
+                color: new THREE.Color().setHSL(0.08 + Math.random() * 0.08, 1, 0.5 + Math.random() * 0.3),
+                transparent: true,
+                opacity: 0.9
+            })
+        );
+        mesh.position.copy(position);
+        mesh.position.y += 0.5 + Math.random() * 1;
+        const dir = new THREE.Vector3(
+            (Math.random() - 0.5) * 2,
+            Math.random() * 2,
+            (Math.random() - 0.5) * 2
+        ).normalize();
+        mesh.userData = {
+            life: 0.4 + Math.random() * 0.3,
+            velocity: dir.multiplyScalar(2 + Math.random() * 4)
+        };
+        fxGroup.add(mesh);
+    }
+}
+
+function updateEffects(dt) {
+    for (let i = fxGroup.children.length - 1; i >= 0; i--) {
+        const fx = fxGroup.children[i];
+        fx.userData.life -= dt;
+        fx.position.add(fx.userData.velocity.clone().multiplyScalar(dt));
+        fx.userData.velocity.multiplyScalar(0.98);
+        fx.scale.multiplyScalar(1 + dt * 0.5);
+        fx.material.opacity = Math.max(0, fx.userData.life / 0.5);
+        if (fx.userData.life <= 0) {
+            fxGroup.remove(fx);
+            fx.geometry?.dispose();
+            fx.material?.dispose();
+        }
+    }
+}
+
+/* =========================================================
    PANELS
    ========================================================== */
 
@@ -1301,7 +1501,7 @@ const panels = {
             return infoCard("Available Forces",
                 friendly.map(u => `
                     <button class="action-btn select-unit" data-id="${u.id}" style="text-align:left">
-                        ${u.type === "TANK" ? "🛡️" : u.type === "AIR" ? "✈️" : "🪖"}
+                        ${u.type === "TANK" ? "🛡️" : u.type === "ARTILLERY" ? "💥" : u.type === "AIR" ? "✈️" : "🪖"}
                         ${u.name} — ${u.state}
                     </button>
                 `).join("")
@@ -1382,7 +1582,7 @@ const panels = {
             infoCard("International Relations",
                 Object.entries(diplomacy).map(([key, value]) =>
                     `<div>
-                        ${statRow(`${nation[key]?.[0] || '🏳️'} ${nation[key]?.[1] || key}`, value)}
+                        ${statRow(`${nation[key]?.flag || '🏳️'} ${nation[key]?.name || key}`, value)}
                         ${actionButton(`dip-${key}`, "IMPROVE RELATIONS")}
                         ${actionButton(`diplomatic-${key}`, value < -50 ? "DECLARE WAR" : "PROPOSE PACT")}
                     </div>`
@@ -1413,11 +1613,10 @@ const panels = {
 };
 
 /* =========================================================
-   UI SETUP
+   UI SETUP (Unchanged)
    ========================================================== */
 
 function setupUI() {
-    // Panel buttons
     document.querySelectorAll('.panel-button').forEach(btn => {
         btn.addEventListener('click', () => {
             const panel = btn.dataset.panel;
@@ -1429,7 +1628,6 @@ function setupUI() {
         });
     });
 
-    // Close panel
     const closePanel = $("closePanel");
     if (closePanel) {
         closePanel.addEventListener('click', () => {
@@ -1438,7 +1636,6 @@ function setupUI() {
         });
     }
 
-    // Close unit panel
     const closeUnit = $("closeUnit");
     if (closeUnit) {
         closeUnit.addEventListener('click', () => {
@@ -1452,26 +1649,19 @@ function setupUI() {
         });
     }
 
-    // Command buttons
     const moveBtn = $("moveCommand");
     if (moveBtn) moveBtn.addEventListener('click', commandMove);
-    
     const attackBtn = $("attackCommand");
     if (attackBtn) attackBtn.addEventListener('click', commandAttack);
-    
     const defendBtn = $("defendCommand");
     if (defendBtn) defendBtn.addEventListener('click', commandDefend);
-    
     const holdBtn = $("holdCommand");
     if (holdBtn) holdBtn.addEventListener('click', commandHold);
-    
     const retreatBtn = $("retreatCommand");
     if (retreatBtn) retreatBtn.addEventListener('click', commandRetreat);
-    
     const airstrikeBtn = $("airstrikeCommand");
     if (airstrikeBtn) airstrikeBtn.addEventListener('click', commandAirstrike);
 
-    // Camera controls
     const zoomIn = $("zoomIn");
     if (zoomIn) {
         zoomIn.addEventListener('click', () => {
@@ -1480,7 +1670,6 @@ function setupUI() {
             controls.update();
         });
     }
-    
     const zoomOut = $("zoomOut");
     if (zoomOut) {
         zoomOut.addEventListener('click', () => {
@@ -1489,17 +1678,15 @@ function setupUI() {
             controls.update();
         });
     }
-    
     const resetCam = $("resetCamera");
     if (resetCam) {
         resetCam.addEventListener('click', () => {
-            camera.position.set(0, 82, 86);
+            camera.position.set(60, 70, 90);
             controls.target.set(0, 0, 0);
             controls.update();
         });
     }
 
-    // Pause/Speed
     const pauseBtn = $("pauseBtn");
     if (pauseBtn) {
         pauseBtn.addEventListener('click', () => {
@@ -1508,7 +1695,6 @@ function setupUI() {
             toast(paused ? "Game paused" : "Game resumed");
         });
     }
-    
     const speedBtn = $("speedBtn");
     if (speedBtn) {
         speedBtn.addEventListener('click', () => {
@@ -1518,21 +1704,19 @@ function setupUI() {
         });
     }
 
-    // Country select
     document.querySelectorAll('.country-card').forEach(card => {
         card.addEventListener('click', () => {
             currentCountry = card.dataset.country;
-            const [flag, name] = nation[currentCountry] || ["🏳️", currentCountry];
+            const data = nation[currentCountry] || { flag: "🏳️", name: currentCountry };
             const flagEl = $("countryFlag");
             const nameEl = $("countryName");
-            if (flagEl) flagEl.textContent = flag;
-            if (nameEl) nameEl.textContent = name;
+            if (flagEl) flagEl.textContent = data.flag;
+            if (nameEl) nameEl.textContent = data.name;
             const modal = $("countryModal");
             if (modal) modal.classList.remove('open');
-            toast(`Switched to ${name}`);
+            toast(`Switched to ${data.name}`);
         });
     });
-    
     const closeCountry = $("closeCountryModal");
     if (closeCountry) {
         closeCountry.addEventListener('click', () => {
@@ -1541,7 +1725,6 @@ function setupUI() {
         });
     }
 
-    // Tutorial
     let tutorialStep = 0;
     const tutorialData = [
         { title: "Welcome, Commander", text: "Select a military unit and command it across the battlefield." },
@@ -1549,7 +1732,6 @@ function setupUI() {
         { title: "Combat", text: "Select a unit, click 'ATTACK', then tap an enemy unit to engage." },
         { title: "Strategy", text: "Use the left panel to manage economy, production, research, and diplomacy." }
     ];
-    
     const tutorialNext = $("tutorialNext");
     if (tutorialNext) {
         tutorialNext.addEventListener('click', () => {
@@ -1568,7 +1750,6 @@ function setupUI() {
         });
     }
 
-    // Panel content event delegation
     const panelContent = $("panelContent");
     if (panelContent) {
         panelContent.addEventListener('click', (e) => {
@@ -1632,7 +1813,7 @@ function setupUI() {
                     money -= p.cost;
                     steel -= p.steel;
                     const pos = new THREE.Vector3((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40);
-                    createUnit(`New ${p.name} Unit`, type, pos.x, pos.z);
+                    create3DUnit(`New ${p.name} Unit`, type, pos.x, pos.z);
                     toast(`${p.name} unit deployed`);
                     openPanel("production");
                     updateAllUI();
@@ -1741,6 +1922,183 @@ function toast(message) {
 }
 
 /* =========================================================
+   COMMAND FUNCTIONS
+   ========================================================== */
+
+function commandMove() {
+    if (!selectedUnit) { toast("Select a friendly unit first"); return; }
+    if (!selectedUnit.friendly) { toast("Enemy units cannot be commanded"); return; }
+    moveMode = true;
+    attackMode = false;
+    toast("Tap terrain to set destination");
+}
+
+function commandAttack() {
+    if (!selectedUnit) { toast("Select a friendly unit first"); return; }
+    if (!selectedUnit.friendly) { toast("Enemy units cannot be commanded"); return; }
+    attackMode = true;
+    moveMode = false;
+    toast("Tap an enemy unit to attack");
+}
+
+function commandDefend() {
+    if (!selectedUnit) return;
+    selectedUnit.state = "DEFENDING";
+    selectedUnit.entrenchment = Math.min(100, selectedUnit.entrenchment + 25);
+    selectedUnit.organization = Math.min(100, selectedUnit.organization + 5);
+    selectedUnit.morale = Math.min(100, selectedUnit.morale + 4);
+    selectedUnit.destination = null;
+    toast(`${selectedUnit.name} taking defensive position`);
+    updateUnitPanel();
+}
+
+function commandHold() {
+    if (!selectedUnit) return;
+    selectedUnit.state = "HOLDING";
+    selectedUnit.destination = null;
+    toast(`${selectedUnit.name} ordered to hold`);
+    updateUnitPanel();
+}
+
+function commandRetreat() {
+    if (!selectedUnit) return;
+    const u = selectedUnit;
+    const retreatPoint = u.object.position.clone();
+    retreatPoint.x -= u.friendly ? 28 : -28;
+    setUnitDestination(u, retreatPoint);
+    u.state = "RETREATING";
+    u.morale = Math.min(100, u.morale + 3);
+    toast(`${u.name} retreating`);
+    updateUnitPanel();
+}
+
+function commandAirstrike() {
+    if (!selectedUnit) return;
+    if (selectedUnit.type !== "AIR") {
+        toast("Select an air unit");
+        return;
+    }
+    const targets = units.filter(u => !u.friendly && u.state !== "DESTROYED");
+    if (!targets.length) {
+        toast("No enemy targets");
+        return;
+    }
+    let target = targets.sort((a, b) =>
+        selectedUnit.object.position.distanceTo(a.object.position) -
+        selectedUnit.object.position.distanceTo(b.object.position)
+    )[0];
+    if (selectedUnit.object.position.distanceTo(target.object.position) > 100) {
+        toast("Target outside airstrike range");
+        return;
+    }
+    executeAirstrike(selectedUnit, target);
+}
+
+function setUnitDestination(unit, point) {
+    if (!unit || unit.state === "DESTROYED") return;
+    unit.destination = new THREE.Vector3(point.x, unit.type === "AIR" ? 8 : 0, point.z);
+    unit.state = "MOVING";
+    unit.entrenchment = 0;
+}
+
+function getTerrainModifier(unit) {
+    let modifier = 1;
+    if (unit.state === "DEFENDING") modifier += 0.18 + unit.entrenchment / 500;
+    if (weather === "RAIN") modifier *= 0.9;
+    if (weather === "SNOW") modifier *= 0.78;
+    if (unit.supply < 30) modifier *= 0.72;
+    if (unit.organization < 30) modifier *= 0.75;
+    return modifier;
+}
+
+function getTechAttackBonus(unit) {
+    let bonus = 1;
+    if (unit.type === "INFANTRY" && tech.INFANTRY.completed) bonus *= 1.08;
+    if (unit.type === "TANK" && tech.ARMOR.completed) bonus *= 1.10;
+    if (unit.type === "AIR" && tech.AIR.completed) bonus *= 1.12;
+    if (unit.type === "ARTILLERY" && tech.ARTILLERY.completed) bonus *= 1.08;
+    return bonus;
+}
+
+function handleWorldClick(event) {
+    if (!renderer) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+
+    const unitHits = raycaster.intersectObjects(unitGroup.children, true);
+    if (unitHits.length) {
+        let object = unitHits[0].object;
+        while (object.parent && !object.userData.unit) {
+            object = object.parent;
+        }
+        const target = object.userData.unit;
+        if (target) {
+            if (attackMode && selectedUnit && target !== selectedUnit && !target.friendly) {
+                executeAttack(selectedUnit, target);
+                attackMode = false;
+                return;
+            }
+            selectUnit(target);
+            return;
+        }
+    }
+
+    if (selectedUnit && moveMode) {
+        const groundHits = raycaster.intersectObject(ground);
+        if (groundHits.length) {
+            const point = groundHits[0].point;
+            setUnitDestination(selectedUnit, point);
+            moveMode = false;
+            toast(`${selectedUnit.name} moving`);
+        }
+    }
+}
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function updateUnitPanel() {
+    if (!selectedUnit) return;
+    const u = selectedUnit;
+    const type = $("selectedUnitType");
+    const name = $("selectedUnitName");
+    const stats = $("unitStats");
+
+    if (type) type.textContent = `${u.type} • ${u.friendly ? "FRIENDLY" : "HOSTILE"}`;
+    if (name) name.textContent = u.name;
+
+    if (stats) {
+        stats.innerHTML =
+            progressRow("Strength", u.strength, u.maxStrength) +
+            progressRow("Organization", u.organization, u.maxOrganization) +
+            progressRow("Morale", u.morale) +
+            progressRow("Readiness", u.readiness) +
+            progressRow("Supply", u.supply) +
+            statRow("State", u.state) +
+            statRow("Experience", Math.round(u.experience)) +
+            statRow("Kills", u.kills);
+    }
+}
+
+function progressRow(label, value, max = 100) {
+    const safe = Math.max(0, Math.min(max, value));
+    const percent = (safe / max) * 100;
+    return `
+        <div class="unit-stat">
+            <span>${label}</span>
+            <div class="progress"><i style="width:${percent}%"></i></div>
+            <b>${Math.round(percent)}%</b>
+        </div>
+    `;
+}
+
+function statRow(label, value) {
+    return `<div class="stat-row"><span>${label}</span><b>${value}</b></div>`;
+}
+
+/* =========================================================
    GAME LOOP
    ========================================================== */
 
@@ -1774,6 +2132,20 @@ function loop() {
         enemyAI(dt);
         updateEffects(dt);
 
+        // Update HP bars for all units
+        for (const unit of units) {
+            if (unit.state !== "DESTROYED") {
+                updateUnitHPBar(unit);
+            }
+        }
+
+        // Propeller animation
+        for (const unit of units) {
+            if (unit.type === "AIR" && unit.object.userData.propeller) {
+                unit.object.userData.propeller.rotation.x += dt * 30 * speed;
+            }
+        }
+
         autosaveTimer += dt;
         if (autosaveTimer >= 30) {
             autosaveTimer = 0;
@@ -1786,11 +2158,13 @@ function loop() {
         if (selectedUnit && selectedUnit.selectionRing) {
             const ring = selectedUnit.selectionRing;
             ring.material.opacity = 0.6 + Math.sin(Date.now() * 0.003) * 0.3;
+            ring.scale.setScalar(1 + Math.sin(Date.now() * 0.002) * 0.05);
         }
     }
 
     controls.update();
     renderer.render(scene, camera);
+    if (labelRenderer) labelRenderer.render(scene, camera);
 }
 
 // Start the game
