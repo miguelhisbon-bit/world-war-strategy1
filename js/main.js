@@ -2,8 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 /* =========================================================
-   WORLD WAR — V4 (UPDATED)
-   HTML/CSS compatible build
+   WORLD WAR — V4 (FIXED)
    ========================================================== */
 
 const $ = id => document.getElementById(id);
@@ -195,11 +194,11 @@ async function init() {
     updateAllUI();
     loading(100, "Battlefield ready.");
     
-    // Auto-save after load
     autosave();
 
     setTimeout(() => {
-        $("loadingScreen")?.classList.add("hidden");
+        const loadingScreen = $("loadingScreen");
+        if (loadingScreen) loadingScreen.classList.add("hidden");
     }, 650);
 
     requestAnimationFrame(loop);
@@ -218,9 +217,11 @@ function loading(progress, text) {
 
 function setup3D() {
     const canvas = $("gameCanvas");
+    if (!canvas) return;
+
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x071015);
-    scene.fog = new THREE.Fog(0x071015, 80, 350); // Reduced for performance
+    scene.fog = new THREE.Fog(0x071015, 80, 350);
 
     camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 1000);
     camera.position.set(0, 82, 86);
@@ -230,7 +231,7 @@ function setup3D() {
         antialias: true,
         powerPreference: "high-performance"
     });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); // Capped for performance
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     renderer.setSize(innerWidth, innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -269,7 +270,7 @@ function resizeRenderer() {
 }
 
 /* =========================================================
-   TERRAIN (UPDATED - Fixed Line Creation)
+   TERRAIN
    ========================================================== */
 
 function createTerrain() {
@@ -307,7 +308,7 @@ function createTerrain() {
     scene.add(water);
 
     createMountains();
-    createForest(); // Reduced count inside
+    createForest();
     createFrontLines();
 }
 
@@ -324,8 +325,7 @@ function createMountains() {
 }
 
 function createForest() {
-    const count = 100; // Reduced from 150 for performance
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < 100; i++) {
         const tree = new THREE.Group();
         const trunk = new THREE.Mesh(
             new THREE.CylinderGeometry(0.12, 0.18, 1.3, 5),
@@ -345,7 +345,6 @@ function createForest() {
 }
 
 function createFrontLines() {
-    // Fixed: Removed duplicate last point
     createLine(0xb0a66f, [
         [-150, -90], [-70, -125], [10, -100], [60, -60], [-10, -20]
     ]);
@@ -370,7 +369,7 @@ function createLine(color, points) {
 }
 
 /* =========================================================
-   UNIT SYSTEM (UPDATED - Added reinforcement)
+   UNIT SYSTEM
    ========================================================== */
 
 function createUnit(name, type, x, z, friendly = true) {
@@ -467,7 +466,8 @@ function selectUnit(unit) {
     unit.selected = true;
     createSelectionVisual(unit);
     updateUnitPanel();
-    $("unitPanel")?.classList.add("open");
+    const panel = $("unitPanel");
+    if (panel) panel.classList.add("open");
 }
 
 function createSelectionVisual(unit) {
@@ -659,7 +659,7 @@ function commandAirstrike() {
 }
 
 /* =========================================================
-   COMBAT (UPDATED - Fixed error handling)
+   COMBAT
    ========================================================== */
 
 function getTerrainModifier(unit) {
@@ -765,12 +765,13 @@ function destroyUnit(unit, killer = null) {
     toast(`${unit.name} destroyed`);
     if (selectedUnit === unit) {
         selectedUnit = null;
-        $("unitPanel")?.classList.remove("open");
+        const panel = $("unitPanel");
+        if (panel) panel.classList.remove("open");
     }
 }
 
 /* =========================================================
-   EFFECTS (UPDATED - Fixed dispose)
+   EFFECTS
    ========================================================== */
 
 function createExplosion(position) {
@@ -799,7 +800,7 @@ function updateEffects(dt) {
 }
 
 /* =========================================================
-   MOVEMENT / AI (UPDATED - Fixed enemy AI)
+   MOVEMENT / AI
    ========================================================== */
 
 function updateUnitMovement(dt) {
@@ -900,7 +901,6 @@ function enemyAirAI(enemy) {
 
 function enemyAICombat(attacker, defender) {
     if (Math.random() > 0.025 * speed) return;
-    // Fixed: Check attacker strength to avoid NaN
     if (attacker.strength <= 0 || attacker.organization <= 0) return;
 
     const attack = attacker.attack * (attacker.strength / 100) * (attacker.organization / 100);
@@ -932,7 +932,7 @@ function enemyAirstrike(aircraft, target) {
 }
 
 /* =========================================================
-   ECONOMY (UPDATED)
+   ECONOMY
    ========================================================== */
 
 function updateEconomy(dt) {
@@ -959,7 +959,7 @@ function updateEconomy(dt) {
 }
 
 /* =========================================================
-   PRODUCTION (UPDATED - Fixed ARTILLERY missing)
+   PRODUCTION
    ========================================================== */
 
 function updateProduction(dt) {
@@ -991,7 +991,6 @@ function applyProductionOutput(type, amount) {
             }
         }
     } else if (type === "ARTILLERY") {
-        // Find a friendly artillery unit or just add to manpower
         for (const unit of units) {
             if (unit.friendly && unit.type === "ARTILLERY" && unit.state !== "DESTROYED") {
                 unit.strength = Math.min(unit.maxStrength || 100, unit.strength + amount * 0.7);
@@ -1071,7 +1070,7 @@ function applyTechnology(key) {
 }
 
 /* =========================================================
-   DIPLOMACY (UPDATED - Added missing countries)
+   DIPLOMACY
    ========================================================== */
 
 function improveDiplomacy(country) {
@@ -1153,7 +1152,6 @@ function changeWeather() {
     if (weather === "CLEAR") weather = "RAIN";
     else if (weather === "RAIN") weather = "SNOW";
     else weather = "CLEAR";
-    // Visual effect on ground
     if (ground) {
         ground.material.color.setHex(weather === "SNOW" ? 0x8a9a9a : mapColors[mapLayer]);
     }
@@ -1169,7 +1167,7 @@ function setMapLayer(layer) {
 }
 
 /* =========================================================
-   BATTLE LOG & DIPLOMATIC MESSAGES (NEW)
+   BATTLE LOG & DIPLOMATIC MESSAGES
    ========================================================== */
 
 function addBattleLog(message) {
@@ -1183,7 +1181,7 @@ function addDiplomaticMessage(message) {
 }
 
 /* =========================================================
-   AUTO-SAVE (NEW)
+   AUTO-SAVE
    ========================================================== */
 
 function autosave() {
@@ -1233,7 +1231,6 @@ function loadCampaign() {
         if (data.year) year = data.year;
         if (data.month) month = data.month;
         if (data.day) day = data.day;
-        // Load units positions
         if (data.units) {
             for (let i = 0; i < data.units.length && i < units.length; i++) {
                 const d = data.units[i];
@@ -1247,7 +1244,7 @@ function loadCampaign() {
 }
 
 /* =========================================================
-   PANELS (UPDATED - Added new features)
+   PANELS
    ========================================================== */
 
 function averageStat(key) {
@@ -1416,7 +1413,7 @@ const panels = {
 };
 
 /* =========================================================
-   UI SETUP (UPDATED - Added event listeners)
+   UI SETUP
    ========================================================== */
 
 function setupUI() {
@@ -1433,73 +1430,116 @@ function setupUI() {
     });
 
     // Close panel
-    $("closePanel")?.addEventListener('click', () => {
-        $("mainPanel")?.classList.remove('open');
-    });
+    const closePanel = $("closePanel");
+    if (closePanel) {
+        closePanel.addEventListener('click', () => {
+            const mainPanel = $("mainPanel");
+            if (mainPanel) mainPanel.classList.remove('open');
+        });
+    }
 
     // Close unit panel
-    $("closeUnit")?.addEventListener('click', () => {
-        $("unitPanel")?.classList.remove('open');
-        if (selectedUnit) {
-            selectedUnit.selected = false;
-            clearSelectionVisual(selectedUnit);
-            selectedUnit = null;
-        }
-    });
+    const closeUnit = $("closeUnit");
+    if (closeUnit) {
+        closeUnit.addEventListener('click', () => {
+            const unitPanel = $("unitPanel");
+            if (unitPanel) unitPanel.classList.remove('open');
+            if (selectedUnit) {
+                selectedUnit.selected = false;
+                clearSelectionVisual(selectedUnit);
+                selectedUnit = null;
+            }
+        });
+    }
 
     // Command buttons
-    $("moveCommand")?.addEventListener('click', commandMove);
-    $("attackCommand")?.addEventListener('click', commandAttack);
-    $("defendCommand")?.addEventListener('click', commandDefend);
-    $("holdCommand")?.addEventListener('click', commandHold);
-    $("retreatCommand")?.addEventListener('click', commandRetreat);
-    $("airstrikeCommand")?.addEventListener('click', commandAirstrike);
+    const moveBtn = $("moveCommand");
+    if (moveBtn) moveBtn.addEventListener('click', commandMove);
+    
+    const attackBtn = $("attackCommand");
+    if (attackBtn) attackBtn.addEventListener('click', commandAttack);
+    
+    const defendBtn = $("defendCommand");
+    if (defendBtn) defendBtn.addEventListener('click', commandDefend);
+    
+    const holdBtn = $("holdCommand");
+    if (holdBtn) holdBtn.addEventListener('click', commandHold);
+    
+    const retreatBtn = $("retreatCommand");
+    if (retreatBtn) retreatBtn.addEventListener('click', commandRetreat);
+    
+    const airstrikeBtn = $("airstrikeCommand");
+    if (airstrikeBtn) airstrikeBtn.addEventListener('click', commandAirstrike);
 
     // Camera controls
-    $("zoomIn")?.addEventListener('click', () => {
-        controls.minDistance = 18;
-        controls.maxDistance = 260;
-        const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
-        camera.position.addScaledVector(dir, -8);
-        controls.update();
-    });
-    $("zoomOut")?.addEventListener('click', () => {
-        const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
-        camera.position.addScaledVector(dir, 8);
-        controls.update();
-    });
-    $("resetCamera")?.addEventListener('click', () => {
-        camera.position.set(0, 82, 86);
-        controls.target.set(0, 0, 0);
-        controls.update();
-    });
+    const zoomIn = $("zoomIn");
+    if (zoomIn) {
+        zoomIn.addEventListener('click', () => {
+            const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+            camera.position.addScaledVector(dir, -8);
+            controls.update();
+        });
+    }
+    
+    const zoomOut = $("zoomOut");
+    if (zoomOut) {
+        zoomOut.addEventListener('click', () => {
+            const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+            camera.position.addScaledVector(dir, 8);
+            controls.update();
+        });
+    }
+    
+    const resetCam = $("resetCamera");
+    if (resetCam) {
+        resetCam.addEventListener('click', () => {
+            camera.position.set(0, 82, 86);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        });
+    }
 
     // Pause/Speed
-    $("pauseBtn")?.addEventListener('click', () => {
-        paused = !paused;
-        $("pauseBtn").textContent = paused ? "▶" : "Ⅱ";
-        toast(paused ? "Game paused" : "Game resumed");
-    });
-    $("speedBtn")?.addEventListener('click', () => {
-        speed = speed === 1 ? 2 : speed === 2 ? 4 : 1;
-        $("speedBtn").textContent = `${speed}×`;
-        toast(`Speed: ${speed}×`);
-    });
+    const pauseBtn = $("pauseBtn");
+    if (pauseBtn) {
+        pauseBtn.addEventListener('click', () => {
+            paused = !paused;
+            pauseBtn.textContent = paused ? "▶" : "Ⅱ";
+            toast(paused ? "Game paused" : "Game resumed");
+        });
+    }
+    
+    const speedBtn = $("speedBtn");
+    if (speedBtn) {
+        speedBtn.addEventListener('click', () => {
+            speed = speed === 1 ? 2 : speed === 2 ? 4 : 1;
+            speedBtn.textContent = `${speed}×`;
+            toast(`Speed: ${speed}×`);
+        });
+    }
 
     // Country select
     document.querySelectorAll('.country-card').forEach(card => {
         card.addEventListener('click', () => {
             currentCountry = card.dataset.country;
             const [flag, name] = nation[currentCountry] || ["🏳️", currentCountry];
-            $("countryFlag").textContent = flag;
-            $("countryName").textContent = name;
-            $("countryModal")?.classList.remove('open');
+            const flagEl = $("countryFlag");
+            const nameEl = $("countryName");
+            if (flagEl) flagEl.textContent = flag;
+            if (nameEl) nameEl.textContent = name;
+            const modal = $("countryModal");
+            if (modal) modal.classList.remove('open');
             toast(`Switched to ${name}`);
         });
     });
-    $("closeCountryModal")?.addEventListener('click', () => {
-        $("countryModal")?.classList.remove('open');
-    });
+    
+    const closeCountry = $("closeCountryModal");
+    if (closeCountry) {
+        closeCountry.addEventListener('click', () => {
+            const modal = $("countryModal");
+            if (modal) modal.classList.remove('open');
+        });
+    }
 
     // Tutorial
     let tutorialStep = 0;
@@ -1509,110 +1549,127 @@ function setupUI() {
         { icon: "⚔️", title: "Combat", text: "Select a unit, click 'ATTACK', then tap an enemy unit to engage." },
         { icon: "📊", title: "Strategy", text: "Use the left panel to manage economy, production, research, and diplomacy." }
     ];
-
-    $("tutorialNext")?.addEventListener('click', () => {
-        tutorialStep++;
-        if (tutorialStep >= tutorialData.length) {
-            $("tutorial").style.display = 'none';
-            return;
-        }
-        const t = tutorialData[tutorialStep];
-        $("tutorialIcon").textContent = t.icon;
-        $("tutorialTitle").textContent = t.title;
-        $("tutorialText").textContent = t.text;
-        $("tutorialNext").textContent = tutorialStep === tutorialData.length - 1 ? "FINISH" : "NEXT";
-    });
-
-    // Panel content event delegation for dynamic buttons
-    $("panelContent")?.addEventListener('click', (e) => {
-        const target = e.target.closest('button');
-        if (!target) return;
-
-        // Layer buttons
-        if (target.dataset.layer) {
-            setMapLayer(target.dataset.layer);
-            openPanel("overview");
-            return;
-        }
-
-        // Select unit buttons
-        if (target.classList.contains('select-unit')) {
-            const id = target.dataset.id;
-            const unit = units.find(u => u.id === id);
-            if (unit) selectUnit(unit);
-            return;
-        }
-
-        // Economy actions
-        if (target.id === 'tax-down') {
-            tax = Math.max(5, tax - 2);
-            toast(`Tax lowered to ${tax}%`);
-            openPanel("economy");
-        }
-        if (target.id === 'tax-up') {
-            tax = Math.min(50, tax + 2);
-            toast(`Tax raised to ${tax}%`);
-            openPanel("economy");
-        }
-        if (target.id === 'invest-industry') {
-            if (money < 1000) { toast("Not enough money"); return; }
-            money -= 1000;
-            construction += 2;
-            toast("Industry investment successful");
-            openPanel("economy");
-        }
-        if (target.id === 'build-factory') {
-            if (construction < 4) { toast("Need 4 construction points"); return; }
-            construction -= 4;
-            factories.military++;
-            toast("Military factory built");
-            openPanel("economy");
-        }
-
-        // Production actions
-        if (target.id.startsWith('factory-')) {
-            const type = target.id.replace('factory-', '');
-            assignFactory(type);
-        }
-        ['buy-tank', 'buy-infantry', 'buy-artillery', 'buy-air'].forEach(id => {
-            if (target.id === id) {
-                const type = id.replace('buy-', '').toUpperCase();
-                const p = production[type];
-                if (!p) return;
-                if (money < p.cost) { toast("Not enough money"); return; }
-                if (steel < p.steel) { toast("Not enough steel"); return; }
-                money -= p.cost;
-                steel -= p.steel;
-                // Add a new unit
-                const pos = new THREE.Vector3((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40);
-                createUnit(`New ${p.name} Unit`, type, pos.x, pos.z);
-                toast(`${p.name} unit deployed`);
-                openPanel("production");
-                updateAllUI();
+    
+    const tutorialNext = $("tutorialNext");
+    if (tutorialNext) {
+        tutorialNext.addEventListener('click', () => {
+            tutorialStep++;
+            if (tutorialStep >= tutorialData.length) {
+                const tutorial = $("tutorial");
+                if (tutorial) tutorial.style.display = 'none';
+                return;
             }
+            const t = tutorialData[tutorialStep];
+            const iconEl = $("tutorialIcon");
+            const titleEl = $("tutorialTitle");
+            const textEl = $("tutorialText");
+            if (iconEl) iconEl.textContent = t.icon;
+            if (titleEl) titleEl.textContent = t.title;
+            if (textEl) textEl.textContent = t.text;
+            tutorialNext.textContent = tutorialStep === tutorialData.length - 1 ? "FINISH" : "NEXT";
         });
+    }
 
-        // Research actions
-        if (target.id.startsWith('research-')) {
-            const key = target.id.replace('research-', '');
-            startResearch(key);
-        }
+    // Panel content event delegation
+    const panelContent = $("panelContent");
+    if (panelContent) {
+        panelContent.addEventListener('click', (e) => {
+            const target = e.target.closest('button');
+            if (!target) return;
 
-        // Diplomacy actions
-        if (target.id.startsWith('dip-')) {
-            const country = target.id.replace('dip-', '');
-            improveDiplomacy(country);
-        }
-        if (target.id.startsWith('diplomatic-')) {
-            const country = target.id.replace('diplomatic-', '');
-            diplomaticAction(country);
-        }
+            // Layer buttons
+            if (target.dataset.layer) {
+                setMapLayer(target.dataset.layer);
+                openPanel("overview");
+                return;
+            }
 
-        // Intel actions
-        if (target.id === 'run-recon') runRecon();
-        if (target.id === 'expand-spy') expandSpyNetwork();
-        if (target.id === 'improve-counter') improveCounterIntel();
-    });
+            // Select unit buttons
+            if (target.classList.contains('select-unit')) {
+                const id = target.dataset.id;
+                const unit = units.find(u => u.id === id);
+                if (unit) selectUnit(unit);
+                return;
+            }
+
+            // Economy actions
+            if (target.id === 'tax-down') {
+                tax = Math.max(5, tax - 2);
+                toast(`Tax lowered to ${tax}%`);
+                openPanel("economy");
+                return;
+            }
+            if (target.id === 'tax-up') {
+                tax = Math.min(50, tax + 2);
+                toast(`Tax raised to ${tax}%`);
+                openPanel("economy");
+                return;
+            }
+            if (target.id === 'invest-industry') {
+                if (money < 1000) { toast("Not enough money"); return; }
+                money -= 1000;
+                construction += 2;
+                toast("Industry investment successful");
+                openPanel("economy");
+                return;
+            }
+            if (target.id === 'build-factory') {
+                if (construction < 4) { toast("Need 4 construction points"); return; }
+                construction -= 4;
+                factories.military++;
+                toast("Military factory built");
+                openPanel("economy");
+                return;
+            }
+
+            // Production actions
+            if (target.id.startsWith('factory-')) {
+                const type = target.id.replace('factory-', '');
+                assignFactory(type);
+                return;
+            }
+            ['buy-tank', 'buy-infantry', 'buy-artillery', 'buy-air'].forEach(id => {
+                if (target.id === id) {
+                    const type = id.replace('buy-', '').toUpperCase();
+                    const p = production[type];
+                    if (!p) return;
+                    if (money < p.cost) { toast("Not enough money"); return; }
+                    if (steel < p.steel) { toast("Not enough steel"); return; }
+                    money -= p.cost;
+                    steel -= p.steel;
+                    const pos = new THREE.Vector3((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40);
+                    createUnit(`New ${p.name} Unit`, type, pos.x, pos.z);
+                    toast(`${p.name} unit deployed`);
+                    openPanel("production");
+                    updateAllUI();
+                }
+            });
+
+            // Research actions
+            if (target.id.startsWith('research-')) {
+                const key = target.id.replace('research-', '');
+                startResearch(key);
+                return;
+            }
+
+            // Diplomacy actions
+            if (target.id.startsWith('dip-')) {
+                const country = target.id.replace('dip-', '');
+                improveDiplomacy(country);
+                return;
+            }
+            if (target.id.startsWith('diplomatic-')) {
+                const country = target.id.replace('diplomatic-', '');
+                diplomaticAction(country);
+                return;
+            }
+
+            // Intel actions
+            if (target.id === 'run-recon') { runRecon(); return; }
+            if (target.id === 'expand-spy') { expandSpyNetwork(); return; }
+            if (target.id === 'improve-counter') { improveCounterIntel(); return; }
+        });
+    }
 
     // Initial panel
     openPanel('overview');
@@ -1634,7 +1691,6 @@ function openPanel(name) {
     if (content) content.innerHTML = panel.html();
     if (mainPanel) mainPanel.classList.add('open');
 
-    // Update active button
     document.querySelectorAll('.panel-button').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.panel === name);
     });
@@ -1697,7 +1753,7 @@ function toast(message) {
 }
 
 /* =========================================================
-   GAME LOOP (UPDATED - Added autosave)
+   GAME LOOP
    ========================================================== */
 
 function loop() {
@@ -1706,7 +1762,6 @@ function loop() {
     const dt = Math.min(clock.getDelta(), 0.05);
 
     if (!paused) {
-        // Date tick
         lastDateTick += dt * speed;
         if (lastDateTick >= 1.2) {
             lastDateTick = 0;
@@ -1722,42 +1777,24 @@ function loop() {
             }
         }
 
-        // Economy
         updateEconomy(dt);
-
-        // Production
         updateProduction(dt);
-
-        // Research
         updateResearch(dt);
-
-        // Unit movements
         updateUnitMovement(dt);
-
-        // Supply
         updateSupply(dt);
-
-        // Recovery
         updateRecovery(dt);
-
-        // Enemy AI
         enemyAI(dt);
-
-        // Effects
         updateEffects(dt);
 
-        // Autosave every 30 seconds
         autosaveTimer += dt;
         if (autosaveTimer >= 30) {
             autosaveTimer = 0;
             autosave();
         }
 
-        // Update UI
         updateResources();
         updateBattleStatus();
 
-        // Selection ring animation
         if (selectedUnit && selectedUnit.selectionRing) {
             const ring = selectedUnit.selectionRing;
             ring.material.opacity = 0.6 + Math.sin(Date.now() * 0.003) * 0.3;
