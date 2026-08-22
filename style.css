@@ -10,6 +10,7 @@
     --green: #55d18a;
     --red: #e45d5d;
     --blue: #58a6ff;
+    --gold: #ffd700;
 }
 html, body {
     width: 100%;
@@ -248,6 +249,15 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     font-size: 12px;
     font-weight: 700;
     white-space: nowrap;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    transition: .2s;
+}
+.country-display:hover {
+    border-color: var(--accent);
+    background: rgba(213,173,85,.1);
 }
 #countryFlag { font-size: 22px; }
 .resources {
@@ -263,6 +273,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     background: rgba(255,255,255,.04);
     border-radius: 5px;
     font-size: 11px;
+    transition: .2s;
+}
+.resource:hover {
+    border-color: var(--accent);
+    background: rgba(213,173,85,.05);
 }
 .resource span { margin-right: 5px; }
 .resource b { font-size: 11px; }
@@ -283,6 +298,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     background: rgba(255,255,255,.07);
     border: 1px solid var(--line);
     border-radius: 5px;
+    transition: .2s;
+}
+.date-control button:hover {
+    border-color: var(--accent);
+    background: rgba(213,173,85,.1);
 }
 
 /* ================= LEFT PANEL ================= */
@@ -329,7 +349,7 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     z-index: 25;
     left: 91px;
     top: 92px;
-    width: 380px;
+    width: 400px;
     max-height: calc(100vh - 160px);
     display: none;
     overflow: hidden;
@@ -351,6 +371,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     margin-top: 5px;
     font-size: 21px;
 }
+#selectedCountryDisplay {
+    font-size: 11px;
+    color: var(--accent);
+    margin-top: 4px;
+}
 #closePanel, #closeUnit, .modal-close {
     width: 30px;
     height: 30px;
@@ -358,6 +383,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     background: rgba(255,255,255,.06);
     color: #9da8af;
     font-size: 20px;
+    transition: .2s;
+}
+#closePanel:hover, #closeUnit:hover, .modal-close:hover {
+    background: rgba(228,93,93,.2);
+    color: var(--red);
 }
 #panelContent {
     max-height: calc(100vh - 250px);
@@ -391,6 +421,7 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
 }
 .stat-row:last-child { border-bottom: 0; }
 .stat-row span { color: var(--muted); }
+.stat-row .highlight { color: var(--gold); font-weight: 700; }
 .action-btn {
     width: 100%;
     padding: 10px;
@@ -403,7 +434,7 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     font-weight: 800;
     transition: .2s;
 }
-.action-btn:hover { background: rgba(213,173,85,.25); }
+.action-btn:hover { background: rgba(213,173,85,.25); transform: scale(1.01); }
 .action-btn.success {
     background: rgba(85,209,138,.15);
     border-color: var(--green);
@@ -413,6 +444,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     background: rgba(228,93,93,.15);
     border-color: var(--red);
     color: var(--red);
+}
+.action-btn.info {
+    background: rgba(88,166,255,.15);
+    border-color: var(--blue);
+    color: var(--blue);
 }
 
 /* ================= UNIT PANEL ================= */
@@ -462,6 +498,7 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     display: block;
     height: 100%;
     background: var(--green);
+    transition: width .3s;
 }
 .command-grid {
     display: grid;
@@ -542,18 +579,13 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     position: relative;
     height: 105px;
     overflow: hidden;
-    background: radial-gradient(ellipse,#1a2a1a,#0a120a 65%);
+    border-radius: 4px;
 }
-.mini-land {
-    position: absolute;
-    background: #3a5a3a;
-    opacity: .5;
-    border-radius: 45%;
+#miniMapCanvas {
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
 }
-.land1 { width: 70px; height: 45px; left: 20px; top: 20px; transform: rotate(20deg); }
-.land2 { width: 80px; height: 55px; right: 10px; top: 12px; transform: rotate(-12deg); }
-.land3 { width: 60px; height: 30px; left: 70px; bottom: 7px; }
-#miniUnits { position: absolute; inset: 0; }
 
 /* ================= BOTTOM ================= */
 #bottomStatus {
@@ -688,6 +720,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     color: var(--muted);
     font-size: 9px;
 }
+.country-card .state-count {
+    font-size: 8px;
+    color: var(--accent);
+    margin-top: 4px;
+}
 
 /* ================= TUTORIAL ================= */
 #tutorial {
@@ -739,20 +776,61 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     font-weight: 900;
 }
 
-/* ================= QUICK BUILD ================= */
-#quickFactory {
-    background: var(--accent) !important;
-    color: #111 !important;
+/* ================= QUICK ACTIONS ================= */
+#quickFactory, #quickReinforce {
     padding: 4px 12px !important;
     border-radius: 4px !important;
     font-weight: 700 !important;
     font-size: 10px !important;
     transition: .2s !important;
 }
+#quickFactory {
+    background: var(--accent) !important;
+    color: #111 !important;
+}
 #quickFactory:hover {
     transform: scale(1.05);
     box-shadow: 0 0 20px rgba(213,173,85,.3);
 }
+#quickReinforce {
+    background: var(--green) !important;
+    color: #111 !important;
+}
+#quickReinforce:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(85,209,138,.3);
+}
+
+/* ================= COUNTRY INFO ================= */
+#infoCountryContent {
+    padding: 10px 0;
+}
+.country-detail-card {
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: rgba(255,255,255,.03);
+}
+.country-detail-card h4 {
+    color: var(--accent);
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+.state-tag {
+    display: inline-block;
+    padding: 2px 10px;
+    margin: 3px 4px 3px 0;
+    border-radius: 12px;
+    font-size: 9px;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.05);
+}
+
+/* ================= SCROLLBAR ================= */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
 
 /* ================= MOBILE ================= */
 @media (max-width: 800px) {
