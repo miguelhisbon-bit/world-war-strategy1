@@ -3,18 +3,21 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 
 /* =========================================================
-   WORLD WAR — V7 (FULL GLOBAL MAP)
-   16 COUNTRIES + STATES + REALISTIC TERRAIN
+   WORLD WAR — V8 (FULL REALISTIC MAP)
+   Click Countries → Highlight Territory + States
+   Full Production Info + Real-time Graphics
    ========================================================== */
 
 const $ = id => document.getElementById(id);
 
 let scene, camera, renderer, labelRenderer, controls, clock;
-let ground, unitGroup, fxGroup, borderGroup, labelGroup, stateGroup;
+let ground, unitGroup, fxGroup, borderGroup, labelGroup, stateGroup, highlightGroup;
 
 let selectedUnit = null;
 let moveMode = false;
 let attackMode = false;
+let selectedCountry = null;
+let highlightedCountry = null;
 
 let paused = false;
 let speed = 1;
@@ -48,46 +51,110 @@ let battleLog = [];
 let diplomaticMessages = [];
 
 const units = [];
+const countryMeshMap = {};
+const stateMeshMap = {};
 
 /* =========================================================
-   NATIONS DATA (16 Countries)
+   NATIONS DATA (16 Countries with Colors)
    ========================================================== */
 
 const nation = {
-    // Muslim Countries
-    BANGLADESH: { flag: "🇧🇩", name: "Bangladesh", color: 0x006a4e, capital: "Dhaka", region: "South Asia",
-        states: ["Dhaka", "Chittagong", "Rajshahi", "Khulna", "Sylhet", "Barisal", "Rangpur", "Mymensingh"] },
-    PAKISTAN: { flag: "🇵🇰", name: "Pakistan", color: 0x01411c, capital: "Islamabad", region: "South Asia",
-        states: ["Punjab", "Sindh", "KPK", "Balochistan", "Gilgit", "Azad Kashmir", "Islamabad Capital"] },
-    TURKEY: { flag: "🇹🇷", name: "Turkey", color: 0xe30a17, capital: "Ankara", region: "Eurasia",
-        states: ["Istanbul", "Ankara", "Izmir", "Bursa", "Antalya", "Konya", "Adana", "Gaziantep"] },
-    IRAN: { flag: "🇮🇷", name: "Iran", color: 0x239f40, capital: "Tehran", region: "Middle East",
-        states: ["Tehran", "Isfahan", "Khuzestan", "Fars", "Razavi", "East Azerbaijan", "Mazandaran", "Gilan"] },
-    SAUDI: { flag: "🇸🇦", name: "Saudi Arabia", color: 0x165d31, capital: "Riyadh", region: "Middle East",
-        states: ["Riyadh", "Makkah", "Madinah", "Eastern", "Asir", "Tabuk", "Jazan", "Najran"] },
-    EGYPT: { flag: "🇪🇬", name: "Egypt", color: 0xce1126, capital: "Cairo", region: "North Africa",
-        states: ["Cairo", "Alexandria", "Giza", "Luxor", "Aswan", "Port Said", "Suez", "Minya"] },
-    PALESTINE: { flag: "🇵🇸", name: "Palestine", color: 0x007a3d, capital: "Jerusalem", region: "Middle East",
-        states: ["West Bank", "Gaza Strip", "Jerusalem", "Ramallah", "Hebron", "Nablus"] },
-    INDONESIA: { flag: "🇮🇩", name: "Indonesia", color: 0xce1126, capital: "Jakarta", region: "Southeast Asia",
-        states: ["Java", "Sumatra", "Kalimantan", "Sulawesi", "Papua", "Bali", "Lombok", "Flores"] },
-    AFGHANISTAN: { flag: "🇦🇫", name: "Afghanistan", color: 0x000000, capital: "Kabul", region: "Central Asia",
-        states: ["Kabul", "Kandahar", "Herat", "Mazar", "Nangarhar", "Balkh", "Ghazni", "Helmand"] },
-    // Other Major Powers
-    INDIA: { flag: "🇮🇳", name: "India", color: 0xff9933, capital: "New Delhi", region: "South Asia",
-        states: ["UP", "Maharashtra", "Tamil Nadu", "Gujarat", "Karnataka", "Rajasthan", "West Bengal", "Punjab"] },
-    USA: { flag: "🇺🇸", name: "United States", color: 0x2a5c8a, capital: "Washington DC", region: "North America",
-        states: ["California", "Texas", "Florida", "New York", "Illinois", "Pennsylvania", "Ohio", "Georgia"] },
-    CHINA: { flag: "🇨🇳", name: "China", color: 0xcc2222, capital: "Beijing", region: "East Asia",
-        states: ["Guangdong", "Shandong", "Henan", "Sichuan", "Jiangsu", "Hebei", "Hunan", "Anhui"] },
-    RUSSIA: { flag: "🇷🇺", name: "Russia", color: 0x003399, capital: "Moscow", region: "Eurasia",
-        states: ["Moscow", "St Petersburg", "Novosibirsk", "Yekaterinburg", "Kazan", "Nizhny", "Samara", "Omsk"] },
-    UK: { flag: "🇬🇧", name: "United Kingdom", color: 0x8a2a2a, capital: "London", region: "Europe",
-        states: ["England", "Scotland", "Wales", "Northern Ireland"] },
-    FRANCE: { flag: "🇫🇷", name: "France", color: 0x2a5a8a, capital: "Paris", region: "Europe",
-        states: ["Île-de-France", "Provence", "Brittany", "Normandy", "Alsace", "Aquitaine", "Lyon", "Marseille"] },
-    GERMANY: { flag: "🇩🇪", name: "Germany", color: 0x3a3a3a, capital: "Berlin", region: "Europe",
-        states: ["Bavaria", "North Rhine", "Baden", "Saxony", "Hesse", "Berlin", "Hamburg", "Munich"] }
+    BANGLADESH: { 
+        flag: "🇧🇩", name: "Bangladesh", color: 0x006a4e, lightColor: 0x00a87a, 
+        capital: "Dhaka", region: "South Asia", 
+        states: ["Dhaka", "Chittagong", "Rajshahi", "Khulna", "Sylhet", "Barisal", "Rangpur", "Mymensingh"],
+        desc: "Bangladesh is a South Asian country with a rich history and strategic location. Known for its textile industry and deltaic geography."
+    },
+    PAKISTAN: { 
+        flag: "🇵🇰", name: "Pakistan", color: 0x01411c, lightColor: 0x027a35,
+        capital: "Islamabad", region: "South Asia",
+        states: ["Punjab", "Sindh", "KPK", "Balochistan", "Gilgit", "Azad Kashmir", "Islamabad"],
+        desc: "Pakistan is a South Asian nation with diverse landscapes, from mountains to deserts. A nuclear power with a strategic location."
+    },
+    TURKEY: { 
+        flag: "🇹🇷", name: "Turkey", color: 0xe30a17, lightColor: 0xff1a2a,
+        capital: "Ankara", region: "Eurasia",
+        states: ["Istanbul", "Ankara", "Izmir", "Bursa", "Antalya", "Konya", "Adana", "Gaziantep"],
+        desc: "Turkey is a transcontinental country bridging Europe and Asia. A key NATO member with a strong military and economy."
+    },
+    IRAN: { 
+        flag: "🇮🇷", name: "Iran", color: 0x239f40, lightColor: 0x3ad060,
+        capital: "Tehran", region: "Middle East",
+        states: ["Tehran", "Isfahan", "Khuzestan", "Fars", "Razavi", "East Azerbaijan", "Mazandaran", "Gilan"],
+        desc: "Iran is a Middle Eastern country with ancient history. A major regional power with significant oil reserves."
+    },
+    SAUDI: { 
+        flag: "🇸🇦", name: "Saudi Arabia", color: 0x165d31, lightColor: 0x229544,
+        capital: "Riyadh", region: "Middle East",
+        states: ["Riyadh", "Makkah", "Madinah", "Eastern", "Asir", "Tabuk", "Jazan", "Najran"],
+        desc: "Saudi Arabia is the largest country in the Middle East. The birthplace of Islam and a global oil powerhouse."
+    },
+    EGYPT: { 
+        flag: "🇪🇬", name: "Egypt", color: 0xce1126, lightColor: 0xff1a33,
+        capital: "Cairo", region: "North Africa",
+        states: ["Cairo", "Alexandria", "Giza", "Luxor", "Aswan", "Port Said", "Suez", "Minya"],
+        desc: "Egypt is a transcontinental country spanning North Africa and the Middle East. Home to ancient civilization and the Suez Canal."
+    },
+    PALESTINE: { 
+        flag: "🇵🇸", name: "Palestine", color: 0x007a3d, lightColor: 0x00b85a,
+        capital: "Jerusalem", region: "Middle East",
+        states: ["West Bank", "Gaza Strip", "Jerusalem", "Ramallah", "Hebron", "Nablus"],
+        desc: "Palestine is a historic region in the Middle East. Rich in cultural and religious heritage, with a resilient population."
+    },
+    INDONESIA: { 
+        flag: "🇮🇩", name: "Indonesia", color: 0xce1126, lightColor: 0xff1a33,
+        capital: "Jakarta", region: "Southeast Asia",
+        states: ["Java", "Sumatra", "Kalimantan", "Sulawesi", "Papua", "Bali", "Lombok", "Flores"],
+        desc: "Indonesia is the world's largest archipelago nation. Rich in biodiversity and natural resources, with a growing economy."
+    },
+    AFGHANISTAN: { 
+        flag: "🇦🇫", name: "Afghanistan", color: 0x000000, lightColor: 0x333333,
+        capital: "Kabul", region: "Central Asia",
+        states: ["Kabul", "Kandahar", "Herat", "Mazar", "Nangarhar", "Balkh", "Ghazni", "Helmand"],
+        desc: "Afghanistan is a landlocked country at the crossroads of Central and South Asia. Known for its rugged terrain and strategic importance."
+    },
+    INDIA: { 
+        flag: "🇮🇳", name: "India", color: 0xff9933, lightColor: 0xffbb55,
+        capital: "New Delhi", region: "South Asia",
+        states: ["UP", "Maharashtra", "Tamil Nadu", "Gujarat", "Karnataka", "Rajasthan", "West Bengal", "Punjab"],
+        desc: "India is the world's largest democracy. A rapidly growing economy with diverse culture and a major regional power."
+    },
+    USA: { 
+        flag: "🇺🇸", name: "United States", color: 0x2a5c8a, lightColor: 0x4a8cc0,
+        capital: "Washington DC", region: "North America",
+        states: ["California", "Texas", "Florida", "New York", "Illinois", "Pennsylvania", "Ohio", "Georgia"],
+        desc: "The United States is a global superpower with the world's largest economy and most powerful military."
+    },
+    CHINA: { 
+        flag: "🇨🇳", name: "China", color: 0xcc2222, lightColor: 0xff3333,
+        capital: "Beijing", region: "East Asia",
+        states: ["Guangdong", "Shandong", "Henan", "Sichuan", "Jiangsu", "Hebei", "Hunan", "Anhui"],
+        desc: "China is the world's most populous country and second-largest economy. A rising global power with ancient civilization."
+    },
+    RUSSIA: { 
+        flag: "🇷🇺", name: "Russia", color: 0x003399, lightColor: 0x0055cc,
+        capital: "Moscow", region: "Eurasia",
+        states: ["Moscow", "St Petersburg", "Novosibirsk", "Yekaterinburg", "Kazan", "Nizhny", "Samara", "Omsk"],
+        desc: "Russia is the world's largest country by area. A major global power with vast natural resources and a permanent UN Security Council seat."
+    },
+    UK: { 
+        flag: "🇬🇧", name: "United Kingdom", color: 0x8a2a2a, lightColor: 0xcc4040,
+        capital: "London", region: "Europe",
+        states: ["England", "Scotland", "Wales", "Northern Ireland"],
+        desc: "The United Kingdom is a European island nation with a rich history. A former global empire and current nuclear power."
+    },
+    FRANCE: { 
+        flag: "🇫🇷", name: "France", color: 0x2a5a8a, lightColor: 0x4a88c0,
+        capital: "Paris", region: "Europe",
+        states: ["Île-de-France", "Provence", "Brittany", "Normandy", "Alsace", "Aquitaine", "Lyon", "Marseille"],
+        desc: "France is a European nation with a rich cultural heritage. A nuclear power and permanent UN Security Council member."
+    },
+    GERMANY: { 
+        flag: "🇩🇪", name: "Germany", color: 0x3a3a3a, lightColor: 0x666666,
+        capital: "Berlin", region: "Europe",
+        states: ["Bavaria", "North Rhine", "Baden", "Saxony", "Hesse", "Berlin", "Hamburg", "Munich"],
+        desc: "Germany is Europe's largest economy. A key EU member with a strong industrial base and military."
+    }
 };
 
 const countryColors = {};
@@ -129,9 +196,9 @@ const tech = {
    ========================================================== */
 
 async function init() {
-    loading(10, "Initializing command system...");
+    loading(10, "Initializing global command system...");
     setup3D();
-    loading(25, "Generating global terrain...");
+    loading(25, "Generating world terrain...");
     createTerrain();
     loading(35, "Drawing country borders...");
     createCountryBorders();
@@ -234,11 +301,13 @@ function setup3D() {
     borderGroup = new THREE.Group();
     labelGroup = new THREE.Group();
     stateGroup = new THREE.Group();
+    highlightGroup = new THREE.Group();
     scene.add(unitGroup);
     scene.add(fxGroup);
     scene.add(borderGroup);
     scene.add(labelGroup);
     scene.add(stateGroup);
+    scene.add(highlightGroup);
 
     canvas.addEventListener("pointerdown", handleWorldClick);
     window.addEventListener("resize", resizeRenderer);
@@ -253,22 +322,23 @@ function resizeRenderer() {
 }
 
 /* =========================================================
-   TERRAIN (Enhanced)
+   TERRAIN (Enhanced Realistic)
    ========================================================== */
 
 function createTerrain() {
-    const geometry = new THREE.PlaneGeometry(400, 400, 200, 200);
+    const geometry = new THREE.PlaneGeometry(420, 420, 200, 200);
     const positions = geometry.attributes.position;
     
     for (let i = 0; i < positions.count; i++) {
         const x = positions.getX(i);
         const y = positions.getY(i);
         const height = 
-            Math.sin(x * 0.035) * 1.8 +
-            Math.cos(y * 0.04) * 1.5 +
-            Math.sin((x + y) * 0.02) * 2.8 +
-            Math.cos(x * 0.07 + y * 0.05) * 1.5 +
-            Math.sin(x * 0.1) * Math.cos(y * 0.08) * 0.8;
+            Math.sin(x * 0.032) * 2.0 +
+            Math.cos(y * 0.038) * 1.8 +
+            Math.sin((x + y) * 0.018) * 3.0 +
+            Math.cos(x * 0.065 + y * 0.045) * 1.6 +
+            Math.sin(x * 0.095) * Math.cos(y * 0.075) * 1.0 +
+            Math.cos(x * 0.025 - y * 0.035) * 1.2;
         positions.setZ(i, height);
     }
     geometry.computeVertexNormals();
@@ -278,15 +348,21 @@ function createTerrain() {
         const x = positions.getX(i);
         const y = positions.getY(i);
         const z = positions.getZ(i);
-        let r = 0.2, g = 0.32, b = 0.2;
-        if (z > 4) { r += 0.15; g += 0.12; b += 0.08; }
-        if (z > 7) { r += 0.1; g += 0.05; b -= 0.02; }
-        if (Math.sin(x * 0.08) * Math.cos(y * 0.08) > 0.3 && z < 2.5) { r -= 0.05; g += 0.08; b -= 0.02; }
-        if (Math.abs(z) < 0.5) { r += 0.08; g += 0.05; b -= 0.05; }
-        if (Math.sin(x * 0.04 + y * 0.03) > 0.5 && z < 1.5) { r += 0.05; g += 0.02; }
-        colors[i*3] = Math.max(0.1, Math.min(0.6, r));
-        colors[i*3+1] = Math.max(0.15, Math.min(0.7, g));
-        colors[i*3+2] = Math.max(0.08, Math.min(0.5, b));
+        let r = 0.18, g = 0.30, b = 0.18;
+        // Mountains
+        if (z > 5) { r += 0.18; g += 0.15; b += 0.08; }
+        if (z > 9) { r += 0.12; g += 0.05; b -= 0.02; }
+        // Forests
+        if (Math.sin(x * 0.07) * Math.cos(y * 0.07) > 0.35 && z < 3) { r -= 0.04; g += 0.10; b -= 0.02; }
+        // Plains
+        if (Math.abs(z) < 0.5) { r += 0.10; g += 0.06; b -= 0.04; }
+        // Desert
+        if (Math.sin(x * 0.02 + y * 0.03) > 0.6 && z < 1.5) { r += 0.15; g += 0.08; b -= 0.06; }
+        // Snow
+        if (z > 10) { r += 0.2; g += 0.2; b += 0.2; }
+        colors[i*3] = Math.max(0.08, Math.min(0.7, r));
+        colors[i*3+1] = Math.max(0.12, Math.min(0.7, g));
+        colors[i*3+2] = Math.max(0.06, Math.min(0.5, b));
     }
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
@@ -301,23 +377,23 @@ function createTerrain() {
     ground.userData.isGround = true;
     scene.add(ground);
 
-    const grid = new THREE.GridHelper(400, 80, 0x68715f, 0x30382f);
+    const grid = new THREE.GridHelper(420, 84, 0x68715f, 0x30382f);
     grid.material.transparent = true;
     grid.material.opacity = 0.04;
     scene.add(grid);
 
     const water = new THREE.Mesh(
-        new THREE.PlaneGeometry(600, 600),
+        new THREE.PlaneGeometry(620, 620),
         new THREE.MeshStandardMaterial({
             color: 0x0a2a3a,
             transparent: true,
-            opacity: 0.3,
+            opacity: 0.28,
             roughness: 0.1,
             metalness: 0.5
         })
     );
     water.rotation.x = -Math.PI / 2;
-    water.position.y = -2.5;
+    water.position.y = -2.8;
     scene.add(water);
 
     createMountains();
@@ -326,9 +402,9 @@ function createTerrain() {
 }
 
 function createMountains() {
-    for (let i = 0; i < 90; i++) {
-        const height = 8 + Math.random() * 25;
-        const radius = 2 + Math.random() * 10;
+    for (let i = 0; i < 100; i++) {
+        const height = 8 + Math.random() * 28;
+        const radius = 2 + Math.random() * 12;
         const mountain = new THREE.Mesh(
             new THREE.ConeGeometry(radius, height, 6 + Math.floor(Math.random() * 6)),
             new THREE.MeshStandardMaterial({
@@ -338,7 +414,7 @@ function createMountains() {
             })
         );
         const angle = Math.random() * Math.PI * 2;
-        const dist = 30 + Math.random() * 160;
+        const dist = 30 + Math.random() * 170;
         mountain.position.set(
             Math.cos(angle) * dist,
             0.5 + height * 0.4,
@@ -352,7 +428,7 @@ function createMountains() {
         mountain.castShadow = true;
         scene.add(mountain);
 
-        if (height > 18) {
+        if (height > 20) {
             const snow = new THREE.Mesh(
                 new THREE.ConeGeometry(radius * 0.25, height * 0.18, 6),
                 new THREE.MeshStandardMaterial({ color: 0xeeeeff, roughness: 0.7 })
@@ -366,17 +442,17 @@ function createMountains() {
 }
 
 function createForests() {
-    for (let i = 0; i < 300; i++) {
+    for (let i = 0; i < 350; i++) {
         const tree = new THREE.Group();
-        const trunkHeight = 0.8 + Math.random() * 1.8;
+        const trunkHeight = 0.8 + Math.random() * 2.0;
         const trunk = new THREE.Mesh(
             new THREE.CylinderGeometry(0.08, 0.15, trunkHeight, 5),
             new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 1 })
         );
         trunk.position.y = trunkHeight / 2;
-        const crownSize = 0.5 + Math.random() * 1.0;
+        const crownSize = 0.5 + Math.random() * 1.2;
         const crown = new THREE.Mesh(
-            new THREE.ConeGeometry(crownSize, 1.5 + Math.random() * 2.0, 5 + Math.floor(Math.random() * 5)),
+            new THREE.ConeGeometry(crownSize, 1.5 + Math.random() * 2.2, 5 + Math.floor(Math.random() * 5)),
             new THREE.MeshStandardMaterial({
                 color: new THREE.Color().setHSL(0.25 + Math.random() * 0.08, 0.3, 0.2 + Math.random() * 0.15),
                 roughness: 1
@@ -385,7 +461,7 @@ function createForests() {
         crown.position.y = trunkHeight + (0.5 + Math.random() * 0.8);
         tree.add(trunk, crown);
         const angle = Math.random() * Math.PI * 2;
-        const dist = 20 + Math.random() * 170;
+        const dist = 20 + Math.random() * 180;
         tree.position.set(
             Math.cos(angle) * dist + (Math.random() - 0.5) * 25,
             0,
@@ -398,9 +474,10 @@ function createForests() {
 
 function createRivers() {
     const riverPoints = [
-        [[-60, -30], [-40, -25], [-20, -20], [0, -15], [20, -10], [40, -5], [60, 0]],
-        [[-50, 40], [-30, 35], [-10, 30], [10, 25], [30, 20], [50, 25]],
-        [[-100, -60], [-80, -50], [-60, -45], [-40, -50], [-20, -55], [0, -50]]
+        [[-60, -30], [-40, -25], [-20, -20], [0, -15], [20, -10], [40, -5], [60, 0], [80, 5]],
+        [[-50, 40], [-30, 35], [-10, 30], [10, 25], [30, 20], [50, 25], [70, 30]],
+        [[-100, -60], [-80, -50], [-60, -45], [-40, -50], [-20, -55], [0, -50], [20, -45]],
+        [[-20, -5], [0, 0], [20, 5], [40, 10], [60, 15]]
     ];
     
     riverPoints.forEach(points => {
@@ -408,47 +485,52 @@ function createRivers() {
         const geometry = new THREE.BufferGeometry().setFromPoints(pts);
         const line = new THREE.Line(
             geometry,
-            new THREE.LineBasicMaterial({ color: 0x1a5a7a, transparent: true, opacity: 0.4 })
+            new THREE.LineBasicMaterial({ color: 0x1a5a7a, transparent: true, opacity: 0.35 })
         );
         scene.add(line);
     });
 }
 
 /* =========================================================
-   COUNTRY BORDERS + STATES
+   COUNTRY BORDERS + STATES (Clickable)
    ========================================================== */
 
 function createCountryBorders() {
     const countryData = [
-        { name: 'BANGLADESH', points: [[-5,-25],[15,-20],[25,-15],[20,0],[5,5],[-5,0],[-10,-10],[-5,-25]] },
-        { name: 'PAKISTAN', points: [[20,15],[40,10],[50,20],[45,35],[30,40],[20,35],[15,25],[20,15]] },
-        { name: 'TURKEY', points: [[-70,40],[-50,35],[-40,45],[-50,60],[-65,55],[-75,50],[-70,40]] },
-        { name: 'IRAN', points: [[10,30],[30,25],[40,35],[35,50],[20,55],[10,50],[5,40],[10,30]] },
-        { name: 'SAUDI', points: [[10,10],[30,5],[40,15],[35,30],[20,35],[5,30],[0,20],[10,10]] },
-        { name: 'EGYPT', points: [[-40,5],[-20,0],[-10,10],[-15,25],[-30,30],[-45,25],[-50,15],[-40,5]] },
-        { name: 'PALESTINE', points: [[-10,25],[0,20],[5,30],[0,40],[-10,35],[-15,30],[-10,25]] },
-        { name: 'INDONESIA', points: [[80,-20],[100,-25],[120,-20],[115,-5],[95,0],[80,-5],[75,-15],[80,-20]] },
-        { name: 'AFGHANISTAN', points: [[25,40],[45,35],[55,45],[50,60],[35,65],[20,60],[15,50],[25,40]] },
-        { name: 'INDIA', points: [[0,-5],[20,-10],[35,-5],[40,10],[30,25],[15,30],[5,25],[-5,15],[0,-5]] },
-        { name: 'USA', points: [[-150,-50],[-120,-45],[-100,-30],[-110,-10],[-130,-5],[-150,-15],[-160,-35],[-150,-50]] },
-        { name: 'CHINA', points: [[40,-10],[70,-15],[90,-5],[85,15],[70,25],[50,20],[40,10],[35,0],[40,-10]] },
-        { name: 'RUSSIA', points: [[20,65],[60,60],[90,70],[100,85],[80,100],[50,105],[20,95],[10,80],[20,65]] },
-        { name: 'UK', points: [[-135,25],[-120,20],[-110,35],[-120,50],[-135,45],[-140,35],[-135,25]] },
-        { name: 'FRANCE', points: [[-60,30],[-40,25],[-30,40],[-40,55],[-55,50],[-65,40],[-60,30]] },
-        { name: 'GERMANY', points: [[-20,5],[0,0],[10,15],[0,30],[-15,25],[-25,15],[-20,5]] }
+        { name: 'BANGLADESH', points: [[-8,-28],[12,-22],[22,-16],[18,-2],[4,4],[-8,-2],[-12,-12],[-8,-28]] },
+        { name: 'PAKISTAN', points: [[18,14],[38,10],[48,20],[44,34],[30,38],[20,34],[16,24],[18,14]] },
+        { name: 'TURKEY', points: [[-72,38],[-52,34],[-42,44],[-52,58],[-66,54],[-76,48],[-72,38]] },
+        { name: 'IRAN', points: [[8,28],[28,24],[38,34],[34,48],[18,52],[8,48],[4,38],[8,28]] },
+        { name: 'SAUDI', points: [[8,8],[28,4],[38,14],[34,28],[18,34],[4,28],[0,18],[8,8]] },
+        { name: 'EGYPT', points: [[-42,4],[-22,0],[-12,10],[-16,24],[-32,28],[-46,24],[-50,14],[-42,4]] },
+        { name: 'PALESTINE', points: [[-12,24],[0,20],[4,30],[0,38],[-12,34],[-16,28],[-12,24]] },
+        { name: 'INDONESIA', points: [[78,-22],[98,-26],[118,-22],[114,-6],[94,0],[78,-6],[74,-16],[78,-22]] },
+        { name: 'AFGHANISTAN', points: [[24,38],[44,34],[54,44],[48,58],[34,62],[18,58],[14,48],[24,38]] },
+        { name: 'INDIA', points: [[-2,-8],[18,-12],[34,-6],[38,8],[28,24],[14,28],[4,22],[-6,12],[-2,-8]] },
+        { name: 'USA', points: [[-152,-52],[-122,-48],[-102,-32],[-112,-12],[-132,-8],[-152,-16],[-162,-38],[-152,-52]] },
+        { name: 'CHINA', points: [[38,-12],[68,-18],[88,-8],[84,14],[68,24],[48,18],[38,10],[34,-2],[38,-12]] },
+        { name: 'RUSSIA', points: [[18,64],[58,60],[88,68],[98,84],[78,98],[48,104],[18,94],[8,78],[18,64]] },
+        { name: 'UK', points: [[-138,24],[-122,20],[-112,34],[-122,48],[-138,44],[-142,34],[-138,24]] },
+        { name: 'FRANCE', points: [[-62,28],[-42,24],[-32,38],[-42,54],[-56,50],[-66,40],[-62,28]] },
+        { name: 'GERMANY', points: [[-22,4],[-2,0],[8,14],[-2,28],[-16,24],[-26,14],[-22,4]] }
     ];
+
+    // Clear previous
+    while(borderGroup.children.length) borderGroup.remove(borderGroup.children[0]);
 
     countryData.forEach(data => {
         const color = countryColors[data.name] || 0x888888;
-        const points = data.points.map(p => new THREE.Vector3(p[0], 0.3, p[1]));
+        const points = data.points.map(p => new THREE.Vector3(p[0], 0.4, p[1]));
         
+        // Border line (thicker)
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         const line = new THREE.Line(
             geometry,
-            new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 })
+            new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8, linewidth: 2 })
         );
         borderGroup.add(line);
 
+        // Fill area (clickable)
         const shape = new THREE.Shape();
         points.forEach((p, i) => {
             if (i === 0) shape.moveTo(p.x, p.z);
@@ -460,15 +542,18 @@ function createCountryBorders() {
             new THREE.MeshBasicMaterial({
                 color,
                 transparent: true,
-                opacity: 0.1,
+                opacity: 0.15,
                 side: THREE.DoubleSide,
                 depthWrite: false
             })
         );
         fill.rotation.x = -Math.PI / 2;
-        fill.position.y = 0.15;
+        fill.position.y = 0.2;
+        fill.userData.country = data.name;
         borderGroup.add(fill);
+        countryMeshMap[data.name] = fill;
 
+        // Country label
         const center = points.reduce((acc, p) => { acc.x += p.x; acc.z += p.z; return acc; }, { x: 0, z: 0 });
         center.x /= points.length;
         center.z /= points.length;
@@ -476,34 +561,46 @@ function createCountryBorders() {
         const labelDiv = document.createElement('div');
         labelDiv.textContent = `${nation[data.name]?.flag || '🏳️'} ${nation[data.name]?.name || data.name}`;
         labelDiv.style.color = '#eef4f8';
-        labelDiv.style.fontSize = '11px';
+        labelDiv.style.fontSize = '12px';
         labelDiv.style.fontWeight = '700';
-        labelDiv.style.textShadow = '0 2px 12px rgba(0,0,0,0.9)';
-        labelDiv.style.background = 'rgba(0,0,0,0.6)';
-        labelDiv.style.padding = '4px 10px';
+        labelDiv.style.textShadow = '0 2px 16px rgba(0,0,0,0.95)';
+        labelDiv.style.background = 'rgba(0,0,0,0.7)';
+        labelDiv.style.padding = '4px 12px';
         labelDiv.style.borderRadius = '12px';
         labelDiv.style.border = '1px solid rgba(255,255,255,0.08)';
         labelDiv.style.backdropFilter = 'blur(4px)';
         labelDiv.style.pointerEvents = 'none';
         labelDiv.style.userSelect = 'none';
+        labelDiv.style.cursor = 'pointer';
         
         const label = new CSS2DObject(labelDiv);
-        label.position.set(center.x, 2.0, center.z);
+        label.position.set(center.x, 2.5, center.z);
         labelGroup.add(label);
     });
 }
 
 function createStates() {
     const stateData = {
-        BANGLADESH: { points: [[-5,-25],[-2,-20],[5,-18],[8,-15],[5,-10],[0,-8],[-5,-10],[-8,-15],[-10,-20],[-5,-25]],
-            color: 0x006a4e },
-        PAKISTAN: { points: [[25,20],[35,18],[42,22],[40,28],[32,32],[25,30],[22,25],[25,20]], color: 0x01411c },
-        TURKEY: { points: [[-65,45],[-55,42],[-45,48],[-48,55],[-58,58],[-65,52],[-65,45]], color: 0xe30a17 },
-        IRAN: { points: [[15,35],[25,32],[32,38],[28,45],[18,48],[12,42],[15,35]], color: 0x239f40 },
-        SAUDI: { points: [[15,15],[25,12],[32,18],[28,25],[18,28],[10,22],[15,15]], color: 0x165d31 },
-        EGYPT: { points: [[-35,10],[-25,8],[-18,14],[-22,22],[-32,24],[-38,18],[-35,10]], color: 0xce1126 },
-        PALESTINE: { points: [[-5,28],[2,25],[6,32],[0,36],[-6,32],[-5,28]], color: 0x007a3d }
+        BANGLADESH: { points: [[-8,-28],[-2,-22],[6,-20],[10,-16],[6,-10],[0,-8],[-6,-10],[-10,-14],[-12,-20],[-8,-28]], color: 0x006a4e },
+        PAKISTAN: { points: [[22,18],[32,16],[40,20],[38,26],[30,30],[24,28],[20,22],[22,18]], color: 0x01411c },
+        TURKEY: { points: [[-66,44],[-56,40],[-46,46],[-48,52],[-58,56],[-66,50],[-66,44]], color: 0xe30a17 },
+        IRAN: { points: [[12,34],[22,30],[30,36],[26,42],[16,46],[10,40],[12,34]], color: 0x239f40 },
+        SAUDI: { points: [[12,14],[22,10],[30,16],[26,22],[16,26],[8,20],[12,14]], color: 0x165d31 },
+        EGYPT: { points: [[-36,10],[-26,8],[-18,14],[-22,22],[-32,24],[-38,18],[-36,10]], color: 0xce1126 },
+        PALESTINE: { points: [[-8,26],[0,22],[4,30],[0,36],[-8,32],[-12,28],[-8,26]], color: 0x007a3d },
+        INDIA: { points: [[2,-6],[16,-8],[28,-4],[32,4],[24,16],[12,20],[4,14],[-2,6],[2,-6]], color: 0xff9933 },
+        USA: { points: [[-142,-42],[-130,-40],[-118,-32],[-124,-20],[-138,-16],[-148,-28],[-152,-38],[-142,-42]], color: 0x2a5c8a },
+        CHINA: { points: [[42,-8],[62,-12],[78,-4],[74,8],[62,16],[48,12],[40,4],[36,-4],[42,-8]], color: 0xcc2222 },
+        RUSSIA: { points: [[28,72],[52,68],[72,74],[80,86],[64,92],[40,96],[22,88],[16,78],[28,72]], color: 0x003399 },
+        UK: { points: [[-130,28],[-118,24],[-110,34],[-118,44],[-130,40],[-134,34],[-130,28]], color: 0x8a2a2a },
+        FRANCE: { points: [[-56,32],[-46,28],[-36,40],[-44,50],[-56,46],[-60,38],[-56,32]], color: 0x2a5a8a },
+        GERMANY: { points: [[-16,8],[-4,4],[4,16],[-2,26],[-14,22],[-22,14],[-16,8]], color: 0x3a3a3a },
+        INDONESIA: { points: [[82,-18],[96,-22],[110,-18],[106,-6],[90,-2],[78,-6],[74,-14],[82,-18]], color: 0xce1126 },
+        AFGHANISTAN: { points: [[28,42],[42,38],[50,46],[44,56],[34,60],[22,56],[18,48],[28,42]], color: 0x000000 }
     };
+
+    // Clear previous
+    while(stateGroup.children.length) stateGroup.remove(stateGroup.children[0]);
 
     Object.keys(stateData).forEach(key => {
         const data = stateData[key];
@@ -521,14 +618,16 @@ function createStates() {
             new THREE.MeshBasicMaterial({
                 color,
                 transparent: true,
-                opacity: 0.25,
+                opacity: 0.3,
                 side: THREE.DoubleSide,
                 depthWrite: false
             })
         );
         mesh.rotation.x = -Math.PI / 2;
         mesh.position.y = 0.1;
+        mesh.userData.country = key;
         stateGroup.add(mesh);
+        stateMeshMap[key] = mesh;
 
         // State label
         const center = points.reduce((acc, p) => { acc.x += p.x; acc.z += p.z; return acc; }, { x: 0, z: 0 });
@@ -540,21 +639,134 @@ function createStates() {
         labelDiv.style.color = '#aabbcc';
         labelDiv.style.fontSize = '8px';
         labelDiv.style.fontWeight = '600';
-        labelDiv.style.textShadow = '0 1px 8px rgba(0,0,0,0.9)';
-        labelDiv.style.background = 'rgba(0,0,0,0.4)';
-        labelDiv.style.padding = '2px 6px';
+        labelDiv.style.textShadow = '0 1px 10px rgba(0,0,0,0.95)';
+        labelDiv.style.background = 'rgba(0,0,0,0.5)';
+        labelDiv.style.padding = '2px 8px';
         labelDiv.style.borderRadius = '8px';
         labelDiv.style.pointerEvents = 'none';
         labelDiv.style.userSelect = 'none';
         
         const label = new CSS2DObject(labelDiv);
-        label.position.set(center.x, 0.8, center.z);
+        label.position.set(center.x, 1.0, center.z);
         labelGroup.add(label);
     });
 }
 
 /* =========================================================
-   3D UNIT CREATION (Enhanced)
+   HIGHLIGHT COUNTRY (Click to Highlight)
+   ========================================================== */
+
+function highlightCountry(countryKey) {
+    // Clear previous highlight
+    while(highlightGroup.children.length) highlightGroup.remove(highlightGroup.children[0]);
+
+    if (!countryKey || !nation[countryKey]) {
+        highlightedCountry = null;
+        $("selectedCountryDisplay").textContent = '';
+        return;
+    }
+
+    highlightedCountry = countryKey;
+    const data = nation[countryKey];
+    const color = data.color;
+
+    // Find the country mesh
+    const mesh = countryMeshMap[countryKey];
+    if (mesh) {
+        // Clone and highlight
+        const highlight = mesh.clone();
+        highlight.material = new THREE.MeshBasicMaterial({
+            color: 0xffdd44,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        highlight.position.y = 0.3;
+        highlightGroup.add(highlight);
+
+        // Glow ring
+        const points = mesh.geometry.attributes.position;
+        const center = new THREE.Vector3();
+        for (let i = 0; i < points.count; i++) {
+            center.x += points.getX(i);
+            center.z += points.getY(i);
+        }
+        center.x /= points.count;
+        center.z /= points.count;
+
+        const ring = new THREE.Mesh(
+            new THREE.RingGeometry(4, 6, 32),
+            new THREE.MeshBasicMaterial({
+                color: 0xffdd44,
+                transparent: true,
+                opacity: 0.6,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            })
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(center.x, 0.5, center.z);
+        highlightGroup.add(ring);
+
+        // Show country info
+        const stateCount = data.states?.length || 0;
+        $("selectedCountryDisplay").textContent = `📍 ${data.flag} ${data.name} • ${data.region} • ${stateCount} States`;
+
+        // Show info modal
+        showCountryInfo(countryKey);
+    }
+}
+
+function showCountryInfo(countryKey) {
+    const data = nation[countryKey];
+    if (!data) return;
+
+    const modal = $("countryInfoModal");
+    const title = $("infoCountryTitle");
+    const kicker = $("infoCountryKicker");
+    const content = $("infoCountryContent");
+
+    if (title) title.textContent = `${data.flag} ${data.name}`;
+    if (kicker) kicker.textContent = `${data.region} • Capital: ${data.capital}`;
+    
+    if (content) {
+        content.innerHTML = `
+            <div class="country-detail-card">
+                <h4>📍 Territory Information</h4>
+                <div class="stat-row"><span>Country</span><b>${data.name}</b></div>
+                <div class="stat-row"><span>Region</span><b>${data.region}</b></div>
+                <div class="stat-row"><span>Capital</span><b>${data.capital}</b></div>
+                <div class="stat-row"><span>States/Provinces</span><b>${data.states?.length || 0}</b></div>
+                <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
+                    ${data.states?.map(s => `<span class="state-tag">${s}</span>`).join('') || ''}
+                </div>
+            </div>
+            <div class="country-detail-card">
+                <h4>📖 Description</h4>
+                <p style="font-size:11px;color:var(--muted);line-height:1.6;">${data.desc || 'No description available.'}</p>
+            </div>
+            <div class="country-detail-card">
+                <h4>⚔️ Military Forces</h4>
+                ${units.filter(u => u.country === countryKey && u.state !== "DESTROYED").map(u => 
+                    `<div class="stat-row"><span>${u.type}</span><b>${u.name} (${u.state})</b></div>`
+                ).join('') || '<p style="font-size:10px;color:var(--muted);">No active units</p>'}
+            </div>
+            <div class="country-detail-card">
+                <h4>🤝 Diplomatic Relations</h4>
+                ${Object.keys(nation).filter(k => k !== countryKey).map(k => {
+                    const val = diplomacy[k] || 0;
+                    return `<div class="stat-row"><span>${nation[k].flag} ${nation[k].name}</span><b style="color:${val > 0 ? 'var(--green)' : val < -30 ? 'var(--red)' : 'var(--accent)'}">${val}</b></div>`;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    modal.classList.add('open');
+}
+
+/* =========================================================
+   3D UNIT CREATION
    ========================================================== */
 
 function create3DTank(color) {
@@ -827,61 +1039,61 @@ function updateUnitHPBar(unit) {
 
 function deployInitialForces() {
     units.length = 0;
-    // Bangladesh Forces
-    create3DUnit("1st Infantry Division", "INFANTRY", -8, -18, true, "BANGLADESH");
-    create3DUnit("2nd Infantry Division", "INFANTRY", 0, -22, true, "BANGLADESH");
-    create3DUnit("Armored Brigade", "TANK", -5, -15, true, "BANGLADESH");
-    create3DUnit("Artillery Regiment", "ARTILLERY", -12, -20, true, "BANGLADESH");
-    create3DUnit("Air Wing", "AIR", -3, -25, true, "BANGLADESH");
+    // Bangladesh
+    create3DUnit("1st Infantry Div", "INFANTRY", -6, -22, true, "BANGLADESH");
+    create3DUnit("2nd Infantry Div", "INFANTRY", 2, -26, true, "BANGLADESH");
+    create3DUnit("Armored Brigade", "TANK", -4, -18, true, "BANGLADESH");
+    create3DUnit("Artillery Reg", "ARTILLERY", -10, -24, true, "BANGLADESH");
+    create3DUnit("Air Wing", "AIR", -2, -30, true, "BANGLADESH");
     
-    // Pakistan Forces (Friendly)
-    create3DUnit("Pakistani Infantry", "INFANTRY", 25, 18, true, "PAKISTAN");
-    create3DUnit("Pakistani Armor", "TANK", 30, 22, true, "PAKISTAN");
+    // Pakistan
+    create3DUnit("Pakistani Infantry", "INFANTRY", 28, 16, true, "PAKISTAN");
+    create3DUnit("Pakistani Armor", "TANK", 32, 20, true, "PAKISTAN");
     
-    // Turkey Forces (Friendly)
-    create3DUnit("Turkish Infantry", "INFANTRY", -55, 48, true, "TURKEY");
-    create3DUnit("Turkish Artillery", "ARTILLERY", -60, 45, true, "TURKEY");
+    // Turkey
+    create3DUnit("Turkish Infantry", "INFANTRY", -58, 42, true, "TURKEY");
+    create3DUnit("Turkish Artillery", "ARTILLERY", -62, 38, true, "TURKEY");
     
-    // Iran Forces (Friendly)
-    create3DUnit("Iranian Infantry", "INFANTRY", 18, 35, true, "IRAN");
-    create3DUnit("Iranian Armor", "TANK", 22, 38, true, "IRAN");
+    // Iran
+    create3DUnit("Iranian Infantry", "INFANTRY", 16, 32, true, "IRAN");
+    create3DUnit("Iranian Armor", "TANK", 20, 36, true, "IRAN");
     
-    // Saudi Forces (Friendly)
-    create3DUnit("Saudi Infantry", "INFANTRY", 18, 18, true, "SAUDI");
+    // Saudi
+    create3DUnit("Saudi Infantry", "INFANTRY", 16, 16, true, "SAUDI");
     
-    // Egypt Forces (Friendly)
-    create3DUnit("Egyptian Infantry", "INFANTRY", -25, 12, true, "EGYPT");
+    // Egypt
+    create3DUnit("Egyptian Infantry", "INFANTRY", -28, 10, true, "EGYPT");
     
-    // Palestine Forces (Friendly)
-    create3DUnit("Palestinian Defense", "INFANTRY", -3, 30, true, "PALESTINE");
+    // Palestine
+    create3DUnit("Palestinian Defense", "INFANTRY", -4, 28, true, "PALESTINE");
     
-    // India Forces (Neutral)
-    create3DUnit("Indian Infantry", "INFANTRY", 10, -8, false, "INDIA");
-    create3DUnit("Indian Armor", "TANK", 15, -5, false, "INDIA");
+    // India (Neutral)
+    create3DUnit("Indian Infantry", "INFANTRY", 8, -12, false, "INDIA");
+    create3DUnit("Indian Armor", "TANK", 14, -8, false, "INDIA");
     
-    // China Forces (Neutral)
-    create3DUnit("Chinese Infantry", "INFANTRY", 55, 5, false, "CHINA");
-    create3DUnit("Chinese Armor", "TANK", 60, 10, false, "CHINA");
+    // China (Neutral)
+    create3DUnit("Chinese Infantry", "INFANTRY", 52, 4, false, "CHINA");
+    create3DUnit("Chinese Armor", "TANK", 58, 8, false, "CHINA");
     
-    // Russia Forces (Neutral)
-    create3DUnit("Russian Infantry", "INFANTRY", 35, 70, false, "RUSSIA");
+    // Russia
+    create3DUnit("Russian Infantry", "INFANTRY", 32, 68, false, "RUSSIA");
     
-    // USA Forces (Neutral)
-    create3DUnit("US Infantry", "INFANTRY", -130, -30, false, "USA");
-    create3DUnit("US Armor", "TANK", -125, -35, false, "USA");
+    // USA
+    create3DUnit("US Infantry", "INFANTRY", -132, -32, false, "USA");
+    create3DUnit("US Armor", "TANK", -128, -38, false, "USA");
     
-    // UK Forces (Neutral)
-    create3DUnit("UK Infantry", "INFANTRY", -120, 35, false, "UK");
+    // UK
+    create3DUnit("UK Infantry", "INFANTRY", -124, 32, false, "UK");
     
-    // France Forces (Neutral)
-    create3DUnit("French Infantry", "INFANTRY", -45, 40, false, "FRANCE");
+    // France
+    create3DUnit("French Infantry", "INFANTRY", -48, 38, false, "FRANCE");
     
-    // Germany Forces (Neutral)
-    create3DUnit("German Infantry", "INFANTRY", -10, 12, false, "GERMANY");
+    // Germany
+    create3DUnit("German Infantry", "INFANTRY", -12, 10, false, "GERMANY");
 }
 
 /* =========================================================
-   COMBAT SYSTEM (Same as before - optimized)
+   COMBAT SYSTEM
    ========================================================== */
 
 function getTerrainModifier(unit) {
@@ -988,7 +1200,7 @@ function executeAirstrike(aircraft, target) {
 }
 
 function createExplosion(position) {
-    const count = 10;
+    const count = 12;
     for (let i = 0; i < count; i++) {
         const mesh = new THREE.Mesh(
             new THREE.SphereGeometry(0.2 + Math.random() * 0.6, 6, 6),
@@ -1033,7 +1245,7 @@ function destroyUnit(unit, killer = null) {
 }
 
 /* =========================================================
-   ECONOMY (Enhanced)
+   ECONOMY
    ========================================================== */
 
 function updateEconomy(dt) {
@@ -1060,7 +1272,7 @@ function updateEconomy(dt) {
 }
 
 /* =========================================================
-   PRODUCTION (Enhanced - Easy Building)
+   PRODUCTION
    ========================================================== */
 
 function updateProduction(dt) {
@@ -1135,6 +1347,30 @@ function quickBuildFactory() {
     updateAllUI();
 }
 
+function quickReinforce() {
+    if (money < 300) {
+        toast("Need $300 to reinforce");
+        return;
+    }
+    if (manpower < 1000) {
+        toast("Not enough manpower");
+        return;
+    }
+    money -= 300;
+    manpower -= 1000;
+    // Reinforce all friendly units
+    for (const unit of units) {
+        if (unit.friendly && unit.state !== "DESTROYED") {
+            unit.hp = Math.min(unit.maxHp, unit.hp + 20);
+            unit.organization = Math.min(unit.maxOrganization, unit.organization + 15);
+            unit.morale = Math.min(100, unit.morale + 10);
+            updateUnitHPBar(unit);
+        }
+    }
+    toast("🪖 Units reinforced!");
+    updateAllUI();
+}
+
 /* =========================================================
    RESEARCH
    ========================================================== */
@@ -1187,7 +1423,7 @@ function applyTechnology(key) {
 }
 
 /* =========================================================
-   DIPLOMACY (Updated for all countries)
+   DIPLOMACY
    ========================================================== */
 
 function improveDiplomacy(country) {
@@ -1551,6 +1787,9 @@ const panels = {
                 progressRow("Organization", averageStat("organization")) +
                 progressRow("Morale", averageStat("morale")) +
                 progressRow("Readiness", averageStat("readiness"))
+            ) +
+            infoCard("💡 Tip", 
+                '<p style="font-size:10px;color:var(--accent);">Click any country on the map to view its territory, states, and diplomatic relations!</p>'
             )
     },
     army: {
@@ -1579,19 +1818,19 @@ const panels = {
         kicker: "NATIONAL ECONOMY",
         html: () =>
             infoCard("Resources",
-                statRow("Money", Math.floor(money).toLocaleString()) +
-                statRow("Oil", Math.floor(oil).toLocaleString()) +
-                statRow("Steel", Math.floor(steel).toLocaleString()) +
-                statRow("Food", Math.floor(food).toLocaleString()) +
-                statRow("Manpower", Math.floor(manpower).toLocaleString())
+                statRow("💰 Money", Math.floor(money).toLocaleString(), "highlight") +
+                statRow("🛢️ Oil", Math.floor(oil).toLocaleString()) +
+                statRow("⚙️ Steel", Math.floor(steel).toLocaleString()) +
+                statRow("🌾 Food", Math.floor(food).toLocaleString()) +
+                statRow("👥 Manpower", Math.floor(manpower).toLocaleString())
             ) +
             infoCard("National Stability",
                 progressRow("Stability", stability) +
                 statRow("Tax Rate", `${tax}%`) +
                 statRow("Political Power", Math.floor(political)) +
                 statRow("Construction", construction.toFixed(1)) +
-                statRow("Civilian Factories", factories.civilian) +
-                statRow("Military Factories", factories.military)
+                statRow("🏭 Civilian Factories", factories.civilian) +
+                statRow("🏭 Military Factories", factories.military)
             ) +
             actionButton("tax-down", "LOWER TAX — 2%") +
             actionButton("tax-up", "RAISE TAX — 2%") +
@@ -1615,7 +1854,8 @@ const panels = {
             actionButton("buy-infantry", "BUY INFANTRY — $350 / 35 STEEL", "success") +
             actionButton("buy-artillery", "BUY ARTILLERY — $600 / 65 STEEL", "success") +
             actionButton("buy-air", "BUY AIRCRAFT — $1100 / 90 STEEL", "success") +
-            actionButton("quick-factory", "⚡ QUICK BUILD FACTORY — $500", "success")
+            actionButton("quick-factory", "⚡ QUICK BUILD FACTORY — $500", "success") +
+            actionButton("quick-reinforce", "🪖 QUICK REINFORCE — $300", "success")
     },
     research: {
         title: "Technology",
@@ -1721,17 +1961,18 @@ function setupUI() {
     const airstrikeBtn = $("airstrikeCommand");
     if (airstrikeBtn) airstrikeBtn.addEventListener('click', commandAirstrike);
 
-    // Quick Factory
+    // Quick actions
     const quickFactory = $("quickFactory");
-    if (quickFactory) {
-        quickFactory.addEventListener('click', quickBuildFactory);
-    }
+    if (quickFactory) quickFactory.addEventListener('click', quickBuildFactory);
+    const quickReinforce = $("quickReinforce");
+    if (quickReinforce) quickReinforce.addEventListener('click', quickReinforce);
 
+    // Camera controls
     const zoomIn = $("zoomIn");
     if (zoomIn) {
         zoomIn.addEventListener('click', () => {
             const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
-            camera.position.addScaledVector(dir, -8);
+            camera.position.addScaledVector(dir, -10);
             controls.update();
         });
     }
@@ -1739,7 +1980,7 @@ function setupUI() {
     if (zoomOut) {
         zoomOut.addEventListener('click', () => {
             const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
-            camera.position.addScaledVector(dir, 8);
+            camera.position.addScaledVector(dir, 10);
             controls.update();
         });
     }
@@ -1747,6 +1988,14 @@ function setupUI() {
     if (resetCam) {
         resetCam.addEventListener('click', () => {
             camera.position.set(80, 80, 120);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        });
+    }
+    const topDown = $("topDown");
+    if (topDown) {
+        topDown.addEventListener('click', () => {
+            camera.position.set(0, 140, 0.1);
             controls.target.set(0, 0, 0);
             controls.update();
         });
@@ -1769,6 +2018,16 @@ function setupUI() {
         });
     }
 
+    // Country display click
+    const countryDisplay = $("countryDisplay");
+    if (countryDisplay) {
+        countryDisplay.addEventListener('click', () => {
+            const modal = $("countryModal");
+            if (modal) modal.classList.add('open');
+        });
+    }
+
+    // Country selection
     document.querySelectorAll('.country-card').forEach(card => {
         card.addEventListener('click', () => {
             currentCountry = card.dataset.country;
@@ -1781,6 +2040,7 @@ function setupUI() {
             if (modal) modal.classList.remove('open');
             toast(`Switched to ${data.name}`);
             updateAllUI();
+            highlightCountry(currentCountry);
         });
     });
     const closeCountry = $("closeCountryModal");
@@ -1791,12 +2051,22 @@ function setupUI() {
         });
     }
 
+    // Country Info Modal close
+    const closeCountryInfo = $("closeCountryInfo");
+    if (closeCountryInfo) {
+        closeCountryInfo.addEventListener('click', () => {
+            const modal = $("countryInfoModal");
+            if (modal) modal.classList.remove('open');
+        });
+    }
+
+    // Tutorial
     let tutorialStep = 0;
     const tutorialData = [
-        { title: "Welcome, Commander!", text: "Select a military unit and command it across the global battlefield." },
-        { title: "Movement", text: "Click a friendly unit, then click 'MOVE' and tap terrain to set destination." },
-        { title: "Combat", text: "Select a unit, click 'ATTACK', then tap an enemy unit to engage." },
-        { title: "Strategy", text: "Use the left panel to manage economy, production, research, and diplomacy." }
+        { title: "🌍 Welcome, Commander!", text: "Select a military unit and command it across the global battlefield. Click any country to view its territory and states." },
+        { title: "📍 Movement", text: "Click a friendly unit (🟢), then click 'MOVE' and tap terrain to set destination." },
+        { title: "⚔️ Combat", text: "Select a unit, click 'ATTACK', then tap an enemy unit (🔴) to engage in combat." },
+        { title: "📊 Strategy", text: "Use the left panel to manage economy, production, research, and diplomacy. Click countries for detailed info!" }
     ];
     const tutorialNext = $("tutorialNext");
     if (tutorialNext) {
@@ -1868,6 +2138,11 @@ function setupUI() {
                 openPanel("production");
                 return;
             }
+            if (target.id === 'quick-reinforce') {
+                quickReinforce();
+                openPanel("production");
+                return;
+            }
 
             if (target.id.startsWith('factory-')) {
                 const type = target.id.replace('factory-', '');
@@ -1920,6 +2195,9 @@ function setupUI() {
     const nameEl = $("countryName");
     if (flagEl) flagEl.textContent = data.flag;
     if (nameEl) nameEl.textContent = data.name;
+
+    // Highlight initial country
+    highlightCountry(currentCountry);
 
     openPanel('overview');
     updateDateDisplay();
@@ -2086,6 +2364,22 @@ function handleWorldClick(event) {
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
 
+    // Check for country clicks first (on ground)
+    const groundHits = raycaster.intersectObjects(borderGroup.children, true);
+    for (const hit of groundHits) {
+        let obj = hit.object;
+        while (obj) {
+            if (obj.userData?.country && nation[obj.userData.country]) {
+                const country = obj.userData.country;
+                highlightCountry(country);
+                toast(`📍 ${nation[country].flag} ${nation[country].name} — Clicked!`);
+                return;
+            }
+            obj = obj.parent;
+        }
+    }
+
+    // Check for unit clicks
     const unitHits = raycaster.intersectObjects(unitGroup.children, true);
     if (unitHits.length) {
         let object = unitHits[0].object;
@@ -2104,10 +2398,11 @@ function handleWorldClick(event) {
         }
     }
 
+    // Move command
     if (selectedUnit && moveMode) {
-        const groundHits = raycaster.intersectObject(ground);
-        if (groundHits.length) {
-            const point = groundHits[0].point;
+        const groundHits2 = raycaster.intersectObject(ground);
+        if (groundHits2.length) {
+            const point = groundHits2[0].point;
             setUnitDestination(selectedUnit, point);
             moveMode = false;
             toast(`${selectedUnit.name} moving`);
@@ -2193,8 +2488,8 @@ function progressRow(label, value, max = 100) {
     `;
 }
 
-function statRow(label, value) {
-    return `<div class="stat-row"><span>${label}</span><b>${value}</b></div>`;
+function statRow(label, value, cls = "") {
+    return `<div class="stat-row"><span>${label}</span><b class="${cls}">${value}</b></div>`;
 }
 
 /* =========================================================
@@ -2256,6 +2551,15 @@ function loop() {
             const ring = selectedUnit.selectionRing;
             ring.material.opacity = 0.6 + Math.sin(Date.now() * 0.003) * 0.3;
             ring.scale.setScalar(1 + Math.sin(Date.now() * 0.002) * 0.05);
+        }
+
+        // Highlight animation
+        if (highlightGroup.children.length > 0) {
+            for (const child of highlightGroup.children) {
+                if (child.material) {
+                    child.material.opacity = 0.2 + Math.sin(Date.now() * 0.002) * 0.15;
+                }
+            }
         }
     }
 
