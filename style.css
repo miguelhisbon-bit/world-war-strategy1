@@ -11,6 +11,7 @@
     --red: #e45d5d;
     --blue: #58a6ff;
     --gold: #ffd700;
+    --gradient: linear-gradient(135deg, rgba(213,173,85,0.15), rgba(213,173,85,0.02));
 }
 html, body {
     width: 100%;
@@ -21,7 +22,7 @@ html, body {
     font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     touch-action: none;
 }
-button { border: 0; color: inherit; font: inherit; cursor: pointer; }
+button { border: 0; color: inherit; font: inherit; cursor: pointer; transition: all 0.2s ease; }
 #game {
     position: fixed;
     inset: 0;
@@ -230,6 +231,7 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     border: 1px solid var(--accent);
     color: var(--accent);
     font-weight: 900;
+    border-radius: 4px;
 }
 .brand-title {
     font-size: 14px;
@@ -250,14 +252,16 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     font-weight: 700;
     white-space: nowrap;
     cursor: pointer;
-    padding: 4px 10px;
+    padding: 4px 14px;
     border-radius: 6px;
     border: 1px solid var(--line);
-    transition: .2s;
+    background: var(--gradient);
+    transition: all 0.3s ease;
 }
 .country-display:hover {
     border-color: var(--accent);
-    background: rgba(213,173,85,.1);
+    background: rgba(213,173,85,0.15);
+    transform: scale(1.02);
 }
 #countryFlag { font-size: 22px; }
 .resources {
@@ -273,11 +277,12 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     background: rgba(255,255,255,.04);
     border-radius: 5px;
     font-size: 11px;
-    transition: .2s;
+    transition: all 0.3s ease;
 }
 .resource:hover {
     border-color: var(--accent);
-    background: rgba(213,173,85,.05);
+    background: rgba(213,173,85,0.08);
+    transform: translateY(-1px);
 }
 .resource span { margin-right: 5px; }
 .resource b { font-size: 11px; }
@@ -298,11 +303,12 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     background: rgba(255,255,255,.07);
     border: 1px solid var(--line);
     border-radius: 5px;
-    transition: .2s;
+    transition: all 0.3s ease;
 }
 .date-control button:hover {
     border-color: var(--accent);
-    background: rgba(213,173,85,.1);
+    background: rgba(213,173,85,0.15);
+    transform: scale(1.05);
 }
 
 /* ================= LEFT PANEL ================= */
@@ -334,13 +340,19 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     border-radius: 6px;
     background: transparent;
     color: #87939c;
-    transition: .2s;
+    transition: all 0.3s ease;
 }
 .panel-button span { font-size: 18px; }
 .panel-button small { font-size: 8px; }
-.panel-button:hover, .panel-button.active {
-    background: rgba(213,173,85,.12);
+.panel-button:hover {
+    background: rgba(213,173,85,0.12);
     color: var(--accent);
+    transform: scale(1.05);
+}
+.panel-button.active {
+    background: rgba(213,173,85,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(213,173,85,0.2);
 }
 
 /* ================= MAIN PANEL ================= */
@@ -358,6 +370,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     border-radius: 10px;
     box-shadow: 0 20px 60px rgba(0,0,0,.45);
     backdrop-filter: blur(18px);
+    animation: slideIn 0.3s ease;
+}
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
 }
 #mainPanel.open { display: block; }
 .panel-header {
@@ -383,11 +400,12 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     background: rgba(255,255,255,.06);
     color: #9da8af;
     font-size: 20px;
-    transition: .2s;
+    transition: all 0.3s ease;
 }
 #closePanel:hover, #closeUnit:hover, .modal-close:hover {
     background: rgba(228,93,93,.2);
     color: var(--red);
+    transform: rotate(90deg);
 }
 #panelContent {
     max-height: calc(100vh - 250px);
@@ -400,6 +418,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     border: 1px solid var(--line);
     border-radius: 7px;
     background: rgba(255,255,255,.025);
+    transition: all 0.3s ease;
+}
+.info-card:hover {
+    border-color: var(--accent);
+    background: rgba(213,173,85,0.05);
 }
 .info-card h3 {
     font-size: 12px;
@@ -432,9 +455,12 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     border-radius: 6px;
     font-size: 11px;
     font-weight: 800;
-    transition: .2s;
+    transition: all 0.3s ease;
 }
-.action-btn:hover { background: rgba(213,173,85,.25); transform: scale(1.01); }
+.action-btn:hover {
+    background: rgba(213,173,85,.25);
+    transform: scale(1.02);
+}
 .action-btn.success {
     background: rgba(85,209,138,.15);
     border-color: var(--green);
@@ -464,6 +490,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     border-radius: 10px;
     box-shadow: 0 20px 60px rgba(0,0,0,.5);
     backdrop-filter: blur(15px);
+    animation: slideUp 0.3s ease;
+}
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 #unitPanel.open { display: block; }
 .unit-header {
@@ -514,17 +545,18 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     font-size: 9px;
     font-weight: 800;
     color: #bdc7cc;
-    transition: .2s;
+    transition: all 0.3s ease;
 }
 .command-btn span {
     display: block;
     font-size: 17px;
     margin-bottom: 4px;
 }
-.command-btn:hover, .command-btn:active {
+.command-btn:hover {
     border-color: var(--accent);
     color: var(--accent);
     background: rgba(213,173,85,.1);
+    transform: scale(1.02);
 }
 .command-btn.danger:hover {
     border-color: var(--red);
@@ -550,11 +582,12 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     background: rgba(7,11,14,.8);
     color: #c9d0d4;
     font-size: 19px;
-    transition: .2s;
+    transition: all 0.3s ease;
 }
 #cameraControls button:hover {
     background: rgba(213,173,85,.2);
     border-color: var(--accent);
+    transform: scale(1.05);
 }
 
 /* ================= MINIMAP ================= */
@@ -612,6 +645,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     border-radius: 50%;
     background: var(--green);
     box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.4; }
 }
 #battleStatus {
     color: var(--accent);
@@ -625,13 +663,14 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     left: 50%;
     bottom: 55px;
     transform: translateX(-50%);
-    padding: 8px 13px;
+    padding: 8px 16px;
     background: rgba(6,10,13,.75);
     border: 1px solid var(--line);
     border-radius: 20px;
     color: #9aa5ac;
     font-size: 9px;
     pointer-events: none;
+    backdrop-filter: blur(8px);
 }
 
 /* ================= TOAST ================= */
@@ -641,7 +680,7 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     left: 50%;
     top: 88px;
     transform: translateX(-50%) translateY(-20px);
-    padding: 10px 18px;
+    padding: 10px 20px;
     border: 1px solid rgba(213,173,85,.35);
     background: rgba(10,15,19,.94);
     color: #d8c086;
@@ -649,7 +688,8 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     font-size: 11px;
     opacity: 0;
     pointer-events: none;
-    transition: .3s;
+    transition: all 0.4s ease;
+    backdrop-filter: blur(8px);
 }
 #toast.show {
     opacity: 1;
@@ -666,6 +706,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     padding: 20px;
     background: rgba(0,0,0,.72);
     backdrop-filter: blur(10px);
+    animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 .modal.open { display: grid; }
 .modal-box {
@@ -677,6 +722,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     background: #0b1116;
     border: 1px solid var(--line);
     border-radius: 12px;
+    animation: scaleIn 0.3s ease;
+}
+@keyframes scaleIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
 }
 .modal-box h2 {
     margin-top: 8px;
@@ -700,12 +750,13 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     background: rgba(255,255,255,.035);
     border: 1px solid var(--line);
     border-radius: 8px;
-    transition: .2s;
+    transition: all 0.3s ease;
 }
 .country-card:hover {
     border-color: var(--accent);
-    transform: translateY(-2px);
-    background: rgba(213,173,85,.05);
+    transform: translateY(-3px) scale(1.02);
+    background: rgba(213,173,85,.08);
+    box-shadow: 0 10px 30px rgba(0,0,0,.3);
 }
 .country-card span {
     display: block;
@@ -719,11 +770,6 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
 .country-card small {
     color: var(--muted);
     font-size: 9px;
-}
-.country-card .state-count {
-    font-size: 8px;
-    color: var(--accent);
-    margin-top: 4px;
 }
 
 /* ================= TUTORIAL ================= */
@@ -748,6 +794,7 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     border-radius: 10px;
     box-shadow: 0 20px 60px rgba(0,0,0,.5);
     pointer-events: auto;
+    animation: slideUp 0.5s ease;
 }
 .tutorial-icon {
     width: 48px;
@@ -768,12 +815,17 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     color: var(--muted);
 }
 #tutorialNext {
-    padding: 10px 15px;
+    padding: 10px 20px;
     background: var(--accent);
     color: #111;
     border-radius: 5px;
     font-size: 10px;
     font-weight: 900;
+    transition: all 0.3s ease;
+}
+#tutorialNext:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(213,173,85,.3);
 }
 
 /* ================= QUICK ACTIONS ================= */
@@ -782,7 +834,7 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     border-radius: 4px !important;
     font-weight: 700 !important;
     font-size: 10px !important;
-    transition: .2s !important;
+    transition: all 0.3s ease !important;
 }
 #quickFactory {
     background: var(--accent) !important;
@@ -811,6 +863,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     border: 1px solid var(--line);
     border-radius: 6px;
     background: rgba(255,255,255,.03);
+    transition: all 0.3s ease;
+}
+.country-detail-card:hover {
+    border-color: var(--accent);
+    background: rgba(213,173,85,.05);
 }
 .country-detail-card h4 {
     color: var(--accent);
@@ -825,6 +882,11 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     font-size: 9px;
     border: 1px solid var(--line);
     background: rgba(255,255,255,.05);
+    transition: all 0.3s ease;
+}
+.state-tag:hover {
+    border-color: var(--accent);
+    background: rgba(213,173,85,.1);
 }
 
 /* ================= SCROLLBAR ================= */
