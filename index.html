@@ -24,41 +24,25 @@
 <!-- ================= LOADING ================= -->
 
 <div id="loadingScreen">
-
     <div class="loading-background">
         <div class="smoke smoke1"></div>
         <div class="smoke smoke2"></div>
         <div class="smoke smoke3"></div>
-
         <div class="loading-soldier soldier1"></div>
         <div class="loading-soldier soldier2"></div>
-
         <div class="loading-tank"></div>
-
         <div class="loading-explosion exp1"></div>
         <div class="loading-explosion exp2"></div>
     </div>
-
     <div class="loading-content">
         <div class="loading-eyebrow">TACTICAL COMMAND SYSTEM</div>
         <h1>WORLD WAR</h1>
         <div class="loading-subtitle">3D GRAND STRATEGY</div>
-
-        <div class="loading-status" id="loadingStatus">
-            Preparing battlefield...
-        </div>
-
-        <div class="loading-bar">
-            <div id="loadingProgress"></div>
-        </div>
-
-        <div class="loading-tip" id="loadingTip">
-            TIP: Use the strategy camera to monitor your entire frontline.
-        </div>
+        <div class="loading-status" id="loadingStatus">Preparing battlefield...</div>
+        <div class="loading-bar"><div id="loadingProgress"></div></div>
+        <div class="loading-tip" id="loadingTip">TIP: Use the strategy camera to monitor your entire frontline.</div>
     </div>
-
 </div>
-
 
 <!-- ================= MAIN GAME ================= -->
 
@@ -66,331 +50,141 @@
 
     <canvas id="gameCanvas"></canvas>
 
-
     <!-- TOP BAR -->
-
     <header id="topBar">
-
         <div class="brand">
             <div class="brand-mark">W</div>
-
             <div>
                 <div class="brand-title">WORLD WAR</div>
                 <div class="brand-subtitle">COMMAND</div>
             </div>
         </div>
-
         <div class="country-display">
             <span id="countryFlag">🇺🇸</span>
             <span id="countryName">United States</span>
         </div>
-
         <div class="resources">
-
-            <div class="resource">
-                <span>💰</span>
-                <b id="money">12500</b>
-            </div>
-
-            <div class="resource">
-                <span>🛢️</span>
-                <b id="oil">850</b>
-            </div>
-
-            <div class="resource">
-                <span>⚙️</span>
-                <b id="steel">1250</b>
-            </div>
-
-            <div class="resource">
-                <span>🌾</span>
-                <b id="food">1600</b>
-            </div>
-
-            <div class="resource">
-                <span>👥</span>
-                <b id="manpower">85000</b>
-            </div>
-
+            <div class="resource"><span>💰</span><b id="money">12500</b></div>
+            <div class="resource"><span>🛢️</span><b id="oil">850</b></div>
+            <div class="resource"><span>⚙️</span><b id="steel">1250</b></div>
+            <div class="resource"><span>🌾</span><b id="food">1600</b></div>
+            <div class="resource"><span>👥</span><b id="manpower">85000</b></div>
         </div>
-
         <div class="date-control">
-
             <div id="gameDate">1940 • JAN 01</div>
-
             <button id="pauseBtn">Ⅱ</button>
-
             <button id="speedBtn">1×</button>
-
         </div>
-
     </header>
 
-
     <!-- LEFT SIDE -->
-
     <aside id="leftPanel">
-
-        <button class="panel-button active" data-panel="overview">
-            <span>🌍</span>
-            <small>World</small>
-        </button>
-
-        <button class="panel-button" data-panel="army">
-            <span>🪖</span>
-            <small>Army</small>
-        </button>
-
-        <button class="panel-button" data-panel="economy">
-            <span>💰</span>
-            <small>Economy</small>
-        </button>
-
-        <button class="panel-button" data-panel="production">
-            <span>🏭</span>
-            <small>Production</small>
-        </button>
-
-        <button class="panel-button" data-panel="research">
-            <span>🔬</span>
-            <small>Research</small>
-        </button>
-
-        <button class="panel-button" data-panel="diplomacy">
-            <span>🤝</span>
-            <small>Diplomacy</small>
-        </button>
-
-        <button class="panel-button" data-panel="intel">
-            <span>🕵️</span>
-            <small>Intel</small>
-        </button>
-
-        <button class="panel-button" data-panel="settings">
-            <span>⚙️</span>
-            <small>Settings</small>
-        </button>
-
+        <button class="panel-button active" data-panel="overview"><span>🌍</span><small>World</small></button>
+        <button class="panel-button" data-panel="army"><span>🪖</span><small>Army</small></button>
+        <button class="panel-button" data-panel="economy"><span>💰</span><small>Economy</small></button>
+        <button class="panel-button" data-panel="production"><span>🏭</span><small>Production</small></button>
+        <button class="panel-button" data-panel="research"><span>🔬</span><small>Research</small></button>
+        <button class="panel-button" data-panel="diplomacy"><span>🤝</span><small>Diplomacy</small></button>
+        <button class="panel-button" data-panel="intel"><span>🕵️</span><small>Intel</small></button>
+        <button class="panel-button" data-panel="settings"><span>⚙️</span><small>Settings</small></button>
     </aside>
 
-
     <!-- MAIN INFORMATION PANEL -->
-
     <section id="mainPanel">
-
         <div class="panel-header">
             <div>
-                <div class="panel-kicker" id="panelKicker">
-                    STRATEGIC COMMAND
-                </div>
-
+                <div class="panel-kicker" id="panelKicker">STRATEGIC COMMAND</div>
                 <h2 id="panelTitle">World Overview</h2>
             </div>
-
             <button id="closePanel">×</button>
         </div>
-
         <div id="panelContent"></div>
-
     </section>
-
 
     <!-- BATTLE / UNIT PANEL -->
-
     <section id="unitPanel">
-
         <div class="unit-header">
-
             <div>
-                <div class="unit-type" id="selectedUnitType">
-                    NO UNIT SELECTED
-                </div>
-
+                <div class="unit-type" id="selectedUnitType">NO UNIT SELECTED</div>
                 <h2 id="selectedUnitName">Select an army</h2>
             </div>
-
             <button id="closeUnit">×</button>
-
         </div>
-
         <div id="unitStats"></div>
-
         <div class="command-grid">
-
-            <button class="command-btn" id="moveCommand">
-                <span>📍</span>
-                MOVE
-            </button>
-
-            <button class="command-btn danger" id="attackCommand">
-                <span>⚔️</span>
-                ATTACK
-            </button>
-
-            <button class="command-btn" id="defendCommand">
-                <span>🛡️</span>
-                DEFEND
-            </button>
-
-            <button class="command-btn" id="holdCommand">
-                <span>⏸</span>
-                HOLD
-            </button>
-
-            <button class="command-btn" id="retreatCommand">
-                <span>↩️</span>
-                RETREAT
-            </button>
-
-            <button class="command-btn" id="airstrikeCommand">
-                <span>✈️</span>
-                AIRSTRIKE
-            </button>
-
+            <button class="command-btn" id="moveCommand"><span>📍</span>MOVE</button>
+            <button class="command-btn danger" id="attackCommand"><span>⚔️</span>ATTACK</button>
+            <button class="command-btn" id="defendCommand"><span>🛡️</span>DEFEND</button>
+            <button class="command-btn" id="holdCommand"><span>⏸</span>HOLD</button>
+            <button class="command-btn" id="retreatCommand"><span>↩️</span>RETREAT</button>
+            <button class="command-btn" id="airstrikeCommand"><span>✈️</span>AIRSTRIKE</button>
         </div>
-
     </section>
 
-
     <!-- BOTTOM TOUCH COMMAND -->
-
-    <div id="touchHint">
-        <span>👆</span>
-        Tap a unit to select • Tap terrain to move
-    </div>
-
+    <div id="touchHint"><span>👆</span>Tap a unit to select • Tap terrain to move</div>
 
     <!-- CAMERA CONTROLS -->
-
     <div id="cameraControls">
-
         <button id="zoomIn">＋</button>
         <button id="zoomOut">−</button>
         <button id="resetCamera">⌖</button>
-
     </div>
 
-
     <!-- MINIMAP -->
-
     <div id="miniMap">
-
         <div class="mini-title">TACTICAL MAP</div>
-
         <div class="mini-map-body">
             <div class="mini-land land1"></div>
             <div class="mini-land land2"></div>
             <div class="mini-land land3"></div>
-
             <div id="miniUnits"></div>
         </div>
-
     </div>
 
-
     <!-- BOTTOM STATUS -->
-
     <div id="bottomStatus">
-
         <div>
             <span class="status-dot"></span>
             <span id="statusText">All systems operational</span>
         </div>
-
-        <div id="battleStatus">
-            NO ACTIVE BATTLE
-        </div>
-
+        <div id="battleStatus">NO ACTIVE BATTLE</div>
     </div>
-
 
     <!-- TOAST -->
-
     <div id="toast"></div>
 
-
     <!-- COUNTRY SELECT -->
-
     <div id="countryModal" class="modal">
-
         <div class="modal-box">
-
             <button class="modal-close" id="closeCountryModal">×</button>
-
             <div class="panel-kicker">SELECT NATION</div>
             <h2>Choose Your Country</h2>
-
             <div class="country-grid">
-
-                <button class="country-card" data-country="USA">
-                    <span>🇺🇸</span>
-                    <b>United States</b>
-                    <small>Industrial Power</small>
-                </button>
-
-                <button class="country-card" data-country="GERMANY">
-                    <span>🇩🇪</span>
-                    <b>Germany</b>
-                    <small>Military Power</small>
-                </button>
-
-                <button class="country-card" data-country="UK">
-                    <span>🇬🇧</span>
-                    <b>United Kingdom</b>
-                    <small>Naval Power</small>
-                </button>
-
-                <button class="country-card" data-country="JAPAN">
-                    <span>🇯🇵</span>
-                    <b>Japan</b>
-                    <small>Pacific Power</small>
-                </button>
-
-                <button class="country-card" data-country="USSR">
-                    <span>☭</span>
-                    <b>Soviet Union</b>
-                    <small>Manpower Power</small>
-                </button>
-
-                <button class="country-card" data-country="FRANCE">
-                    <span>🇫🇷</span>
-                    <b>France</b>
-                    <small>European Power</small>
-                </button>
-
+                <button class="country-card" data-country="USA"><span>🇺🇸</span><b>United States</b><small>Industrial Power</small></button>
+                <button class="country-card" data-country="GERMANY"><span>🇩🇪</span><b>Germany</b><small>Military Power</small></button>
+                <button class="country-card" data-country="UK"><span>🇬🇧</span><b>United Kingdom</b><small>Naval Power</small></button>
+                <button class="country-card" data-country="JAPAN"><span>🇯🇵</span><b>Japan</b><small>Pacific Power</small></button>
+                <button class="country-card" data-country="USSR"><span>☭</span><b>Soviet Union</b><small>Manpower Power</small></button>
+                <button class="country-card" data-country="FRANCE"><span>🇫🇷</span><b>France</b><small>European Power</small></button>
             </div>
-
         </div>
-
     </div>
 
-
     <!-- TUTORIAL -->
-
     <div id="tutorial">
-
         <div class="tutorial-box">
-
             <div class="tutorial-icon">🎖️</div>
-
             <div>
                 <div class="panel-kicker">FIELD MANUAL</div>
                 <h2 id="tutorialTitle">Welcome, Commander</h2>
-
-                <p id="tutorialText">
-                    Select a military unit and command it across the battlefield.
-                </p>
+                <p id="tutorialText">Select a military unit and command it across the battlefield.</p>
             </div>
-
             <button id="tutorialNext">NEXT</button>
-
         </div>
-
     </div>
 
-
 </div>
-
 
 <script type="module" src="js/main.js"></script>
 
