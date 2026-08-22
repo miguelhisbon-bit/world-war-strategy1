@@ -55,7 +55,6 @@ button {
     display: block;
 }
 
-
 /* ================= LOADING ================= */
 
 #loadingScreen {
@@ -100,31 +99,13 @@ button {
     animation: smokeMove 8s infinite alternate ease-in-out;
 }
 
-.smoke1 {
-    left: 30%;
-    top: 10%;
-}
-
-.smoke2 {
-    right: -5%;
-    bottom: 10%;
-    animation-delay: 2s;
-}
-
-.smoke3 {
-    left: -10%;
-    bottom: -10%;
-    animation-delay: 4s;
-}
+.smoke1 { left: 30%; top: 10%; }
+.smoke2 { right: -5%; bottom: 10%; animation-delay: 2s; }
+.smoke3 { left: -10%; bottom: -10%; animation-delay: 4s; }
 
 @keyframes smokeMove {
-    from {
-        transform: translate(-5vw,0) scale(.9);
-    }
-
-    to {
-        transform: translate(5vw,-3vw) scale(1.2);
-    }
+    from { transform: translate(-5vw,0) scale(.9); }
+    to { transform: translate(5vw,-3vw) scale(1.2); }
 }
 
 .loading-tank {
@@ -184,24 +165,12 @@ button {
     top: -22px;
 }
 
-.soldier1 {
-    right: 38%;
-}
-
-.soldier2 {
-    right: 46%;
-    transform: scale(.8);
-    animation-delay: 1s;
-}
+.soldier1 { right: 38%; }
+.soldier2 { right: 46%; transform: scale(.8); animation-delay: 1s; }
 
 @keyframes soldierWalk {
-    from {
-        transform: translateX(-25px) rotate(-3deg);
-    }
-
-    to {
-        transform: translateX(25px) rotate(3deg);
-    }
+    from { transform: translateX(-25px) rotate(-3deg); }
+    to { transform: translateX(25px) rotate(3deg); }
 }
 
 .loading-explosion {
@@ -210,38 +179,17 @@ button {
     height: 30px;
     border-radius: 50%;
     background: #ffb43b;
-    box-shadow:
-        0 0 30px #ff6a1f,
-        0 0 70px #ff471f;
+    box-shadow: 0 0 30px #ff6a1f, 0 0 70px #ff471f;
     animation: explosion 2s infinite;
 }
 
-.exp1 {
-    right: 24%;
-    bottom: 26%;
-}
-
-.exp2 {
-    right: 48%;
-    bottom: 38%;
-    animation-delay: .8s;
-}
+.exp1 { right: 24%; bottom: 26%; }
+.exp2 { right: 48%; bottom: 38%; animation-delay: .8s; }
 
 @keyframes explosion {
-    0%,100% {
-        transform: scale(.3);
-        opacity: .2;
-    }
-
-    40% {
-        transform: scale(2.8);
-        opacity: 1;
-    }
-
-    70% {
-        transform: scale(1.2);
-        opacity: .5;
-    }
+    0%,100% { transform: scale(.3); opacity: .2; }
+    40% { transform: scale(2.8); opacity: 1; }
+    70% { transform: scale(1.2); opacity: .5; }
 }
 
 .loading-content {
@@ -303,7 +251,6 @@ button {
     color: #74818b;
     font-size: 11px;
 }
-
 
 /* ================= TOP BAR ================= */
 
@@ -414,7 +361,6 @@ button {
     border-radius: 5px;
 }
 
-
 /* ================= LEFT PANEL ================= */
 
 #leftPanel {
@@ -462,7 +408,6 @@ button {
     background: rgba(213,173,85,.12);
     color: var(--accent);
 }
-
 
 /* ================= MAIN PANEL ================= */
 
@@ -568,7 +513,6 @@ button {
     background: rgba(213,173,85,.2);
 }
 
-
 /* ================= UNIT PANEL ================= */
 
 #unitPanel {
@@ -665,7 +609,6 @@ button {
     color: var(--red);
 }
 
-
 /* ================= CAMERA ================= */
 
 #cameraControls {
@@ -687,7 +630,6 @@ button {
     color: #c9d0d4;
     font-size: 19px;
 }
-
 
 /* ================= MINIMAP ================= */
 
@@ -753,7 +695,6 @@ button {
     inset: 0;
 }
 
-
 /* ================= BOTTOM ================= */
 
 #bottomStatus {
@@ -788,7 +729,6 @@ button {
     letter-spacing: 1px;
 }
 
-
 /* ================= TOUCH HINT ================= */
 
 #touchHint {
@@ -805,7 +745,6 @@ button {
     font-size: 9px;
     pointer-events: none;
 }
-
 
 /* ================= TOAST ================= */
 
@@ -830,7 +769,6 @@ button {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }
-
 
 /* ================= MODAL ================= */
 
@@ -909,7 +847,6 @@ button {
     font-size: 9px;
 }
 
-
 /* ================= TUTORIAL ================= */
 
 #tutorial {
@@ -966,161 +903,41 @@ button {
     font-weight: 900;
 }
 
-
 /* ================= MOBILE ================= */
 
 @media (max-width: 800px) {
-
-    #topBar {
-        height: 60px;
-        padding: 0 9px;
-        gap: 7px;
-    }
-
-    .brand {
-        min-width: auto;
-    }
-
-    .brand-mark {
-        width: 30px;
-        height: 30px;
-    }
-
-    .brand-title {
-        font-size: 10px;
-    }
-
-    .brand-subtitle {
-        font-size: 6px;
-    }
-
-    .country-display {
-        display: none;
-    }
-
-    .resources {
-        gap: 3px;
-        overflow: hidden;
-    }
-
-    .resource {
-        min-width: auto;
-        padding: 5px;
-        border: 0;
-        background: transparent;
-    }
-
-    .resource span {
-        margin: 0;
-    }
-
-    .resource b {
-        display: none;
-    }
-
-    .date-control {
-        margin-left: auto;
-    }
-
-    #gameDate {
-        display: none;
-    }
-
-    #leftPanel {
-        left: 7px;
-        top: 70px;
-        bottom: 52px;
-        width: 52px;
-    }
-
-    .panel-button {
-        width: 42px;
-        height: 45px;
-    }
-
-    .panel-button span {
-        font-size: 16px;
-    }
-
-    #mainPanel {
-        left: 65px;
-        top: 70px;
-        width: calc(100vw - 75px);
-        max-height: 60vh;
-    }
-
-    #miniMap {
-        right: 7px;
-        top: 70px;
-        width: 130px;
-    }
-
-    .mini-map-body {
-        height: 75px;
-    }
-
-    #unitPanel {
-        left: 65px;
-        right: 7px;
-        bottom: 52px;
-        width: auto;
-    }
-
-    #cameraControls {
-        right: 7px;
-        bottom: 130px;
-    }
-
-    #touchHint {
-        bottom: 48px;
-        white-space: nowrap;
-        font-size: 8px;
-    }
-
-    #bottomStatus {
-        height: 38px;
-        padding: 0 8px;
-    }
-
-    .country-grid {
-        grid-template-columns: repeat(2,1fr);
-    }
-
-    .tutorial-box {
-        grid-template-columns: 40px 1fr;
-    }
-
-    .tutorial-icon {
-        width: 38px;
-        height: 38px;
-        font-size: 18px;
-    }
-
-    #tutorialNext {
-        grid-column: 2;
-        justify-self: end;
-    }
+    #topBar { height: 60px; padding: 0 9px; gap: 7px; }
+    .brand { min-width: auto; }
+    .brand-mark { width: 30px; height: 30px; }
+    .brand-title { font-size: 10px; }
+    .brand-subtitle { font-size: 6px; }
+    .country-display { display: none; }
+    .resources { gap: 3px; overflow: hidden; }
+    .resource { min-width: auto; padding: 5px; border: 0; background: transparent; }
+    .resource span { margin: 0; }
+    .resource b { display: none; }
+    .date-control { margin-left: auto; }
+    #gameDate { display: none; }
+    #leftPanel { left: 7px; top: 70px; bottom: 52px; width: 52px; }
+    .panel-button { width: 42px; height: 45px; }
+    .panel-button span { font-size: 16px; }
+    #mainPanel { left: 65px; top: 70px; width: calc(100vw - 75px); max-height: 60vh; }
+    #miniMap { right: 7px; top: 70px; width: 130px; }
+    .mini-map-body { height: 75px; }
+    #unitPanel { left: 65px; right: 7px; bottom: 52px; width: auto; }
+    #cameraControls { right: 7px; bottom: 130px; }
+    #touchHint { bottom: 48px; white-space: nowrap; font-size: 8px; }
+    #bottomStatus { height: 38px; padding: 0 8px; }
+    .country-grid { grid-template-columns: repeat(2,1fr); }
+    .tutorial-box { grid-template-columns: 40px 1fr; }
+    .tutorial-icon { width: 38px; height: 38px; font-size: 18px; }
+    #tutorialNext { grid-column: 2; justify-self: end; }
 }
 
 @media (max-width: 420px) {
-
-    .country-grid {
-        grid-template-columns: 1fr;
-    }
-
-    #miniMap {
-        display: none;
-    }
-
-    #battleStatus {
-        display: none;
-    }
-
-    .command-grid {
-        gap: 5px;
-    }
-
-    .command-btn {
-        min-height: 48px;
-    }
+    .country-grid { grid-template-columns: 1fr; }
+    #miniMap { display: none; }
+    #battleStatus { display: none; }
+    .command-grid { gap: 5px; }
+    .command-btn { min-height: 48px; }
 }
