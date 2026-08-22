@@ -1,30 +1,60 @@
+const SAVE_KEY = "WWS_PREMIUM_SAVE";
+
 const defaultGame = {
   money:10000,
   oil:5000,
   steel:5000,
   food:5000,
-  energy:3000,
 
   reputation:50,
-  nationLevel:1,
   stability:78,
+  nationLevel:1,
 
   infantry:1000,
   armor:150,
   aircraft:60,
   ships:25,
 
-  supply:85,
-  defense:500,
   airBases:2,
+  defense:500,
 
-  level:1,
-  xp:0,
   wins:0,
   losses:0,
-  seasonPoints:0,
+  xp:0,
+  level:1,
 
-  satelliteLevel:1,
+  satellite:1,
+
+  cities:[
+    {
+      name:"Aurora City",
+      icon:"🏙️",
+      type:"Capital",
+      level:3,
+      buildings:"Capital • Factory • Defense HQ"
+    },
+    {
+      name:"Ironvale",
+      icon:"⛏️",
+      type:"Industrial City",
+      level:2,
+      buildings:"Steel Works • Factory • Mine"
+    },
+    {
+      name:"Greenfield",
+      icon:"🌾",
+      type:"Agricultural City",
+      level:2,
+      buildings:"Farms • Food Storage • Housing"
+    },
+    {
+      name:"Harbor Point",
+      icon:"⚓",
+      type:"Naval City",
+      level:1,
+      buildings:"Port • Shipyard"
+    }
+  ],
 
   research:{
     military:1,
@@ -33,165 +63,87 @@ const defaultGame = {
     naval:1,
     defense:1,
     economy:1,
-    intelligence:1,
-    energy:1,
-    space:1,
-    AI:1
+    intelligence:1
   },
-
-  cities:[
-    {
-      name:"Aurora City",
-      level:1,
-      buildings:[
-        "🏛️ Capital",
-        "🏭 Factory",
-        "🪖 Military Base",
-        "✈️ Air Base",
-        "🚢 Naval Base"
-      ]
-    },
-    {
-      name:"Ironvale",
-      level:1,
-      buildings:[
-        "🏭 Factory",
-        "⛏️ Mine"
-      ]
-    },
-    {
-      name:"Greenfield",
-      level:1,
-      buildings:[
-        "🌾 Farm",
-        "🏙️ Housing"
-      ]
-    },
-    {
-      name:"Harbor Point",
-      level:1,
-      buildings:[
-        "🚢 Port",
-        "🏭 Factory"
-      ]
-    }
-  ],
 
   diplomacy:{
-    "Eastern Alliance":20,
-    "Southern Republic":45,
     "Northern Dominion":-30,
-    "Western Empire":-15
+    "Western Empire":-15,
+    "Southern Republic":35,
+    "Eastern Alliance":20
   },
 
-  commanders:[
-    {
-      name:"General Orion",
-      role:"Army Commander",
-      level:1,
-      bonus:"+10% Army"
-    },
-    {
-      name:"Admiral Vega",
-      role:"Naval Commander",
-      level:1,
-      bonus:"+10% Navy"
-    },
-    {
-      name:"Air Marshal Nova",
-      role:"Air Commander",
-      level:1,
-      bonus:"+10% Air"
-    },
-    {
-      name:"Director Atlas",
-      role:"Intelligence",
-      level:1,
-      bonus:"+10% Recon"
-    }
-  ],
-
-  missions:[
-    {
-      name:"Build a stronger economy",
-      done:false,
-      reward:1000
-    },
-    {
-      name:"Win your first battle",
-      done:false,
-      reward:1500
-    },
-    {
-      name:"Research 3 technologies",
-      done:false,
-      reward:2000
-    },
-    {
-      name:"Sign a diplomatic agreement",
-      done:false,
-      reward:1200
-    }
-  ],
-
   news:[
-    "🌎 A new era has begun.",
-    "🏭 Global production is increasing.",
-    "🤝 Nations are forming new alliances."
+    "🌍 A new strategic era has begun.",
+    "🏭 Industrial production is increasing.",
+    "🛰️ Satellite network is online."
   ]
 };
 
+
 let game = loadGame();
 
-function cloneDefault(){
-  return JSON.parse(JSON.stringify(defaultGame));
-}
+let scene;
+let camera;
+let renderer;
+let globe;
+let globeGroup;
+
+let rotating = true;
+
+let targetRotation = 0;
+
+let currentZoom = 5;
+
 
 function loadGame(){
 
   try{
 
-    const saved = localStorage.getItem("WWS_SAVE");
+    const saved =
+      localStorage.getItem(SAVE_KEY);
 
-    if(!saved){
-      return cloneDefault();
+    if(saved){
+
+      return {
+        ...structuredClone(defaultGame),
+        ...JSON.parse(saved)
+      };
+
     }
-
-    return {
-      ...cloneDefault(),
-      ...JSON.parse(saved)
-    };
 
   }catch(error){
 
-    return cloneDefault();
+    console.log(error);
 
   }
+
+  return structuredClone(defaultGame);
+
 }
+
 
 function saveGame(){
 
   localStorage.setItem(
-    "WWS_SAVE",
-    JSON.stringify(game)
-  );
-
-  toast("💾 Game saved");
-
-}
-
-function silentSave(){
-
-  localStorage.setItem(
-    "WWS_SAVE",
+    SAVE_KEY,
     JSON.stringify(game)
   );
 
 }
+
+
+function format(value){
+
+  return Math.floor(value).toLocaleString();
+
+}
+
 
 function toast(message){
 
-  const box = document.getElementById("toast");
+  const box =
+    document.getElementById("toast");
 
   box.textContent = message;
 
@@ -203,23 +155,25 @@ function toast(message){
 
 }
 
-function format(number){
-
-  return Math.floor(number).toLocaleString();
-
-}
 
 function addNews(message){
 
   game.news.unshift(message);
 
-  game.news = game.news.slice(0,30);
+  game.news =
+    game.news.slice(0,8);
 
   renderNews();
 
+  saveGame();
+
 }
 
-function armyPower(){
+
+function militaryPower(){
+
+  const researchBonus =
+    1 + game.research.military * .04;
 
   return Math.floor(
 
@@ -228,177 +182,771 @@ function armyPower(){
       game.armor * 12 +
       game.aircraft * 20 +
       game.ships * 25
-
-    )
-
-    *
-
-    (1 + game.research.military * 0.04)
-
-    *
-
-    (0.75 + game.supply / 400)
+    ) * researchBonus
 
   );
 
 }
 
-function render(){
 
-  document.getElementById("money").textContent =
-    format(game.money);
+function init3D(){
 
-  document.getElementById("oil").textContent =
-    format(game.oil);
+  const container =
+    document.getElementById("globeContainer");
 
-  document.getElementById("steel").textContent =
-    format(game.steel);
+  scene =
+    new THREE.Scene();
 
-  document.getElementById("food").textContent =
-    format(game.food);
+  camera =
+    new THREE.PerspectiveCamera(
+      45,
+      container.clientWidth /
+      container.clientHeight,
+      .1,
+      100
+    );
 
-  document.getElementById("energy").textContent =
-    format(game.energy);
-
-
-  document.getElementById("ecoMoney").textContent =
-    format(game.money);
-
-  document.getElementById("ecoOil").textContent =
-    format(game.oil);
-
-  document.getElementById("ecoSteel").textContent =
-    format(game.steel);
-
-  document.getElementById("ecoFood").textContent =
-    format(game.food);
+  camera.position.z =
+    currentZoom;
 
 
-  document.getElementById("reputation").textContent =
-    game.reputation;
+  renderer =
+    new THREE.WebGLRenderer({
+      antialias:true,
+      alpha:true
+    });
 
-  document.getElementById("nationLevel").textContent =
-    game.nationLevel;
+  renderer.setPixelRatio(
+    Math.min(window.devicePixelRatio,2)
+  );
 
-  document.getElementById("stability").textContent =
-    game.stability + "%";
+  renderer.setSize(
+    container.clientWidth,
+    container.clientHeight
+  );
 
-  document.getElementById("stabilityBar").style.width =
-    game.stability + "%";
-
-
-  document.getElementById("infantry").textContent =
-    format(game.infantry);
-
-  document.getElementById("armor").textContent =
-    format(game.armor);
-
-  document.getElementById("aircraft").textContent =
-    format(game.aircraft);
-
-  document.getElementById("ships").textContent =
-    format(game.ships);
-
-  document.getElementById("supply").textContent =
-    game.supply + "%";
-
-  document.getElementById("supplyBar").style.width =
-    game.supply + "%";
-
-  document.getElementById("airBases").textContent =
-    game.airBases;
+  container.appendChild(renderer.domElement);
 
 
-  document.getElementById("armyPower").textContent =
-    format(armyPower());
+  const ambient =
+    new THREE.AmbientLight(
+      0x8ac8ff,
+      1.5
+    );
 
-  document.getElementById("defense").textContent =
-    format(game.defense);
-
-  document.getElementById("battleSupply").textContent =
-    game.supply + "%";
-
-
-  document.getElementById("level").textContent =
-    game.level;
-
-  document.getElementById("xp").textContent =
-    game.xp;
-
-  document.getElementById("wins").textContent =
-    game.wins;
-
-  document.getElementById("losses").textContent =
-    game.losses;
-
-  document.getElementById("seasonPoints").textContent =
-    game.seasonPoints;
+  scene.add(ambient);
 
 
-  document.getElementById("satelliteLevel").textContent =
-    game.satelliteLevel;
+  const light =
+    new THREE.DirectionalLight(
+      0xffffff,
+      2.2
+    );
+
+  light.position.set(5,3,5);
+
+  scene.add(light);
 
 
-  renderCities();
-  renderResearch();
-  renderDiplomacy();
-  renderMissions();
-  renderCommanders();
-  renderNews();
+  globeGroup =
+    new THREE.Group();
 
-  silentSave();
+  scene.add(globeGroup);
+
+
+  const geometry =
+    new THREE.SphereGeometry(
+      2.05,
+      64,
+      64
+    );
+
+
+  const material =
+    new THREE.MeshPhongMaterial({
+
+      color:0x0b5a91,
+
+      emissive:0x031a2b,
+
+      shininess:35,
+
+      transparent:true,
+
+      opacity:.98
+
+    });
+
+
+  globe =
+    new THREE.Mesh(
+      geometry,
+      material
+    );
+
+  globeGroup.add(globe);
+
+
+  createGrid();
+
+  createAtmosphere();
+
+  createContinents();
+
+  createMarkers();
+
+
+  window.addEventListener(
+    "resize",
+    resize3D
+  );
+
+
+  setupGlobeTouch();
+
+  animate3D();
 
 }
+
+
+function createGrid(){
+
+  const group =
+    new THREE.Group();
+
+  const material =
+    new THREE.LineBasicMaterial({
+      color:0x2a94c9,
+      transparent:true,
+      opacity:.18
+    });
+
+
+  for(let lat=-60;lat<=60;lat+=15){
+
+    const points=[];
+
+    const phi =
+      (90-lat) * Math.PI/180;
+
+    for(
+      let lon=0;
+      lon<=360;
+      lon+=4
+    ){
+
+      const theta =
+        lon * Math.PI/180;
+
+      const r=2.06;
+
+      points.push(
+        new THREE.Vector3(
+          r*Math.sin(phi)*Math.cos(theta),
+          r*Math.cos(phi),
+          r*Math.sin(phi)*Math.sin(theta)
+        )
+      );
+
+    }
+
+    const geometry =
+      new THREE.BufferGeometry()
+      .setFromPoints(points);
+
+    group.add(
+      new THREE.Line(
+        geometry,
+        material
+      )
+    );
+
+  }
+
+
+  for(let lon=0;lon<360;lon+=15){
+
+    const points=[];
+
+    const theta =
+      lon*Math.PI/180;
+
+    for(
+      let lat=-90;
+      lat<=90;
+      lat+=4
+    ){
+
+      const phi =
+        (90-lat)*Math.PI/180;
+
+      const r=2.061;
+
+      points.push(
+        new THREE.Vector3(
+          r*Math.sin(phi)*Math.cos(theta),
+          r*Math.cos(phi),
+          r*Math.sin(phi)*Math.sin(theta)
+        )
+      );
+
+    }
+
+    const geometry =
+      new THREE.BufferGeometry()
+      .setFromPoints(points);
+
+    group.add(
+      new THREE.Line(
+        geometry,
+        material
+      )
+    );
+
+  }
+
+  globeGroup.add(group);
+
+}
+
+
+function createAtmosphere(){
+
+  const geometry =
+    new THREE.SphereGeometry(
+      2.15,
+      64,
+      64
+    );
+
+  const material =
+    new THREE.MeshBasicMaterial({
+
+      color:0x299dff,
+
+      transparent:true,
+
+      opacity:.10,
+
+      side:THREE.BackSide
+
+    });
+
+  const atmosphere =
+    new THREE.Mesh(
+      geometry,
+      material
+    );
+
+  globeGroup.add(atmosphere);
+
+}
+
+
+function createContinents(){
+
+  const continentMaterial =
+    new THREE.MeshBasicMaterial({
+      color:0x3b9b65,
+      transparent:true,
+      opacity:.72
+    });
+
+
+  const shapes=[
+
+    {
+      x:-.5,
+      y:.6,
+      z:1.85,
+      s:.5
+    },
+
+    {
+      x:.75,
+      y:.35,
+      z:1.78,
+      s:.42
+    },
+
+    {
+      x:-.8,
+      y:-.35,
+      z:1.82,
+      s:.55
+    },
+
+    {
+      x:.45,
+      y:-.65,
+      z:1.72,
+      s:.38
+    },
+
+    {
+      x:1.05,
+      y:-.15,
+      z:1.75,
+      s:.28
+    }
+
+  ];
+
+
+  shapes.forEach(item=>{
+
+    const geo =
+      new THREE.IcosahedronGeometry(
+        item.s,
+        1
+      );
+
+    const mesh =
+      new THREE.Mesh(
+        geo,
+        continentMaterial
+      );
+
+    mesh.position.set(
+      item.x,
+      item.y,
+      item.z
+    );
+
+    mesh.scale.set(
+      1.5,
+      .55,
+      .12
+    );
+
+    globeGroup.add(mesh);
+
+  });
+
+}
+
+
+function createMarkers(){
+
+  const markerData=[
+
+    {
+      x:-.65,
+      y:.55,
+      z:1.95,
+      color:0x36c9ff
+    },
+
+    {
+      x:.65,
+      y:.75,
+      z:1.85,
+      color:0xff5264
+    },
+
+    {
+      x:1.1,
+      y:-.1,
+      z:1.72,
+      color:0xff5264
+    },
+
+    {
+      x:-.35,
+      y:-.65,
+      z:1.88,
+      color:0x3ee0a0
+    }
+
+  ];
+
+
+  markerData.forEach(data=>{
+
+    const geometry =
+      new THREE.SphereGeometry(
+        .06,
+        16,
+        16
+      );
+
+    const material =
+      new THREE.MeshBasicMaterial({
+        color:data.color
+      });
+
+    const marker =
+      new THREE.Mesh(
+        geometry,
+        material
+      );
+
+    marker.position.set(
+      data.x,
+      data.y,
+      data.z
+    );
+
+    globeGroup.add(marker);
+
+
+    const ringGeometry =
+      new THREE.RingGeometry(
+        .08,
+        .1,
+        24
+      );
+
+    const ringMaterial =
+      new THREE.MeshBasicMaterial({
+        color:data.color,
+        transparent:true,
+        opacity:.5,
+        side:THREE.DoubleSide
+      });
+
+    const ring =
+      new THREE.Mesh(
+        ringGeometry,
+        ringMaterial
+      );
+
+    ring.position.copy(
+      marker.position
+    );
+
+    ring.lookAt(0,0,0);
+
+    globeGroup.add(ring);
+
+  });
+
+}
+
+
+function animate3D(){
+
+  requestAnimationFrame(
+    animate3D
+  );
+
+
+  if(rotating){
+
+    globeGroup.rotation.y += .0018;
+
+  }
+
+
+  renderer.render(
+    scene,
+    camera
+  );
+
+}
+
+
+function resize3D(){
+
+  const container =
+    document.getElementById(
+      "globeContainer"
+    );
+
+  if(!container || !renderer)
+    return;
+
+  camera.aspect =
+    container.clientWidth /
+    container.clientHeight;
+
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(
+    container.clientWidth,
+    container.clientHeight
+  );
+
+}
+
+
+function setupGlobeTouch(){
+
+  const container =
+    document.getElementById(
+      "globeContainer"
+    );
+
+  let startX=0;
+
+  container.addEventListener(
+    "pointerdown",
+    event=>{
+      startX=event.clientX;
+      rotating=false;
+    }
+  );
+
+
+  container.addEventListener(
+    "pointermove",
+    event=>{
+
+      if(!startX)
+        return;
+
+      const diff =
+        event.clientX-startX;
+
+      globeGroup.rotation.y +=
+        diff*.004;
+
+      startX=event.clientX;
+
+    }
+  );
+
+
+  container.addEventListener(
+    "pointerup",
+    ()=>{
+      startX=0;
+    }
+  );
+
+}
+
+
+function setupNavigation(){
+
+  document.querySelectorAll(
+    "[data-page]"
+  ).forEach(button=>{
+
+    button.addEventListener(
+      "click",
+      ()=>{
+
+        const page =
+          button.dataset.page;
+
+        document.querySelectorAll(
+          ".page"
+        ).forEach(item=>{
+          item.classList.remove(
+            "active"
+          );
+        });
+
+
+        const target =
+          document.getElementById(page);
+
+        if(target){
+
+          target.classList.add(
+            "active"
+          );
+
+        }
+
+
+        document.querySelectorAll(
+          ".menu-item,.mobile-nav button"
+        ).forEach(item=>{
+          item.classList.remove(
+            "active"
+          );
+        });
+
+
+        document.querySelectorAll(
+          `[data-page="${page}"]`
+        ).forEach(item=>{
+          item.classList.add(
+            "active"
+          );
+        });
+
+      }
+    );
+
+  });
+
+}
+
+
+function render(){
+
+  document.getElementById("money")
+    .textContent=format(game.money);
+
+  document.getElementById("oil")
+    .textContent=format(game.oil);
+
+  document.getElementById("steel")
+    .textContent=format(game.steel);
+
+  document.getElementById("food")
+    .textContent=format(game.food);
+
+
+  document.getElementById("nationMoney")
+    .textContent=format(game.money);
+
+  document.getElementById("stability")
+    .textContent=game.stability;
+
+  document.getElementById("reputation")
+    .textContent=game.reputation;
+
+  document.getElementById("nationLevel")
+    .textContent=game.nationLevel;
+
+  document.getElementById("defense")
+    .textContent=format(game.defense);
+
+
+  document.getElementById("infantry")
+    .textContent=format(game.infantry);
+
+  document.getElementById("armor")
+    .textContent=format(game.armor);
+
+  document.getElementById("aircraft")
+    .textContent=format(game.aircraft);
+
+  document.getElementById("ships")
+    .textContent=format(game.ships);
+
+  document.getElementById("airBases")
+    .textContent=game.airBases;
+
+
+  const power =
+    militaryPower();
+
+  document.getElementById("armyPower")
+    .textContent=format(power);
+
+  document.getElementById("battlePower")
+    .textContent=format(power);
+
+
+  document.getElementById("stabilityProgress")
+    .style.width=game.stability+"%";
+
+  document.getElementById("nationStability")
+    .style.width=game.stability+"%";
+
+
+  document.getElementById("satelliteLevel")
+    .textContent=
+      "Level "+game.satellite;
+
+
+  renderNews();
+
+  renderCities();
+
+  renderResearch();
+
+  renderDiplomacy();
+
+  saveGame();
+
+}
+
+
+function renderNews(){
+
+  const feed =
+    document.getElementById(
+      "newsFeed"
+    );
+
+  feed.innerHTML =
+    game.news.map(item=>`
+
+      <div class="news-item">
+        ${item}
+      </div>
+
+    `).join("");
+
+}
+
 
 function renderCities(){
 
-  const box = document.getElementById("citiesList");
+  const box =
+    document.getElementById(
+      "citiesList"
+    );
 
-  box.innerHTML = game.cities.map((city,index)=>`
+  box.innerHTML =
+    game.cities.map(
+      (city,index)=>`
 
-    <div class="row">
+      <div class="city-item">
 
-      <div>
-        <h3>🏙️ ${city.name}</h3>
+        <div class="item-left">
 
-        <div class="muted">
-          Level ${city.level}
+          <div class="city-icon">
+            ${city.icon}
+          </div>
+
+          <div>
+
+            <h3>
+              ${city.name}
+            </h3>
+
+            <p>
+              ${city.type}
+              • Level ${city.level}
+            </p>
+
+            <p>
+              ${city.buildings}
+            </p>
+
+          </div>
+
         </div>
 
-        <small>
-          ${city.buildings.join(" • ")}
-        </small>
-      </div>
+        <div class="item-right">
 
-      <div>
+          <strong>
+            Level ${city.level}
+          </strong>
 
-        <button
-          class="btn"
-          onclick="upgradeCity(${index})">
-          🏗️ Upgrade
-        </button>
+          <button
+            class="primary-button"
+            onclick="upgradeCity(${index})">
 
-        <button
-          class="btn"
-          onclick="buildRandom(${index})">
-          ➕ Build
-        </button>
+            Upgrade
+
+          </button>
+
+        </div>
 
       </div>
 
-    </div>
-
-  `).join("");
+    `).join("");
 
 }
 
+
 function upgradeCity(index){
 
-  const city = game.cities[index];
+  const city =
+    game.cities[index];
 
-  const cost = 1000 * city.level;
+  const cost =
+    city.level*1000;
 
-  if(game.money < cost){
+  if(game.money<cost){
 
     toast("Not enough money");
 
@@ -406,105 +954,271 @@ function upgradeCity(index){
 
   }
 
-  game.money -= cost;
+  game.money-=cost;
 
   city.level++;
 
-  game.defense += 25;
+  game.defense+=25;
+
+  game.xp+=50;
 
   addNews(
-    `🏗️ ${city.name} upgraded to level ${city.level}.`
+    `🏙️ ${city.name} upgraded to Level ${city.level}.`
   );
 
   render();
 
 }
 
-function buildRandom(index){
 
-  const buildings = [
+function renderResearch(){
 
-    "🏭 Factory",
-    "⛏️ Mine",
-    "🌾 Farm",
-    "🪖 Military Base",
-    "✈️ Air Base",
-    "🚢 Naval Base",
-    "🛡️ Defense Base",
-    "🏦 Bank",
-    "🛰️ Research Center",
-    "🚆 Logistics Hub"
+  const names={
 
-  ];
+    military:[
+      "🪖",
+      "Military Technology",
+      "Improve ground forces."
+    ],
 
-  if(game.money < 700){
+    industry:[
+      "🏭",
+      "Industrial Technology",
+      "Increase steel production."
+    ],
 
-    toast("Need 700 money");
+    air:[
+      "✈️",
+      "Aviation Technology",
+      "Improve aircraft capability."
+    ],
+
+    naval:[
+      "🚢",
+      "Naval Technology",
+      "Improve naval capability."
+    ],
+
+    defense:[
+      "🛡️",
+      "Defense Systems",
+      "Increase national defense."
+    ],
+
+    economy:[
+      "💰",
+      "Economic Science",
+      "Improve economic output."
+    ],
+
+    intelligence:[
+      "🛰️",
+      "Intelligence Systems",
+      "Improve reconnaissance."
+    ]
+
+  };
+
+
+  const box =
+    document.getElementById(
+      "researchList"
+    );
+
+
+  box.innerHTML =
+    Object.entries(names)
+    .map(([key,value])=>`
+
+      <div class="research-item">
+
+        <div class="item-left">
+
+          <div class="research-icon">
+            ${value[0]}
+          </div>
+
+          <div>
+
+            <h3>
+              ${value[1]}
+            </h3>
+
+            <p>
+              ${value[2]}
+            </p>
+
+          </div>
+
+        </div>
+
+        <div class="item-right">
+
+          <strong>
+            Level ${game.research[key]}
+          </strong>
+
+          <button
+            class="primary-button"
+            onclick="research('${key}')">
+
+            Research
+
+          </button>
+
+        </div>
+
+      </div>
+
+    `).join("");
+
+}
+
+
+function research(type){
+
+  const cost =
+    700 +
+    game.research[type]*400;
+
+
+  if(game.money<cost){
+
+    toast("Need "+format(cost)+" money");
 
     return;
 
   }
 
-  game.money -= 700;
 
-  const building =
-    buildings[
-      Math.floor(Math.random()*buildings.length)
-    ];
+  game.money-=cost;
 
-  game.cities[index].buildings.push(building);
+  game.research[type]++;
 
-  game.defense += 10;
+  game.xp+=60;
+
 
   addNews(
-    `🏗️ ${building} built in ${game.cities[index].name}.`
+    `🔬 ${type} technology advanced to Level ${game.research[type]}.`
+  );
+
+
+  render();
+
+}
+
+
+function renderDiplomacy(){
+
+  const box =
+    document.getElementById(
+      "diplomacyList"
+    );
+
+
+  box.innerHTML =
+    Object.entries(
+      game.diplomacy
+    ).map(([nation,relation])=>`
+
+      <div class="diplomacy-item">
+
+        <div class="item-left">
+
+          <div class="research-icon">
+            ${relation>=0 ? "🤝" : "⚠️"}
+          </div>
+
+          <div>
+
+            <h3>${nation}</h3>
+
+            <p>
+              Relationship:
+              ${relation}
+            </p>
+
+          </div>
+
+        </div>
+
+        <div class="item-right">
+
+          <button
+            class="primary-button"
+            onclick="improveDiplomacy('${nation}')">
+
+            Diplomatic Action
+
+          </button>
+
+        </div>
+
+      </div>
+
+    `).join("");
+
+}
+
+
+function improveDiplomacy(nation){
+
+  game.diplomacy[nation]+=10;
+
+  game.reputation+=1;
+
+  game.xp+=30;
+
+  addNews(
+    `🤝 Diplomatic relations improved with ${nation}.`
   );
 
   render();
 
 }
 
+
 function trainUnit(type){
 
-  if(type === "infantry"){
+  if(type==="infantry"){
 
-    if(game.food < 100){
+    if(game.food<100){
 
-      toast("Need food");
-
-      return;
-
-    }
-
-    game.food -= 100;
-
-    game.infantry += 100;
-
-  }
-
-
-  if(type === "armor"){
-
-    if(game.steel < 250){
-
-      toast("Need steel");
+      toast("Need 100 food");
 
       return;
 
     }
 
-    game.steel -= 250;
+    game.food-=100;
 
-    game.armor += 5;
+    game.infantry+=100;
 
   }
 
 
-  if(type === "aircraft"){
+  if(type==="armor"){
+
+    if(game.steel<250){
+
+      toast("Need 250 steel");
+
+      return;
+
+    }
+
+    game.steel-=250;
+
+    game.armor+=5;
+
+  }
+
+
+  if(type==="aircraft"){
 
     if(
-      game.steel < 350 ||
-      game.oil < 200
+      game.steel<350 ||
+      game.oil<200
     ){
 
       toast("Need steel + oil");
@@ -513,20 +1227,20 @@ function trainUnit(type){
 
     }
 
-    game.steel -= 350;
+    game.steel-=350;
 
-    game.oil -= 200;
+    game.oil-=200;
 
-    game.aircraft += 2;
+    game.aircraft+=2;
 
   }
 
 
-  if(type === "ships"){
+  if(type==="ships"){
 
     if(
-      game.steel < 600 ||
-      game.oil < 350
+      game.steel<600 ||
+      game.oil<350
     ){
 
       toast("Need steel + oil");
@@ -535,46 +1249,29 @@ function trainUnit(type){
 
     }
 
-    game.steel -= 600;
+    game.steel-=600;
 
-    game.oil -= 350;
+    game.oil-=350;
 
     game.ships++;
 
   }
 
-  addNews("🪖 Military production completed.");
 
-  render();
-
-}
-
-function improveSupply(){
-
-  if(game.money < 500){
-
-    toast("Need 500 money");
-
-    return;
-
-  }
-
-  game.money -= 500;
-
-  game.supply =
-    Math.min(100,game.supply+5);
+  game.xp+=25;
 
   addNews(
-    "📦 Logistics efficiency improved."
+    "🪖 Military production completed."
   );
 
   render();
 
 }
 
+
 function buildAirBase(){
 
-  if(game.money < 1500){
+  if(game.money<1500){
 
     toast("Need 1,500 money");
 
@@ -582,950 +1279,588 @@ function buildAirBase(){
 
   }
 
-  game.money -= 1500;
+  game.money-=1500;
 
   game.airBases++;
 
-  game.aircraft += 5;
+  game.aircraft+=5;
 
-  game.defense += 30;
+  game.defense+=30;
+
+  game.xp+=50;
 
   addNews(
-    "✈️ New Air Base constructed."
+    "✈️ New Air Base became operational."
   );
 
   render();
 
 }
 
+
 function startBattle(){
 
   const target =
-    document.getElementById("target").value;
+    document.getElementById(
+      "target"
+    ).value;
+
 
   const terrain =
-    document.getElementById("terrain").value;
+    document.getElementById(
+      "terrain"
+    ).value;
+
 
   const weather =
-    document.getElementById("weather").value;
+    document.getElementById(
+      "weather"
+    ).value;
 
 
-  let modifier = 1;
+  let modifier=1;
+
 
   if(terrain.includes("Mountain"))
-    modifier *= 0.85;
+    modifier*=.84;
 
-  if(terrain.includes("City"))
-    modifier *= 0.90;
+  if(terrain.includes("Urban"))
+    modifier*=.91;
 
   if(terrain.includes("Forest"))
-    modifier *= 0.92;
+    modifier*=.93;
 
   if(weather.includes("Fog"))
-    modifier *= 0.90;
+    modifier*=.89;
 
   if(weather.includes("Snow"))
-    modifier *= 0.88;
+    modifier*=.88;
 
   if(weather.includes("Rain"))
-    modifier *= 0.94;
+    modifier*=.94;
 
 
-  const enemyPower =
+  const enemy =
     Math.floor(
-      (900 + Math.random()*4200) *
-      modifier
+      (8500+Math.random()*9000)
+      *modifier
     );
 
-  const playerPower =
+
+  const player =
     Math.floor(
-      armyPower() *
-      (0.85 + Math.random()*0.30)
+      militaryPower()*
+      (.88+Math.random()*.24)
     );
+
+
+  document.getElementById(
+    "enemyPower"
+  ).textContent=format(enemy);
 
 
   const result =
-    document.getElementById("battleResult");
+    document.getElementById(
+      "battleResult"
+    );
 
 
-  if(playerPower >= enemyPower){
+  if(player>=enemy){
 
     game.wins++;
 
-    game.xp += 150;
+    game.money+=1500;
 
-    game.money += 1500;
+    game.steel+=300;
 
-    game.steel += 300;
+    game.reputation+=5;
 
-    game.reputation += 5;
+    game.xp+=180;
 
-    game.seasonPoints += 25;
 
-    result.innerHTML = `
-      <h2 class="good">🏆 VICTORY</h2>
-      <p>Target: ${target}</p>
-      <p>Your Power: ${format(playerPower)}</p>
-      <p>Enemy Power: ${format(enemyPower)}</p>
+    result.innerHTML=`
+      🏆 <strong style="color:#35d69b">
+      OPERATION SUCCESSFUL
+      </strong>
+      <br><br>
+      Your forces defeated
+      <b>${target}</b>.
+      <br>
+      Power ${format(player)}
+      vs ${format(enemy)}
     `;
 
+
     addNews(
-      `🏆 Victory reported against ${target}.`
+      `🏆 Victory! Forces successfully completed an operation against ${target}.`
     );
 
   }else{
 
     game.losses++;
 
-    game.xp += 40;
-
-    game.money =
+    game.money=
       Math.max(0,game.money-500);
 
-    game.reputation -= 3;
+    game.stability=
+      Math.max(0,game.stability-3);
 
-    result.innerHTML = `
-      <h2 style="color:#e05252">
-        ❌ DEFEAT
-      </h2>
-      <p>Target: ${target}</p>
-      <p>Your Power: ${format(playerPower)}</p>
-      <p>Enemy Power: ${format(enemyPower)}</p>
+    game.xp+=50;
+
+
+    result.innerHTML=`
+      ❌ <strong style="color:#ff5364">
+      OPERATION FAILED
+      </strong>
+      <br><br>
+      Your forces were pushed back.
+      <br>
+      Power ${format(player)}
+      vs ${format(enemy)}
     `;
 
+
     addNews(
-      `⚠️ Forces suffered a defeat against ${target}.`
+      `⚠️ Operation against ${target} failed.`
     );
 
   }
 
-  checkLevel();
 
   render();
 
 }
 
-function renderResearch(){
-
-  const data = [
-
-    ["military","🪖 Military","Better army efficiency"],
-    ["industry","🏭 Industry","Better production"],
-    ["air","✈️ Air","Improved air capability"],
-    ["naval","🚢 Naval","Improved naval capability"],
-    ["defense","🛡️ Defense","Stronger defenses"],
-    ["economy","💰 Economy","Better income"],
-    ["intelligence","🛰️ Intelligence","Better reconnaissance"],
-    ["energy","⚡ Energy","Energy efficiency"],
-    ["space","🚀 Space","Advanced fictional space research"],
-    ["AI","🤖 AI","Advanced strategic AI"]
-
-  ];
-
-  document.getElementById("researchList").innerHTML =
-    data.map(item=>`
-
-      <div class="row">
-
-        <div>
-          <h3>${item[1]}</h3>
-          <span class="muted">
-            ${item[2]}
-          </span>
-        </div>
-
-        <div>
-
-          <b>
-            Level ${game.research[item[0]]}
-          </b>
-
-          <button
-            class="btn"
-            onclick="researchTech('${item[0]}')">
-            🔬 Research
-          </button>
-
-        </div>
-
-      </div>
-
-    `).join("");
-
-}
-
-function researchTech(type){
-
-  const cost =
-    800 + game.research[type] * 400;
-
-  if(game.money < cost){
-
-    toast("Not enough money");
-
-    return;
-
-  }
-
-  game.money -= cost;
-
-  game.research[type]++;
-
-  game.xp += 50;
-
-  addNews(
-    `🔬 ${type} technology advanced.`
-  );
-
-  checkLevel();
-
-  render();
-
-}
-
-function renderDiplomacy(){
-
-  const box =
-    document.getElementById("diplomacyList");
-
-  box.innerHTML =
-    Object.entries(game.diplomacy)
-    .map(([nation,value])=>`
-
-      <div class="row">
-
-        <div>
-
-          <h3>${nation}</h3>
-
-          <span>
-            Relationship:
-            <b>${value}</b>
-          </span>
-
-        </div>
-
-        <div>
-
-          <button
-            class="btn good"
-            onclick="diplomacy('${nation}','peace')">
-            🕊️ Peace
-          </button>
-
-          <button
-            class="btn"
-            onclick="diplomacy('${nation}','trade')">
-            💹 Trade
-          </button>
-
-          <button
-            class="btn gold"
-            onclick="diplomacy('${nation}','alliance')">
-            🤝 Alliance
-          </button>
-
-        </div>
-
-      </div>
-
-    `).join("");
-
-}
-
-function diplomacy(nation,type){
-
-  if(type === "peace"){
-
-    game.diplomacy[nation] += 10;
-
-  }
-
-  if(type === "trade"){
-
-    if(game.diplomacy[nation] < 0){
-
-      toast("Relations too low");
-
-      return;
-
-    }
-
-    game.money += 500;
-
-    game.diplomacy[nation] += 5;
-
-  }
-
-  if(type === "alliance"){
-
-    if(game.diplomacy[nation] < 30){
-
-      toast("Need relationship 30+");
-
-      return;
-
-    }
-
-    game.diplomacy[nation] += 15;
-
-    game.reputation += 3;
-
-  }
-
-  addNews(
-    `🤝 Diplomatic action with ${nation}.`
-  );
-
-  render();
-
-}
-
-function renderMissions(){
-
-  document.getElementById("missionsList").innerHTML =
-    game.missions.map((mission,index)=>`
-
-      <div class="row">
-
-        <div>
-
-          <h3>
-            ${mission.done ? "✅" : "🎯"}
-            ${mission.name}
-          </h3>
-
-          <span>
-            Reward: 💰 ${mission.reward}
-          </span>
-
-        </div>
-
-        <button
-          class="btn gold"
-          onclick="claimMission(${index})"
-          ${mission.done ? "disabled" : ""}>
-
-          ${mission.done ? "Completed" : "Claim"}
-
-        </button>
-
-      </div>
-
-    `).join("");
-
-}
-
-function claimMission(index){
-
-  const mission =
-    game.missions[index];
-
-  if(mission.done){
-
-    return;
-
-  }
-
-  let completed = false;
-
-  if(index === 0){
-
-    completed =
-      game.cities.some(
-        city => city.buildings.length >= 5
-      );
-
-  }
-
-  if(index === 1){
-
-    completed = game.wins >= 1;
-
-  }
-
-  if(index === 2){
-
-    const total =
-      Object.values(game.research)
-      .reduce((a,b)=>a+b,0);
-
-    completed = total >= 23;
-
-  }
-
-  if(index === 3){
-
-    completed =
-      Object.values(game.diplomacy)
-      .some(value => value >= 30);
-
-  }
-
-  if(!completed){
-
-    toast("Mission objective not completed");
-
-    return;
-
-  }
-
-  mission.done = true;
-
-  game.money += mission.reward;
-
-  game.xp += 100;
-
-  addNews(
-    `🎯 Mission completed: ${mission.name}`
-  );
-
-  checkLevel();
-
-  render();
-
-}
-
-function renderCommanders(){
-
-  document.getElementById("commandersList").innerHTML =
-    game.commanders.map((commander,index)=>`
-
-      <div class="row">
-
-        <div>
-
-          <h3>👑 ${commander.name}</h3>
-
-          <span>
-            ${commander.role}
-            • Level ${commander.level}
-          </span>
-
-        </div>
-
-        <div>
-
-          <b>${commander.bonus}</b>
-
-          <button
-            class="btn"
-            onclick="upgradeCommander(${index})">
-            ⭐ Train
-          </button>
-
-        </div>
-
-      </div>
-
-    `).join("");
-
-}
-
-function upgradeCommander(index){
-
-  if(game.money < 600){
-
-    toast("Need 600 money");
-
-    return;
-
-  }
-
-  game.money -= 600;
-
-  game.commanders[index].level++;
-
-  game.xp += 40;
-
-  addNews(
-    `👑 ${game.commanders[index].name} trained.`
-  );
-
-  render();
-
-}
-
-function renderNews(){
-
-  document.getElementById("newsFeed").innerHTML =
-    game.news.map(item=>`
-
-      <div class="card">
-        📰 ${item}
-      </div>
-
-    `).join("");
-
-}
-
-function checkLevel(){
-
-  const needed =
-    game.level * 500;
-
-  if(game.xp >= needed){
-
-    game.xp -= needed;
-
-    game.level++;
-
-    game.nationLevel++;
-
-    game.reputation += 2;
-
-    addNews(
-      `⭐ Commander reached Level ${game.level}.`
-    );
-
-  }
-
-}
-
-function economicAction(type){
-
-  if(type === "tax"){
-
-    game.money += 500;
-
-    game.stability =
-      Math.max(0,game.stability-2);
-
-  }
-
-  if(type === "factory"){
-
-    if(game.money < 700){
-
-      toast("Need 700 money");
-
-      return;
-
-    }
-
-    game.money -= 700;
-
-    game.steel += 300;
-
-  }
-
-  if(type === "trade"){
-
-    if(game.money < 500){
-
-      toast("Need 500 money");
-
-      return;
-
-    }
-
-    game.money -= 500;
-
-    game.oil += 250;
-
-    game.food += 250;
-
-  }
-
-  if(type === "bank"){
-
-    if(game.money < 400){
-
-      toast("Need 400 money");
-
-      return;
-
-    }
-
-    game.money -= 400;
-
-    game.money += 700;
-
-  }
-
-  addNews("💰 Economic program completed.");
-
-  render();
-
-}
-
-function marketBuy(resource){
-
-  if(game.money < 300){
-
-    toast("Need 300 money");
-
-    return;
-
-  }
-
-  game.money -= 300;
-
-  game[resource] += 100;
-
-  addNews(
-    `💱 Purchased ${resource} from the market.`
-  );
-
-  render();
-
-}
 
 function randomEvent(){
 
-  const events = [
+  const events=[
 
-    "📈 Global trade boom increased treasury.",
-    "🌧️ Weather reduced food production.",
-    "🤝 A diplomatic opportunity appeared.",
-    "🏭 Industrial boom increased steel.",
-    "📰 A peaceful summit improved relations."
+    ["📈","Global trade boom","money",800],
+
+    ["🏭","Industrial expansion","steel",400],
+
+    ["🌾","Excellent harvest","food",500],
+
+    ["🛢️","New oil reserves","oil",350],
+
+    ["🤝","Diplomatic summit","reputation",4]
 
   ];
 
+
   const event =
     events[
-      Math.floor(Math.random()*events.length)
+      Math.floor(
+        Math.random()*events.length
+      )
     ];
 
-  game.money += 300;
 
-  addNews(event);
+  game[event[2]]+=event[3];
+
+
+  addNews(
+    `${event[0]} ${event[1]}: +${event[3]}`
+  );
+
+
+  toast(
+    event[1]
+  );
+
 
   render();
 
 }
 
-function renameNation(){
-
-  const name =
-    prompt(
-      "Enter your fictional nation name:",
-      "Aurora Federation"
-    );
-
-  if(name && name.trim()){
-
-    document.getElementById("nationName")
-      .textContent = name.trim();
-
-    addNews(
-      "🏳️ Nation identity updated."
-    );
-
-    toast("Nation name updated");
-
-  }
-
-}
-
-function toggleTheme(){
-
-  document.body.classList.toggle("light");
-
-}
-
-function resetGame(){
-
-  const answer =
-    confirm(
-      "Reset all game progress?"
-    );
-
-  if(!answer){
-
-    return;
-
-  }
-
-  localStorage.removeItem("WWS_SAVE");
-
-  location.reload();
-
-}
-
-function selectCountry(){
-
-  const name =
-    this.dataset.country;
-
-  let type = "Neutral";
-
-  if(this.classList.contains("player"))
-    type = "Your Nation";
-
-  if(this.classList.contains("ally"))
-    type = "Friendly";
-
-  if(this.classList.contains("enemy"))
-    type = "Hostile";
-
-  document.getElementById("countryInfo").innerHTML = `
-
-    <h2>🌎 ${name}</h2>
-
-    <p>Status:
-      <b>${type}</b>
-    </p>
-
-    <p>
-      Estimated military strength:
-      ${format(800 + Math.random()*3500)}
-    </p>
-
-    <button
-      class="btn"
-      onclick="document.querySelector('[data-page=battle]').click()">
-      ⚔️ Battle Planning
-    </button>
-
-    <button
-      class="btn"
-      onclick="document.querySelector('[data-page=diplomacy]').click()">
-      🤝 Diplomacy
-    </button>
-
-  `;
-
-}
-
-function setupNavigation(){
-
-  document.querySelectorAll(".nav")
-    .forEach(button=>{
-
-      button.addEventListener("click",()=>{
-
-        const page =
-          button.dataset.page;
-
-        document.querySelectorAll(".page")
-          .forEach(section=>{
-            section.classList.remove("active");
-          });
-
-        document.getElementById(page)
-          .classList.add("active");
-
-        document.querySelectorAll(".nav")
-          .forEach(item=>{
-            item.classList.remove("active");
-          });
-
-        button.classList.add("active");
-
-      });
-
-    });
-
-}
 
 function setupButtons(){
 
-  document.querySelectorAll("[data-unit]")
-    .forEach(button=>{
+  document.querySelectorAll(
+    "[data-unit]"
+  ).forEach(button=>{
 
-      button.addEventListener("click",()=>{
-        trainUnit(button.dataset.unit);
-      });
+    button.addEventListener(
+      "click",
+      ()=>{
+        trainUnit(
+          button.dataset.unit
+        );
+      }
+    );
 
-    });
-
-
-  document.querySelectorAll("[data-economy]")
-    .forEach(button=>{
-
-      button.addEventListener("click",()=>{
-        economicAction(button.dataset.economy);
-      });
-
-    });
+  });
 
 
-  document.querySelectorAll(".market-buy")
-    .forEach(button=>{
-
-      button.addEventListener("click",()=>{
-        marketBuy(button.dataset.market);
-      });
-
-    });
+  document.getElementById(
+    "buildAirBase"
+  ).addEventListener(
+    "click",
+    buildAirBase
+  );
 
 
-  document.querySelectorAll(".country")
-    .forEach(country=>{
-      country.addEventListener("click",selectCountry);
-    });
+  document.getElementById(
+    "startBattle"
+  ).addEventListener(
+    "click",
+    startBattle
+  );
 
 
-  document.getElementById("startBattle")
-    .addEventListener("click",startBattle);
+  document.getElementById(
+    "randomEvent"
+  ).addEventListener(
+    "click",
+    randomEvent
+  );
 
 
-  document.getElementById("improveSupply")
-    .addEventListener("click",improveSupply);
+  document.getElementById(
+    "industrialPolicy"
+  ).addEventListener(
+    "click",
+    ()=>{
 
+      game.money+=500;
 
-  document.getElementById("buildAirBase")
-    .addEventListener("click",buildAirBase);
+      game.stability=
+        Math.max(
+          0,
+          game.stability-2
+        );
 
-
-  document.getElementById("renameNation")
-    .addEventListener("click",renameNation);
-
-
-  document.getElementById("industrialPolicy")
-    .addEventListener("click",()=>{
-      game.money += 400;
-      game.stability -= 2;
-      addNews("🏭 Industrial policy activated.");
-      render();
-    });
-
-
-  document.getElementById("socialPolicy")
-    .addEventListener("click",()=>{
-      game.food =
-        Math.max(0,game.food-150);
-
-      game.stability += 5;
-
-      addNews("👥 Social policy improved stability.");
+      addNews(
+        "🏭 Industrial policy increased economic output."
+      );
 
       render();
-    });
+
+    }
+  );
 
 
-  document.getElementById("defensePolicy")
-    .addEventListener("click",()=>{
-      game.money =
-        Math.max(0,game.money-300);
+  document.getElementById(
+    "socialPolicy"
+  ).addEventListener(
+    "click",
+    ()=>{
 
-      game.defense += 75;
+      game.food=
+        Math.max(
+          0,
+          game.food-150
+        );
 
-      game.stability += 2;
+      game.stability=
+        Math.min(
+          100,
+          game.stability+5
+        );
 
-      addNews("🛡️ Defense policy strengthened.");
+      addNews(
+        "👥 Social program improved national stability."
+      );
 
       render();
-    });
+
+    }
+  );
 
 
-  document.getElementById("upgradeIntel")
-    .addEventListener("click",()=>{
-      if(game.money < 800){
-        toast("Need 800 money");
+  document.getElementById(
+    "defensePolicy"
+  ).addEventListener(
+    "click",
+    ()=>{
+
+      if(game.money<500){
+
+        toast("Need 500 money");
+
         return;
+
       }
 
-      game.money -= 800;
-      game.satelliteLevel++;
+      game.money-=500;
 
-      game.xp += 50;
+      game.defense+=75;
 
-      addNews("🛰️ Satellite system upgraded.");
+      game.stability=
+        Math.min(
+          100,
+          game.stability+2
+        );
+
+      addNews(
+        "🛡️ National defense strengthened."
+      );
 
       render();
-    });
+
+    }
+  );
 
 
-  document.getElementById("radarBtn")
-    .addEventListener("click",()=>{
-      toast("📡 Radar upgraded.");
-      game.xp += 25;
+  document.getElementById(
+    "tradeButton"
+  ).addEventListener(
+    "click",
+    ()=>{
+
+      if(game.money<500){
+
+        toast("Need 500 money");
+
+        return;
+
+      }
+
+      game.money-=500;
+
+      game.oil+=250;
+
+      game.food+=250;
+
+      addNews(
+        "🚢 International trade agreement expanded."
+      );
+
       render();
-    });
+
+    }
+  );
 
 
-  document.getElementById("reconBtn")
-    .addEventListener("click",()=>{
-      toast("🔭 Recon mission completed.");
-      game.xp += 50;
+  document.getElementById(
+    "upgradeSatellite"
+  ).addEventListener(
+    "click",
+    ()=>{
+
+      const cost=
+        900*game.satellite;
+
+      if(game.money<cost){
+
+        toast(
+          "Need "+format(cost)+" money"
+        );
+
+        return;
+
+      }
+
+      game.money-=cost;
+
+      game.satellite++;
+
+      game.xp+=50;
+
+      addNews(
+        "🛰️ Satellite network upgraded."
+      );
+
       render();
-    });
+
+    }
+  );
 
 
-  document.getElementById("scanBtn")
-    .addEventListener("click",()=>{
-      toast("🛰️ Territory scan completed.");
-      addNews("🛰️ Intelligence scan revealed new information.");
+  document.getElementById(
+    "scanButton"
+  ).addEventListener(
+    "click",
+    ()=>{
+
+      toast(
+        "🛰️ Global scan completed."
+      );
+
+      addNews(
+        "🛰️ Intelligence scan detected strategic activity."
+      );
+
+    }
+  );
+
+
+  document.getElementById(
+    "reconButton"
+  ).addEventListener(
+    "click",
+    ()=>{
+
+      game.xp+=40;
+
+      toast(
+        "🔭 Recon mission completed."
+      );
+
+      addNews(
+        "🔭 Reconnaissance mission returned successfully."
+      );
+
       render();
-    });
+
+    }
+  );
 
 
-  document.getElementById("createClan")
-    .addEventListener("click",()=>{
-      toast("👥 Alliance system opened.");
-    });
+  document.getElementById(
+    "rotateButton"
+  ).addEventListener(
+    "click",
+    ()=>{
+
+      rotating=!rotating;
+
+      toast(
+        rotating
+        ? "🌍 Auto rotation ON"
+        : "🌍 Auto rotation OFF"
+      );
+
+    }
+  );
 
 
-  document.getElementById("findClan")
-    .addEventListener("click",()=>{
-      toast("🔎 Searching fictional alliances.");
-    });
+  document.getElementById(
+    "zoomIn"
+  ).addEventListener(
+    "click",
+    ()=>{
+
+      currentZoom=
+        Math.max(
+          3.5,
+          currentZoom-.5
+        );
+
+      camera.position.z=
+        currentZoom;
+
+    }
+  );
 
 
-  document.getElementById("joinTournament")
-    .addEventListener("click",()=>{
-      game.seasonPoints += 10;
-      game.xp += 50;
-      addNews("🏆 Tournament registration completed.");
-      render();
-    });
+  document.getElementById(
+    "zoomOut"
+  ).addEventListener(
+    "click",
+    ()=>{
+
+      currentZoom=
+        Math.min(
+          8,
+          currentZoom+.5
+        );
+
+      camera.position.z=
+        currentZoom;
+
+    }
+  );
 
 
-  document.getElementById("themeBtn")
-    .addEventListener("click",toggleTheme);
+  document.getElementById(
+    "profileButton"
+  ).addEventListener(
+    "click",
+    ()=>{
 
+      toast(
+        `👤 Commander Level ${game.level} • ${game.wins} victories`
+      );
 
-  document.getElementById("saveBtn")
-    .addEventListener("click",saveGame);
-
-
-  document.getElementById("resetBtn")
-    .addEventListener("click",resetGame);
-
-
-  document.getElementById("eventBtn")
-    .addEventListener("click",randomEvent);
-
-
-  document.getElementById("zoomBtn")
-    .addEventListener("click",()=>{
-      toast("🔍 Map zoom controls activated.");
-    });
-
-
-  document.getElementById("fogBtn")
-    .addEventListener("click",()=>{
-      toast("🌫️ Fog of war toggled.");
-    });
-
-
-  document.getElementById("weatherBtn")
-    .addEventListener("click",()=>{
-      toast("🌦️ World weather updated.");
-    });
+    }
+  );
 
 }
 
-function gameCycle(){
 
-  game.money +=
-    100 * game.research.economy;
+function startLoading(){
 
-  game.oil += 50;
+  const progress =
+    document.getElementById(
+      "loadingProgress"
+    );
 
-  game.steel +=
-    75 * game.research.industry;
+  const percent =
+    document.getElementById(
+      "loadingPercent"
+    );
 
-  game.food += 100;
+  const status =
+    document.getElementById(
+      "loadingStatus"
+    );
 
-  game.energy += 25;
 
-  render();
+  const stages=[
+
+    [12,"CONNECTING TO WORLD..."],
+
+    [27,"LOADING TERRITORIES..."],
+
+    [43,"INITIALIZING ARMIES..."],
+
+    [59,"PREPARING AIR BASES..."],
+
+    [74,"CALIBRATING SATELLITES..."],
+
+    [88,"BUILDING STRATEGIC MAP..."],
+
+    [100,"COMMAND CENTER READY"]
+
+  ];
+
+
+  let index=0;
+
+
+  const timer =
+    setInterval(()=>{
+
+      const stage=
+        stages[index];
+
+      progress.style.width=
+        stage[0]+"%";
+
+      percent.textContent=
+        stage[0]+"%";
+
+      status.textContent=
+        stage[1];
+
+
+      index++;
+
+
+      if(index>=stages.length){
+
+        clearInterval(timer);
+
+        setTimeout(()=>{
+
+          document
+            .getElementById(
+              "loadingScreen"
+            )
+            .classList.add(
+              "hidden"
+            );
+
+        },500);
+
+      }
+
+    },350);
 
 }
+
 
 setupNavigation();
 
@@ -1533,4 +1868,27 @@ setupButtons();
 
 render();
 
-setInterval(gameCycle,30000);
+init3D();
+
+startLoading();
+
+
+setInterval(()=>{
+
+  game.money+=100;
+
+  game.oil+=50;
+
+  game.steel+=75;
+
+  game.food+=100;
+
+  render();
+
+},30000);
+
+
+window.addEventListener(
+  "beforeunload",
+  saveGame
+);
