@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -8,41 +10,49 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     >
 
-    <meta name="theme-color" content="#071016">
+    <meta
+        name="theme-color"
+        content="#050d10"
+    >
 
-    <title>WARFRONT — Tactical Command</title>
+    <title>WARFRONT — 3D Tactical Command</title>
 
-    <link rel="stylesheet" href="style.css">
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
 </head>
+
 
 <body>
 
-    <!-- ================= LOADING ================= -->
+    <!-- =====================================================
+         LOADING SCREEN
+    ====================================================== -->
 
-    <div id="loadingScreen">
+    <div id="loading">
 
-        <div class="loading-panel">
+        <div class="loading-content">
 
-            <div class="loading-logo">
+            <div class="game-logo">
                 WARFRONT
             </div>
 
-            <div class="loading-subtitle">
-                TACTICAL COMMAND
+            <div class="game-subtitle">
+                3D TACTICAL COMMAND
             </div>
 
-            <div class="loading-status">
-                <span id="loadingText">
-                    Initializing battlefield...
-                </span>
-            </div>
+            <div class="loading-line"></div>
 
             <div class="loading-bar">
-                <div id="loadingProgress"></div>
+
+                <div id="progress"></div>
+
             </div>
 
-            <div class="loading-percent">
-                SYSTEM ONLINE
+            <div id="loadText">
+                Initializing battlefield...
             </div>
 
         </div>
@@ -50,507 +60,190 @@
     </div>
 
 
-    <!-- ================= GAME ================= -->
+    <!-- =====================================================
+         THREE.JS CANVAS
+         main.js will create the 3D battlefield
+    ====================================================== -->
 
-    <main id="game">
 
-        <!-- TOP COMMAND BAR -->
+    <!-- =====================================================
+         GAME HUD
+    ====================================================== -->
 
-        <header class="topbar">
+    <div id="hud">
 
-            <div class="brand">
+        <!-- TOP HEADER -->
 
-                <strong>WARFRONT</strong>
+        <header>
 
-                <span>TACTICAL COMMAND</span>
+            <div>
+
+                <div class="brand-title">
+                    WARFRONT
+                </div>
+
+                <div class="brand-subtitle">
+                    3D TACTICAL COMMAND
+                </div>
 
             </div>
 
 
+            <!-- RESOURCES -->
+
             <div class="resources">
 
-                <div class="resource">
+                <span>
                     💰
-                    <span id="money">5000</span>
-                </div>
+                    <span id="money">
+                        11500
+                    </span>
+                </span>
 
-                <div class="resource">
+                <span>
                     ⛽
-                    <span id="fuel">1000</span>
-                </div>
+                    <span id="fuel">
+                        1520
+                    </span>
+                </span>
 
-                <div class="resource">
-                    🔩
-                    <span id="metal">2000</span>
-                </div>
-
-                <div class="resource">
+                <span>
                     ⭐
-                    <span id="level">1</span>
-                </div>
+                    <span id="score">
+                        5
+                    </span>
+                </span>
 
             </div>
 
         </header>
 
 
-        <!-- ================= BATTLEFIELD ================= -->
+        <!-- =================================================
+             MISSION
+        ================================================== -->
 
-        <section id="battlefield">
+        <div id="mission">
 
-            <!-- 3D-looking terrain -->
-
-            <div class="terrain">
-
-                <!-- WATER -->
-
-                <div class="river"></div>
-
-
-                <!-- ROADS -->
-
-                <div class="road road-main"></div>
-
-                <div class="road road-side"></div>
-
-
-                <!-- PLAYER BASE -->
-
-                <div class="base player-base">
-
-                    <div class="base-building">
-                        HQ
-                    </div>
-
-                    <div class="base-label">
-                        ALLIED HQ
-                    </div>
-
-                </div>
-
-
-                <!-- AIR BASE -->
-
-                <div class="base air-base">
-
-                    <div class="base-building">
-                        ✈
-                    </div>
-
-                    <div class="base-label">
-                        AIR BASE
-                    </div>
-
-                </div>
-
-
-                <!-- ENEMY BASE -->
-
-                <div class="base enemy-base">
-
-                    <div class="base-building">
-                        HQ
-                    </div>
-
-                    <div class="base-label">
-                        ENEMY HQ
-                    </div>
-
-                </div>
-
-
-                <!-- NAVAL BASE -->
-
-                <div class="base naval-base">
-
-                    <div class="base-building">
-                        ⚓
-                    </div>
-
-                    <div class="base-label">
-                        NAVAL BASE
-                    </div>
-
-                </div>
-
-
-                <!-- PLAYER TANKS -->
-
-                <div
-                    class="unit player-unit tank"
-                    id="tank1"
-                    data-unit="tank1"
-                >
-                    🛡️
-                </div>
-
-
-                <div
-                    class="unit player-unit tank"
-                    id="tank2"
-                    data-unit="tank2"
-                >
-                    🛡️
-                </div>
-
-
-                <!-- PLAYER INFANTRY -->
-
-                <div
-                    class="unit player-unit infantry"
-                    id="infantry1"
-                    data-unit="infantry1"
-                >
-                    🪖
-                </div>
-
-
-                <div
-                    class="unit player-unit infantry"
-                    id="infantry2"
-                    data-unit="infantry2"
-                >
-                    🪖
-                </div>
-
-
-                <!-- AIRCRAFT -->
-
-                <div
-                    class="unit player-unit aircraft"
-                    id="aircraft1"
-                    data-unit="aircraft1"
-                >
-                    ✈️
-                </div>
-
-
-                <!-- ENEMY -->
-
-                <div
-                    class="unit enemy enemy-tank"
-                    id="enemyTank1"
-                >
-                    🛡️
-                </div>
-
-
-                <div
-                    class="unit enemy enemy-infantry"
-                    id="enemyInfantry1"
-                >
-                    🪖
-                </div>
-
-
-                <div
-                    class="unit enemy enemy-aircraft"
-                    id="enemyAircraft1"
-                >
-                    ✈️
-                </div>
-
-
-                <!-- TREES -->
-
-                <div class="tree tree1">🌲</div>
-                <div class="tree tree2">🌲</div>
-                <div class="tree tree3">🌲</div>
-                <div class="tree tree4">🌲</div>
-                <div class="tree tree5">🌲</div>
-
-
-                <!-- BATTLE EFFECTS -->
-
-                <div id="effects"></div>
-
-            </div>
-
-        </section>
-
-
-        <!-- ================= MISSION ================= -->
-
-        <section class="mission-panel">
-
-            <div class="mission-title">
+            <strong>
                 🎯 CURRENT MISSION
-            </div>
+            </strong>
 
-            <div id="missionText">
-                Destroy enemy forces and capture the enemy headquarters.
-            </div>
-
-            <div class="score-panel">
-
-                <div>
-                    ALLIED CONTROL
-                    <strong id="allyScore">50</strong>
-                </div>
-
-                <div class="score-bar">
-                    <div id="allyBar"></div>
-                </div>
-
-                <div>
-                    ENEMY
-                    <strong id="enemyScore">50</strong>
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- ================= UNIT PANEL ================= -->
-
-        <section class="unit-panel">
-
-            <div class="panel-title">
-                🪖 ARMY COMMAND
-            </div>
-
-
-            <div class="unit-list">
-
-
-                <button
-                    class="unit-card selected"
-                    data-unit="tank1"
-                >
-
-                    <span class="unit-icon">
-                        🛡️
-                    </span>
-
-                    <b>Tank Alpha</b>
-
-                    <small>
-                        HP 100 • ATK 35
-                    </small>
-
-                </button>
-
-
-                <button
-                    class="unit-card"
-                    data-unit="tank2"
-                >
-
-                    <span class="unit-icon">
-                        🛡️
-                    </span>
-
-                    <b>Tank Bravo</b>
-
-                    <small>
-                        HP 100 • ATK 35
-                    </small>
-
-                </button>
-
-
-                <button
-                    class="unit-card"
-                    data-unit="infantry1"
-                >
-
-                    <span class="unit-icon">
-                        🪖
-                    </span>
-
-                    <b>Infantry Alpha</b>
-
-                    <small>
-                        HP 80 • ATK 20
-                    </small>
-
-                </button>
-
-
-                <button
-                    class="unit-card"
-                    data-unit="infantry2"
-                >
-
-                    <span class="unit-icon">
-                        🪖
-                    </span>
-
-                    <b>Infantry Bravo</b>
-
-                    <small>
-                        HP 80 • ATK 20
-                    </small>
-
-                </button>
-
-
-                <button
-                    class="unit-card"
-                    data-unit="aircraft1"
-                >
-
-                    <span class="unit-icon">
-                        ✈️
-                    </span>
-
-                    <b>Fighter One</b>
-
-                    <small>
-                        HP 90 • ATK 45
-                    </small>
-
-                </button>
-
-
-            </div>
-
-        </section>
-
-
-        <!-- ================= COMMAND BUTTONS ================= -->
-
-        <section class="command-panel">
-
-            <button id="attackBtn">
-                ⚔️
-                <span>ATTACK</span>
-            </button>
-
-
-            <button id="defendBtn">
-                🛡️
-                <span>DEFEND</span>
-            </button>
-
-
-            <button id="airStrikeBtn">
-                ✈️
-                <span>AIR STRIKE</span>
-            </button>
-
-
-            <button id="scoutBtn">
-                🔭
-                <span>SCOUT</span>
-            </button>
-
-
-            <button id="reinforceBtn">
-                ➕
-                <span>REINFORCE</span>
-            </button>
-
-
-            <button id="repairBtn">
-                🔧
-                <span>REPAIR</span>
-            </button>
-
-
-            <button id="researchBtn">
-                🔬
-                <span>RESEARCH</span>
-            </button>
-
-
-            <button id="missionBtn">
-                🎯
-                <span>MISSIONS</span>
-            </button>
-
-
-            <button id="saveBtn">
-                💾
-                <span>SAVE</span>
-            </button>
-
-        </section>
-
-
-        <!-- ================= CAMERA ================= -->
-
-        <section class="camera-panel">
-
-            <button id="zoomOut">
-                −
-            </button>
+            <br>
 
             <span>
-                CAMERA
+                Destroy enemy forces
             </span>
 
-            <button id="zoomIn">
-                +
-            </button>
-
-            <button id="resetCamera">
-                ⟳
-            </button>
-
-        </section>
+        </div>
 
 
-        <!-- ================= INFO ================= -->
+        <!-- =================================================
+             MINIMAP
+        ================================================== -->
 
-        <div id="notification">
+        <div id="minimap">
+
+            <div class="map-grid"></div>
+
+            <div class="player-marker"></div>
+
+            <div class="enemy-marker"></div>
+
+        </div>
+
+
+        <!-- =================================================
+             INFORMATION PANEL
+        ================================================== -->
+
+        <div id="info">
+
             Select a unit to begin.
-        </div>
-
-
-        <div class="battle-status">
-
-            <span>
-                🪖 UNITS:
-                <b id="unitCount">5</b>
-            </span>
-
-            <span>
-                ☠ ENEMIES:
-                <b id="enemyCount">3</b>
-            </span>
-
-            <span>
-                🏆 VICTORIES:
-                <b id="victories">0</b>
-            </span>
 
         </div>
 
 
-        <!-- ================= MODAL ================= -->
+        <!-- =================================================
+             EXTRA BATTLE STATUS
+        ================================================== -->
 
-        <div
-            id="modal"
-            class="hidden"
-        >
+        <div id="battleStatus">
 
-            <div class="modal-box">
+            <span>
+                ALLIES:
+                <b id="allyCount">
+                    5
+                </b>
+            </span>
 
-                <button
-                    id="closeModal"
-                    class="close-modal"
-                >
-                    ×
-                </button>
-
-                <h2 id="modalTitle">
-                    WARFRONT
-                </h2>
-
-                <div id="modalContent"></div>
-
-            </div>
+            <span>
+                ENEMIES:
+                <b id="enemyCount">
+                    5
+                </b>
+            </span>
 
         </div>
 
-    </main>
+
+        <!-- =================================================
+             MAIN CONTROLS
+        ================================================== -->
+
+        <div id="controls">
+
+            <button
+                id="attack"
+                type="button"
+            >
+                ⚔ ATTACK
+            </button>
 
 
-    <!-- GAME ENGINE -->
+            <button
+                id="air"
+                type="button"
+            >
+                ✈ AIR STRIKE
+            </button>
 
-    <script src="game.js"></script>
+
+            <button
+                id="defend"
+                type="button"
+            >
+                🛡 DEFEND
+            </button>
+
+
+            <button
+                id="reset"
+                type="button"
+            >
+                🎯 CAMERA
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         MOBILE TOUCH CONTROL
+         main.js creates the actual joystick.
+    ====================================================== -->
+
+
+    <!-- =====================================================
+         GAME SCRIPT
+    ====================================================== -->
+
+    <script
+        type="module"
+        src="js/main.js">
+    </script>
 
 </body>
+
 </html>
