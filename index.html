@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WORLD WAR — Global Strategy</title>
+    <title>WORLD WAR — Real-Time Global Strategy</title>
     <link rel="stylesheet" href="style.css">
     <script type="importmap">
     {
@@ -29,12 +29,12 @@
         <div class="loading-explosion exp2"></div>
     </div>
     <div class="loading-content">
-        <div class="loading-eyebrow">TACTICAL COMMAND SYSTEM</div>
+        <div class="loading-eyebrow">GLOBAL COMMAND SYSTEM</div>
         <h1>WORLD WAR</h1>
-        <div class="loading-subtitle">GLOBAL STRATEGY</div>
-        <div class="loading-status" id="loadingStatus">Preparing battlefield...</div>
+        <div class="loading-subtitle">REAL-TIME STRATEGY</div>
+        <div class="loading-status" id="loadingStatus">Loading global map...</div>
         <div class="loading-bar"><div id="loadingProgress"></div></div>
-        <div class="loading-tip" id="loadingTip">TIP: Use the strategy camera to monitor your entire frontline.</div>
+        <div class="loading-tip" id="loadingTip">TIP: Click any country to view its territory and states.</div>
     </div>
 </div>
 
@@ -51,7 +51,7 @@
                 <div class="brand-subtitle">COMMAND</div>
             </div>
         </div>
-        <div class="country-display">
+        <div class="country-display" id="countryDisplay">
             <span id="countryFlag">🇧🇩</span>
             <span id="countryName">Bangladesh</span>
         </div>
@@ -87,6 +87,7 @@
             <div>
                 <div class="panel-kicker" id="panelKicker">STRATEGIC COMMAND</div>
                 <h2 id="panelTitle">World Overview</h2>
+                <div id="selectedCountryDisplay" style="font-size:11px;color:var(--accent);margin-top:4px;"></div>
             </div>
             <button id="closePanel">×</button>
         </div>
@@ -112,28 +113,28 @@
             <button class="command-btn" id="airstrikeCommand"><span>✈️</span>AIRSTRIKE</button>
         </div>
         <div style="padding:8px 15px 15px;text-align:center;font-size:10px;color:var(--muted);border-top:1px solid var(--line);margin-top:8px;">
-            ⚡ Quick Build: <button id="quickFactory" style="background:var(--accent);color:#111;padding:4px 12px;border-radius:4px;font-weight:700;font-size:10px;">BUILD FACTORY</button>
+            ⚡ Quick Actions: 
+            <button id="quickFactory" style="background:var(--accent);color:#111;padding:4px 12px;border-radius:4px;font-weight:700;font-size:10px;margin:0 4px;">🏭 BUILD</button>
+            <button id="quickReinforce" style="background:var(--green);color:#111;padding:4px 12px;border-radius:4px;font-weight:700;font-size:10px;margin:0 4px;">🪖 REINFORCE</button>
         </div>
     </section>
 
     <!-- BOTTOM TOUCH COMMAND -->
-    <div id="touchHint"><span>👆</span>Tap a unit to select • Tap terrain to move</div>
+    <div id="touchHint"><span>👆</span>Tap a unit to select • Tap terrain to move • Click country to view</div>
 
     <!-- CAMERA CONTROLS -->
     <div id="cameraControls">
         <button id="zoomIn">＋</button>
         <button id="zoomOut">−</button>
         <button id="resetCamera">⌖</button>
+        <button id="topDown" style="font-size:12px;">⬇</button>
     </div>
 
     <!-- MINIMAP -->
     <div id="miniMap">
-        <div class="mini-title">TACTICAL MAP</div>
-        <div class="mini-map-body">
-            <div class="mini-land land1"></div>
-            <div class="mini-land land2"></div>
-            <div class="mini-land land3"></div>
-            <div id="miniUnits"></div>
+        <div class="mini-title">GLOBAL MAP</div>
+        <div class="mini-map-body" id="miniMapBody">
+            <canvas id="miniMapCanvas" width="185" height="105"></canvas>
         </div>
     </div>
 
@@ -157,24 +158,34 @@
             <h2>Choose Your Country</h2>
             <div class="country-grid">
                 <!-- Muslim Countries -->
-                <button class="country-card" data-country="BANGLADESH"><span>🇧🇩</span><b>Bangladesh</b><small>South Asia</small></button>
-                <button class="country-card" data-country="PAKISTAN"><span>🇵🇰</span><b>Pakistan</b><small>South Asia</small></button>
-                <button class="country-card" data-country="TURKEY"><span>🇹🇷</span><b>Turkey</b><small>Eurasia</small></button>
-                <button class="country-card" data-country="IRAN"><span>🇮🇷</span><b>Iran</b><small>Middle East</small></button>
-                <button class="country-card" data-country="SAUDI"><span>🇸🇦</span><b>Saudi Arabia</b><small>Middle East</small></button>
-                <button class="country-card" data-country="EGYPT"><span>🇪🇬</span><b>Egypt</b><small>North Africa</small></button>
-                <button class="country-card" data-country="PALESTINE"><span>🇵🇸</span><b>Palestine</b><small>Middle East</small></button>
-                <button class="country-card" data-country="INDONESIA"><span>🇮🇩</span><b>Indonesia</b><small>Southeast Asia</small></button>
-                <button class="country-card" data-country="AFGHANISTAN"><span>🇦🇫</span><b>Afghanistan</b><small>Central Asia</small></button>
-                <button class="country-card" data-country="INDIA"><span>🇮🇳</span><b>India</b><small>South Asia</small></button>
+                <button class="country-card" data-country="BANGLADESH"><span>🇧🇩</span><b>Bangladesh</b><small>South Asia • 8 States</small></button>
+                <button class="country-card" data-country="PAKISTAN"><span>🇵🇰</span><b>Pakistan</b><small>South Asia • 7 States</small></button>
+                <button class="country-card" data-country="TURKEY"><span>🇹🇷</span><b>Turkey</b><small>Eurasia • 8 States</small></button>
+                <button class="country-card" data-country="IRAN"><span>🇮🇷</span><b>Iran</b><small>Middle East • 8 States</small></button>
+                <button class="country-card" data-country="SAUDI"><span>🇸🇦</span><b>Saudi Arabia</b><small>Middle East • 8 States</small></button>
+                <button class="country-card" data-country="EGYPT"><span>🇪🇬</span><b>Egypt</b><small>North Africa • 8 States</small></button>
+                <button class="country-card" data-country="PALESTINE"><span>🇵🇸</span><b>Palestine</b><small>Middle East • 6 States</small></button>
+                <button class="country-card" data-country="INDONESIA"><span>🇮🇩</span><b>Indonesia</b><small>SE Asia • 8 States</small></button>
+                <button class="country-card" data-country="AFGHANISTAN"><span>🇦🇫</span><b>Afghanistan</b><small>Central Asia • 8 States</small></button>
                 <!-- Major Powers -->
-                <button class="country-card" data-country="USA"><span>🇺🇸</span><b>United States</b><small>Superpower</small></button>
-                <button class="country-card" data-country="CHINA"><span>🇨🇳</span><b>China</b><small>East Asia</small></button>
-                <button class="country-card" data-country="RUSSIA"><span>🇷🇺</span><b>Russia</b><small>Eurasia</small></button>
-                <button class="country-card" data-country="UK"><span>🇬🇧</span><b>United Kingdom</b><small>Europe</small></button>
-                <button class="country-card" data-country="FRANCE"><span>🇫🇷</span><b>France</b><small>Europe</small></button>
-                <button class="country-card" data-country="GERMANY"><span>🇩🇪</span><b>Germany</b><small>Europe</small></button>
+                <button class="country-card" data-country="INDIA"><span>🇮🇳</span><b>India</b><small>South Asia • 8 States</small></button>
+                <button class="country-card" data-country="USA"><span>🇺🇸</span><b>United States</b><small>North America • 8 States</small></button>
+                <button class="country-card" data-country="CHINA"><span>🇨🇳</span><b>China</b><small>East Asia • 8 States</small></button>
+                <button class="country-card" data-country="RUSSIA"><span>🇷🇺</span><b>Russia</b><small>Eurasia • 8 States</small></button>
+                <button class="country-card" data-country="UK"><span>🇬🇧</span><b>United Kingdom</b><small>Europe • 4 States</small></button>
+                <button class="country-card" data-country="FRANCE"><span>🇫🇷</span><b>France</b><small>Europe • 8 States</small></button>
+                <button class="country-card" data-country="GERMANY"><span>🇩🇪</span><b>Germany</b><small>Europe • 8 States</small></button>
             </div>
+        </div>
+    </div>
+
+    <!-- COUNTRY INFO MODAL -->
+    <div id="countryInfoModal" class="modal">
+        <div class="modal-box">
+            <button class="modal-close" id="closeCountryInfo">×</button>
+            <div class="panel-kicker" id="infoCountryKicker">COUNTRY DETAILS</div>
+            <h2 id="infoCountryTitle">Country Name</h2>
+            <div id="infoCountryContent"></div>
         </div>
     </div>
 
@@ -185,7 +196,7 @@
             <div>
                 <div class="panel-kicker">FIELD MANUAL</div>
                 <h2 id="tutorialTitle">Welcome, Commander</h2>
-                <p id="tutorialText">Select a military unit and command it across the battlefield.</p>
+                <p id="tutorialText">Select a military unit and command it across the battlefield. Click any country to view its territory.</p>
             </div>
             <button id="tutorialNext">NEXT</button>
         </div>
