@@ -3,14 +3,14 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 
 /* =========================================================
-   WORLD WAR — V6 (FULLY WORKABLE)
-   ALL FEATURES WORKING - NO BUGS
+   WORLD WAR — V7 (FULL GLOBAL MAP)
+   16 COUNTRIES + STATES + REALISTIC TERRAIN
    ========================================================== */
 
 const $ = id => document.getElementById(id);
 
 let scene, camera, renderer, labelRenderer, controls, clock;
-let ground, unitGroup, fxGroup, borderGroup, labelGroup;
+let ground, unitGroup, fxGroup, borderGroup, labelGroup, stateGroup;
 
 let selectedUnit = null;
 let moveMode = false;
@@ -23,7 +23,7 @@ let day = 1;
 let month = 1;
 let year = 1940;
 
-let currentCountry = "USA";
+let currentCountry = "BANGLADESH";
 let weather = "CLEAR";
 let mapLayer = "MILITARY";
 
@@ -49,48 +49,79 @@ let diplomaticMessages = [];
 
 const units = [];
 
+/* =========================================================
+   NATIONS DATA (16 Countries)
+   ========================================================== */
+
 const nation = {
-    USA: { flag: "🇺🇸", name: "United States", color: 0x2a5c8a, pos: [-80, -40] },
-    GERMANY: { flag: "🇩🇪", name: "Germany", color: 0x3a3a3a, pos: [20, 30] },
-    UK: { flag: "🇬🇧", name: "United Kingdom", color: 0x8a2a2a, pos: [-120, 50] },
-    JAPAN: { flag: "🇯🇵", name: "Japan", color: 0xcc2222, pos: [150, -20] },
-    USSR: { flag: "☭", name: "Soviet Union", color: 0x8a2a2a, pos: [60, 80] },
-    FRANCE: { flag: "🇫🇷", name: "France", color: 0x2a5a8a, pos: [-40, 60] },
-    ITALY: { flag: "🇮🇹", name: "Italy", color: 0x2a8a3a, pos: [-20, 90] },
-    CHINA: { flag: "🇨🇳", name: "China", color: 0xcc2222, pos: [120, 40] }
+    // Muslim Countries
+    BANGLADESH: { flag: "🇧🇩", name: "Bangladesh", color: 0x006a4e, capital: "Dhaka", region: "South Asia",
+        states: ["Dhaka", "Chittagong", "Rajshahi", "Khulna", "Sylhet", "Barisal", "Rangpur", "Mymensingh"] },
+    PAKISTAN: { flag: "🇵🇰", name: "Pakistan", color: 0x01411c, capital: "Islamabad", region: "South Asia",
+        states: ["Punjab", "Sindh", "KPK", "Balochistan", "Gilgit", "Azad Kashmir", "Islamabad Capital"] },
+    TURKEY: { flag: "🇹🇷", name: "Turkey", color: 0xe30a17, capital: "Ankara", region: "Eurasia",
+        states: ["Istanbul", "Ankara", "Izmir", "Bursa", "Antalya", "Konya", "Adana", "Gaziantep"] },
+    IRAN: { flag: "🇮🇷", name: "Iran", color: 0x239f40, capital: "Tehran", region: "Middle East",
+        states: ["Tehran", "Isfahan", "Khuzestan", "Fars", "Razavi", "East Azerbaijan", "Mazandaran", "Gilan"] },
+    SAUDI: { flag: "🇸🇦", name: "Saudi Arabia", color: 0x165d31, capital: "Riyadh", region: "Middle East",
+        states: ["Riyadh", "Makkah", "Madinah", "Eastern", "Asir", "Tabuk", "Jazan", "Najran"] },
+    EGYPT: { flag: "🇪🇬", name: "Egypt", color: 0xce1126, capital: "Cairo", region: "North Africa",
+        states: ["Cairo", "Alexandria", "Giza", "Luxor", "Aswan", "Port Said", "Suez", "Minya"] },
+    PALESTINE: { flag: "🇵🇸", name: "Palestine", color: 0x007a3d, capital: "Jerusalem", region: "Middle East",
+        states: ["West Bank", "Gaza Strip", "Jerusalem", "Ramallah", "Hebron", "Nablus"] },
+    INDONESIA: { flag: "🇮🇩", name: "Indonesia", color: 0xce1126, capital: "Jakarta", region: "Southeast Asia",
+        states: ["Java", "Sumatra", "Kalimantan", "Sulawesi", "Papua", "Bali", "Lombok", "Flores"] },
+    AFGHANISTAN: { flag: "🇦🇫", name: "Afghanistan", color: 0x000000, capital: "Kabul", region: "Central Asia",
+        states: ["Kabul", "Kandahar", "Herat", "Mazar", "Nangarhar", "Balkh", "Ghazni", "Helmand"] },
+    // Other Major Powers
+    INDIA: { flag: "🇮🇳", name: "India", color: 0xff9933, capital: "New Delhi", region: "South Asia",
+        states: ["UP", "Maharashtra", "Tamil Nadu", "Gujarat", "Karnataka", "Rajasthan", "West Bengal", "Punjab"] },
+    USA: { flag: "🇺🇸", name: "United States", color: 0x2a5c8a, capital: "Washington DC", region: "North America",
+        states: ["California", "Texas", "Florida", "New York", "Illinois", "Pennsylvania", "Ohio", "Georgia"] },
+    CHINA: { flag: "🇨🇳", name: "China", color: 0xcc2222, capital: "Beijing", region: "East Asia",
+        states: ["Guangdong", "Shandong", "Henan", "Sichuan", "Jiangsu", "Hebei", "Hunan", "Anhui"] },
+    RUSSIA: { flag: "🇷🇺", name: "Russia", color: 0x003399, capital: "Moscow", region: "Eurasia",
+        states: ["Moscow", "St Petersburg", "Novosibirsk", "Yekaterinburg", "Kazan", "Nizhny", "Samara", "Omsk"] },
+    UK: { flag: "🇬🇧", name: "United Kingdom", color: 0x8a2a2a, capital: "London", region: "Europe",
+        states: ["England", "Scotland", "Wales", "Northern Ireland"] },
+    FRANCE: { flag: "🇫🇷", name: "France", color: 0x2a5a8a, capital: "Paris", region: "Europe",
+        states: ["Île-de-France", "Provence", "Brittany", "Normandy", "Alsace", "Aquitaine", "Lyon", "Marseille"] },
+    GERMANY: { flag: "🇩🇪", name: "Germany", color: 0x3a3a3a, capital: "Berlin", region: "Europe",
+        states: ["Bavaria", "North Rhine", "Baden", "Saxony", "Hesse", "Berlin", "Hamburg", "Munich"] }
 };
 
-const countryColors = {
-    USA: 0x2a5c8a, GERMANY: 0x3a3a3a, UK: 0x8a2a2a, JAPAN: 0xcc2222,
-    USSR: 0x8a2a2a, FRANCE: 0x2a5a8a, ITALY: 0x2a8a3a, CHINA: 0xcc2222
-};
+const countryColors = {};
+Object.keys(nation).forEach(key => {
+    countryColors[key] = nation[key].color;
+});
 
 const mapColors = {
     MILITARY: 0x596b58, POLITICAL: 0x58667d, TERRAIN: 0x52634d,
     SUPPLY: 0x4e6e5a, RESOURCES: 0x75633c, INTEL: 0x5d4c6b
 };
 
-const diplomacy = {
-    GERMANY: -65, UK: 18, JAPAN: -42, USSR: -8, FRANCE: 35, ITALY: -20, CHINA: 10
-};
+const diplomacy = {};
+Object.keys(nation).forEach(key => {
+    diplomacy[key] = key === "BANGLADESH" ? 0 : (Math.random() * 60 - 30);
+});
 
 const factories = { civilian: 18, military: 14, naval: 5 };
 
 const production = {
     TANK: { name: "Tank", factories: 4, progress: 67, efficiency: 74, cost: 800, steel: 80, output: 0 },
-    INFANTRY: { name: "Infantry Equipment", factories: 5, progress: 42, efficiency: 82, cost: 350, steel: 35, output: 0 },
+    INFANTRY: { name: "Infantry", factories: 5, progress: 42, efficiency: 82, cost: 350, steel: 35, output: 0 },
     ARTILLERY: { name: "Artillery", factories: 3, progress: 55, efficiency: 68, cost: 600, steel: 65, output: 0 },
     AIR: { name: "Aircraft", factories: 2, progress: 31, efficiency: 59, cost: 1100, steel: 90, output: 0 }
 };
 
 const tech = {
-    INFANTRY: { name: "Infantry Weapons", progress: 54, active: false, bonus: "+8% infantry attack", completed: false },
+    INFANTRY: { name: "Infantry Weapons", progress: 54, active: false, bonus: "+8% attack", completed: false },
     ARMOR: { name: "Advanced Armor", progress: 32, active: false, bonus: "+10% tank attack", completed: false },
-    ARTILLERY: { name: "Modern Artillery", progress: 48, active: false, bonus: "+8% artillery damage", completed: false },
+    ARTILLERY: { name: "Modern Artillery", progress: 48, active: false, bonus: "+8% damage", completed: false },
     AIR: { name: "Fighter Interceptors", progress: 28, active: false, bonus: "+12% air defense", completed: false },
-    INDUSTRY: { name: "Industrial Methods", progress: 71, active: false, bonus: "+1 civilian factory", completed: false },
-    LOGISTICS: { name: "Motorized Logistics", progress: 42, active: false, bonus: "-10% supply use", completed: false },
-    ELECTRONICS: { name: "Field Electronics", progress: 18, active: false, bonus: "+10 intelligence", completed: false }
+    INDUSTRY: { name: "Industrial Methods", progress: 71, active: false, bonus: "+1 factory", completed: false },
+    LOGISTICS: { name: "Logistics", progress: 42, active: false, bonus: "-10% supply", completed: false },
+    ELECTRONICS: { name: "Electronics", progress: 18, active: false, bonus: "+10 intel", completed: false }
 };
 
 /* =========================================================
@@ -100,15 +131,17 @@ const tech = {
 async function init() {
     loading(10, "Initializing command system...");
     setup3D();
-    loading(25, "Generating strategic terrain...");
+    loading(25, "Generating global terrain...");
     createTerrain();
     loading(35, "Drawing country borders...");
     createCountryBorders();
-    loading(45, "Deploying military forces...");
+    loading(45, "Adding states/provinces...");
+    createStates();
+    loading(55, "Deploying military forces...");
     deployInitialForces();
-    loading(65, "Connecting economy and production...");
+    loading(70, "Connecting economy...");
     loadCampaign();
-    loading(80, "Initializing intelligence network...");
+    loading(85, "Initializing intelligence...");
     setupUI();
     loading(95, "Preparing battlefield...");
     updateAllUI();
@@ -140,10 +173,10 @@ function setup3D() {
 
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a1218);
-    scene.fog = new THREE.Fog(0x0a1218, 80, 400);
+    scene.fog = new THREE.Fog(0x0a1218, 80, 450);
 
-    camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 1000);
-    camera.position.set(60, 70, 90);
+    camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 1000);
+    camera.position.set(80, 80, 120);
 
     renderer = new THREE.WebGLRenderer({
         canvas,
@@ -175,11 +208,11 @@ function setup3D() {
     sun.shadow.mapSize.width = 2048;
     sun.shadow.mapSize.height = 2048;
     sun.shadow.camera.near = 0.5;
-    sun.shadow.camera.far = 300;
-    sun.shadow.camera.left = -150;
-    sun.shadow.camera.right = 150;
-    sun.shadow.camera.top = 150;
-    sun.shadow.camera.bottom = -150;
+    sun.shadow.camera.far = 350;
+    sun.shadow.camera.left = -180;
+    sun.shadow.camera.right = 180;
+    sun.shadow.camera.top = 180;
+    sun.shadow.camera.bottom = -180;
     scene.add(sun);
 
     const fill = new THREE.DirectionalLight(0x88aaff, 0.4);
@@ -189,8 +222,8 @@ function setup3D() {
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.minDistance = 20;
-    controls.maxDistance = 250;
+    controls.minDistance = 25;
+    controls.maxDistance = 300;
     controls.maxPolarAngle = Math.PI * 0.48;
     controls.target.set(0, 0, 0);
     controls.update();
@@ -200,10 +233,12 @@ function setup3D() {
     fxGroup = new THREE.Group();
     borderGroup = new THREE.Group();
     labelGroup = new THREE.Group();
+    stateGroup = new THREE.Group();
     scene.add(unitGroup);
     scene.add(fxGroup);
     scene.add(borderGroup);
     scene.add(labelGroup);
+    scene.add(stateGroup);
 
     canvas.addEventListener("pointerdown", handleWorldClick);
     window.addEventListener("resize", resizeRenderer);
@@ -218,21 +253,22 @@ function resizeRenderer() {
 }
 
 /* =========================================================
-   TERRAIN
+   TERRAIN (Enhanced)
    ========================================================== */
 
 function createTerrain() {
-    const geometry = new THREE.PlaneGeometry(360, 360, 150, 150);
+    const geometry = new THREE.PlaneGeometry(400, 400, 200, 200);
     const positions = geometry.attributes.position;
     
     for (let i = 0; i < positions.count; i++) {
         const x = positions.getX(i);
         const y = positions.getY(i);
         const height = 
-            Math.sin(x * 0.04) * 1.8 +
-            Math.cos(y * 0.05) * 1.5 +
-            Math.sin((x + y) * 0.025) * 2.5 +
-            Math.cos(x * 0.08 + y * 0.06) * 1.2;
+            Math.sin(x * 0.035) * 1.8 +
+            Math.cos(y * 0.04) * 1.5 +
+            Math.sin((x + y) * 0.02) * 2.8 +
+            Math.cos(x * 0.07 + y * 0.05) * 1.5 +
+            Math.sin(x * 0.1) * Math.cos(y * 0.08) * 0.8;
         positions.setZ(i, height);
     }
     geometry.computeVertexNormals();
@@ -242,19 +278,21 @@ function createTerrain() {
         const x = positions.getX(i);
         const y = positions.getY(i);
         const z = positions.getZ(i);
-        let r = 0.25, g = 0.35, b = 0.25;
-        if (z > 3) { r += 0.1; g += 0.1; b += 0.05; }
-        if (Math.sin(x * 0.1) * Math.cos(y * 0.1) > 0.3 && z < 2) { r -= 0.05; g += 0.05; b -= 0.02; }
-        if (Math.abs(z) < 0.5) { r += 0.05; g += 0.02; b -= 0.05; }
+        let r = 0.2, g = 0.32, b = 0.2;
+        if (z > 4) { r += 0.15; g += 0.12; b += 0.08; }
+        if (z > 7) { r += 0.1; g += 0.05; b -= 0.02; }
+        if (Math.sin(x * 0.08) * Math.cos(y * 0.08) > 0.3 && z < 2.5) { r -= 0.05; g += 0.08; b -= 0.02; }
+        if (Math.abs(z) < 0.5) { r += 0.08; g += 0.05; b -= 0.05; }
+        if (Math.sin(x * 0.04 + y * 0.03) > 0.5 && z < 1.5) { r += 0.05; g += 0.02; }
         colors[i*3] = Math.max(0.1, Math.min(0.6, r));
-        colors[i*3+1] = Math.max(0.2, Math.min(0.7, g));
-        colors[i*3+2] = Math.max(0.1, Math.min(0.5, b));
+        colors[i*3+1] = Math.max(0.15, Math.min(0.7, g));
+        colors[i*3+2] = Math.max(0.08, Math.min(0.5, b));
     }
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     ground = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
         vertexColors: true,
-        roughness: 0.9,
+        roughness: 0.85,
         metalness: 0.0,
         flatShading: false
     }));
@@ -263,60 +301,61 @@ function createTerrain() {
     ground.userData.isGround = true;
     scene.add(ground);
 
-    const grid = new THREE.GridHelper(360, 72, 0x68715f, 0x30382f);
+    const grid = new THREE.GridHelper(400, 80, 0x68715f, 0x30382f);
     grid.material.transparent = true;
-    grid.material.opacity = 0.06;
+    grid.material.opacity = 0.04;
     scene.add(grid);
 
     const water = new THREE.Mesh(
-        new THREE.PlaneGeometry(520, 520),
+        new THREE.PlaneGeometry(600, 600),
         new THREE.MeshStandardMaterial({
-            color: 0x164659,
+            color: 0x0a2a3a,
             transparent: true,
-            opacity: 0.35,
+            opacity: 0.3,
             roughness: 0.1,
-            metalness: 0.4
+            metalness: 0.5
         })
     );
     water.rotation.x = -Math.PI / 2;
-    water.position.y = -2;
+    water.position.y = -2.5;
     scene.add(water);
 
     createMountains();
     createForests();
+    createRivers();
 }
 
 function createMountains() {
-    for (let i = 0; i < 70; i++) {
-        const height = 8 + Math.random() * 22;
-        const radius = 2 + Math.random() * 8;
+    for (let i = 0; i < 90; i++) {
+        const height = 8 + Math.random() * 25;
+        const radius = 2 + Math.random() * 10;
         const mountain = new THREE.Mesh(
-            new THREE.ConeGeometry(radius, height, 7 + Math.floor(Math.random() * 5)),
+            new THREE.ConeGeometry(radius, height, 6 + Math.floor(Math.random() * 6)),
             new THREE.MeshStandardMaterial({
-                color: 0x3a4a3a,
+                color: new THREE.Color().setHSL(0.28 + Math.random() * 0.05, 0.1, 0.2 + Math.random() * 0.15),
                 roughness: 1,
                 flatShading: true
             })
         );
         const angle = Math.random() * Math.PI * 2;
-        const dist = 30 + Math.random() * 140;
+        const dist = 30 + Math.random() * 160;
         mountain.position.set(
             Math.cos(angle) * dist,
             0.5 + height * 0.4,
             Math.sin(angle) * dist
         );
         mountain.rotation.set(
-            (Math.random() - 0.5) * 0.1,
+            (Math.random() - 0.5) * 0.15,
             Math.random() * Math.PI * 2,
-            (Math.random() - 0.5) * 0.1
+            (Math.random() - 0.5) * 0.15
         );
         mountain.castShadow = true;
         scene.add(mountain);
 
-        if (height > 15) {
+        if (height > 18) {
             const snow = new THREE.Mesh(
-                new THREE.ConeGeometry(radius * 0.3, height * 0.15, 7),
-                new THREE.MeshStandardMaterial({ color: 0xeeeeff, roughness: 0.8 })
+                new THREE.ConeGeometry(radius * 0.25, height * 0.18, 6),
+                new THREE.MeshStandardMaterial({ color: 0xeeeeff, roughness: 0.7 })
             );
             snow.position.copy(mountain.position);
             snow.position.y += height * 0.45;
@@ -327,50 +366,76 @@ function createMountains() {
 }
 
 function createForests() {
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 300; i++) {
         const tree = new THREE.Group();
-        const trunkHeight = 0.8 + Math.random() * 1.5;
+        const trunkHeight = 0.8 + Math.random() * 1.8;
         const trunk = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.1, 0.15, trunkHeight, 5),
+            new THREE.CylinderGeometry(0.08, 0.15, trunkHeight, 5),
             new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 1 })
         );
         trunk.position.y = trunkHeight / 2;
-        const crownSize = 0.5 + Math.random() * 0.8;
+        const crownSize = 0.5 + Math.random() * 1.0;
         const crown = new THREE.Mesh(
-            new THREE.ConeGeometry(crownSize, 1.5 + Math.random() * 1.5, 6 + Math.floor(Math.random() * 4)),
+            new THREE.ConeGeometry(crownSize, 1.5 + Math.random() * 2.0, 5 + Math.floor(Math.random() * 5)),
             new THREE.MeshStandardMaterial({
                 color: new THREE.Color().setHSL(0.25 + Math.random() * 0.08, 0.3, 0.2 + Math.random() * 0.15),
                 roughness: 1
             })
         );
-        crown.position.y = trunkHeight + (0.5 + Math.random() * 0.5);
+        crown.position.y = trunkHeight + (0.5 + Math.random() * 0.8);
         tree.add(trunk, crown);
         const angle = Math.random() * Math.PI * 2;
-        const dist = 20 + Math.random() * 150;
+        const dist = 20 + Math.random() * 170;
         tree.position.set(
-            Math.cos(angle) * dist + (Math.random() - 0.5) * 20,
+            Math.cos(angle) * dist + (Math.random() - 0.5) * 25,
             0,
-            Math.sin(angle) * dist + (Math.random() - 0.5) * 20
+            Math.sin(angle) * dist + (Math.random() - 0.5) * 25
         );
-        tree.scale.setScalar(0.7 + Math.random() * 0.6);
+        tree.scale.setScalar(0.6 + Math.random() * 0.8);
         scene.add(tree);
     }
 }
 
+function createRivers() {
+    const riverPoints = [
+        [[-60, -30], [-40, -25], [-20, -20], [0, -15], [20, -10], [40, -5], [60, 0]],
+        [[-50, 40], [-30, 35], [-10, 30], [10, 25], [30, 20], [50, 25]],
+        [[-100, -60], [-80, -50], [-60, -45], [-40, -50], [-20, -55], [0, -50]]
+    ];
+    
+    riverPoints.forEach(points => {
+        const pts = points.map(p => new THREE.Vector3(p[0], 0.15, p[1]));
+        const geometry = new THREE.BufferGeometry().setFromPoints(pts);
+        const line = new THREE.Line(
+            geometry,
+            new THREE.LineBasicMaterial({ color: 0x1a5a7a, transparent: true, opacity: 0.4 })
+        );
+        scene.add(line);
+    });
+}
+
 /* =========================================================
-   COUNTRY BORDERS
+   COUNTRY BORDERS + STATES
    ========================================================== */
 
 function createCountryBorders() {
     const countryData = [
-        { name: 'USA', points: [[-100,-80],[-60,-60],[-40,-20],[-80,0],[-120,-20],[-130,-60],[-100,-80]] },
-        { name: 'GERMANY', points: [[0,10],[30,5],[40,25],[25,45],[5,40],[-5,25],[0,10]] },
-        { name: 'UK', points: [[-130,30],[-110,20],[-100,40],[-110,60],[-130,50],[-130,30]] },
-        { name: 'JAPAN', points: [[130,-40],[160,-30],[170,-10],[150,10],[130,0],[125,-25],[130,-40]] },
-        { name: 'USSR', points: [[30,50],[80,40],[120,50],[130,80],[90,100],[50,90],[20,70],[30,50]] },
-        { name: 'FRANCE', points: [[-50,40],[-30,35],[-20,50],[-30,65],[-50,60],[-60,50],[-50,40]] },
-        { name: 'ITALY', points: [[-30,80],[-10,75],[0,90],[-10,105],[-30,100],[-35,90],[-30,80]] },
-        { name: 'CHINA', points: [[90,20],[130,10],[150,30],[140,60],[110,70],[85,50],[90,20]] }
+        { name: 'BANGLADESH', points: [[-5,-25],[15,-20],[25,-15],[20,0],[5,5],[-5,0],[-10,-10],[-5,-25]] },
+        { name: 'PAKISTAN', points: [[20,15],[40,10],[50,20],[45,35],[30,40],[20,35],[15,25],[20,15]] },
+        { name: 'TURKEY', points: [[-70,40],[-50,35],[-40,45],[-50,60],[-65,55],[-75,50],[-70,40]] },
+        { name: 'IRAN', points: [[10,30],[30,25],[40,35],[35,50],[20,55],[10,50],[5,40],[10,30]] },
+        { name: 'SAUDI', points: [[10,10],[30,5],[40,15],[35,30],[20,35],[5,30],[0,20],[10,10]] },
+        { name: 'EGYPT', points: [[-40,5],[-20,0],[-10,10],[-15,25],[-30,30],[-45,25],[-50,15],[-40,5]] },
+        { name: 'PALESTINE', points: [[-10,25],[0,20],[5,30],[0,40],[-10,35],[-15,30],[-10,25]] },
+        { name: 'INDONESIA', points: [[80,-20],[100,-25],[120,-20],[115,-5],[95,0],[80,-5],[75,-15],[80,-20]] },
+        { name: 'AFGHANISTAN', points: [[25,40],[45,35],[55,45],[50,60],[35,65],[20,60],[15,50],[25,40]] },
+        { name: 'INDIA', points: [[0,-5],[20,-10],[35,-5],[40,10],[30,25],[15,30],[5,25],[-5,15],[0,-5]] },
+        { name: 'USA', points: [[-150,-50],[-120,-45],[-100,-30],[-110,-10],[-130,-5],[-150,-15],[-160,-35],[-150,-50]] },
+        { name: 'CHINA', points: [[40,-10],[70,-15],[90,-5],[85,15],[70,25],[50,20],[40,10],[35,0],[40,-10]] },
+        { name: 'RUSSIA', points: [[20,65],[60,60],[90,70],[100,85],[80,100],[50,105],[20,95],[10,80],[20,65]] },
+        { name: 'UK', points: [[-135,25],[-120,20],[-110,35],[-120,50],[-135,45],[-140,35],[-135,25]] },
+        { name: 'FRANCE', points: [[-60,30],[-40,25],[-30,40],[-40,55],[-55,50],[-65,40],[-60,30]] },
+        { name: 'GERMANY', points: [[-20,5],[0,0],[10,15],[0,30],[-15,25],[-25,15],[-20,5]] }
     ];
 
     countryData.forEach(data => {
@@ -380,7 +445,7 @@ function createCountryBorders() {
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         const line = new THREE.Line(
             geometry,
-            new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6, linewidth: 2 })
+            new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 })
         );
         borderGroup.add(line);
 
@@ -395,13 +460,13 @@ function createCountryBorders() {
             new THREE.MeshBasicMaterial({
                 color,
                 transparent: true,
-                opacity: 0.08,
+                opacity: 0.1,
                 side: THREE.DoubleSide,
                 depthWrite: false
             })
         );
         fill.rotation.x = -Math.PI / 2;
-        fill.position.y = 0.2;
+        fill.position.y = 0.15;
         borderGroup.add(fill);
 
         const center = points.reduce((acc, p) => { acc.x += p.x; acc.z += p.z; return acc; }, { x: 0, z: 0 });
@@ -409,30 +474,90 @@ function createCountryBorders() {
         center.z /= points.length;
         
         const labelDiv = document.createElement('div');
-        labelDiv.textContent = `${nation[data.name]?.flag || '🏳️'} ${data.name}`;
+        labelDiv.textContent = `${nation[data.name]?.flag || '🏳️'} ${nation[data.name]?.name || data.name}`;
         labelDiv.style.color = '#eef4f8';
         labelDiv.style.fontSize = '11px';
         labelDiv.style.fontWeight = '700';
-        labelDiv.style.textShadow = '0 2px 12px rgba(0,0,0,0.8)';
-        labelDiv.style.background = 'rgba(0,0,0,0.5)';
+        labelDiv.style.textShadow = '0 2px 12px rgba(0,0,0,0.9)';
+        labelDiv.style.background = 'rgba(0,0,0,0.6)';
         labelDiv.style.padding = '4px 10px';
         labelDiv.style.borderRadius = '12px';
-        labelDiv.style.border = '1px solid rgba(255,255,255,0.1)';
+        labelDiv.style.border = '1px solid rgba(255,255,255,0.08)';
         labelDiv.style.backdropFilter = 'blur(4px)';
         labelDiv.style.pointerEvents = 'none';
         labelDiv.style.userSelect = 'none';
         
         const label = new CSS2DObject(labelDiv);
-        label.position.set(center.x, 1.5, center.z);
+        label.position.set(center.x, 2.0, center.z);
+        labelGroup.add(label);
+    });
+}
+
+function createStates() {
+    const stateData = {
+        BANGLADESH: { points: [[-5,-25],[-2,-20],[5,-18],[8,-15],[5,-10],[0,-8],[-5,-10],[-8,-15],[-10,-20],[-5,-25]],
+            color: 0x006a4e },
+        PAKISTAN: { points: [[25,20],[35,18],[42,22],[40,28],[32,32],[25,30],[22,25],[25,20]], color: 0x01411c },
+        TURKEY: { points: [[-65,45],[-55,42],[-45,48],[-48,55],[-58,58],[-65,52],[-65,45]], color: 0xe30a17 },
+        IRAN: { points: [[15,35],[25,32],[32,38],[28,45],[18,48],[12,42],[15,35]], color: 0x239f40 },
+        SAUDI: { points: [[15,15],[25,12],[32,18],[28,25],[18,28],[10,22],[15,15]], color: 0x165d31 },
+        EGYPT: { points: [[-35,10],[-25,8],[-18,14],[-22,22],[-32,24],[-38,18],[-35,10]], color: 0xce1126 },
+        PALESTINE: { points: [[-5,28],[2,25],[6,32],[0,36],[-6,32],[-5,28]], color: 0x007a3d }
+    };
+
+    Object.keys(stateData).forEach(key => {
+        const data = stateData[key];
+        const color = data.color || countryColors[key] || 0x888888;
+        const points = data.points.map(p => new THREE.Vector3(p[0], 0.25, p[1]));
+        
+        const shape = new THREE.Shape();
+        points.forEach((p, i) => {
+            if (i === 0) shape.moveTo(p.x, p.z);
+            else shape.lineTo(p.x, p.z);
+        });
+        const geom = new THREE.ShapeGeometry(shape);
+        const mesh = new THREE.Mesh(
+            geom,
+            new THREE.MeshBasicMaterial({
+                color,
+                transparent: true,
+                opacity: 0.25,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            })
+        );
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.y = 0.1;
+        stateGroup.add(mesh);
+
+        // State label
+        const center = points.reduce((acc, p) => { acc.x += p.x; acc.z += p.z; return acc; }, { x: 0, z: 0 });
+        center.x /= points.length;
+        center.z /= points.length;
+        
+        const labelDiv = document.createElement('div');
+        labelDiv.textContent = `📍 ${nation[key]?.name || key}`;
+        labelDiv.style.color = '#aabbcc';
+        labelDiv.style.fontSize = '8px';
+        labelDiv.style.fontWeight = '600';
+        labelDiv.style.textShadow = '0 1px 8px rgba(0,0,0,0.9)';
+        labelDiv.style.background = 'rgba(0,0,0,0.4)';
+        labelDiv.style.padding = '2px 6px';
+        labelDiv.style.borderRadius = '8px';
+        labelDiv.style.pointerEvents = 'none';
+        labelDiv.style.userSelect = 'none';
+        
+        const label = new CSS2DObject(labelDiv);
+        label.position.set(center.x, 0.8, center.z);
         labelGroup.add(label);
     });
 }
 
 /* =========================================================
-   3D UNIT CREATION
+   3D UNIT CREATION (Enhanced)
    ========================================================== */
 
-function create3DTank(color, friendly) {
+function create3DTank(color) {
     const group = new THREE.Group();
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.3 });
     const trackMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
@@ -476,7 +601,7 @@ function create3DTank(color, friendly) {
     return group;
 }
 
-function create3DInfantry(color, friendly) {
+function create3DInfantry(color) {
     const group = new THREE.Group();
     const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xccaa88, roughness: 0.8 });
@@ -524,7 +649,7 @@ function create3DInfantry(color, friendly) {
     return group;
 }
 
-function create3DArtillery(color, friendly) {
+function create3DArtillery(color) {
     const group = new THREE.Group();
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.2 });
     const metalMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.7 });
@@ -567,7 +692,7 @@ function create3DArtillery(color, friendly) {
     return group;
 }
 
-function create3DAircraft(color, friendly) {
+function create3DAircraft(color) {
     const group = new THREE.Group();
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.3, metalness: 0.7 });
     const glassMat = new THREE.MeshStandardMaterial({ color: 0x88ccff, transparent: true, opacity: 0.4 });
@@ -619,16 +744,16 @@ function create3DAircraft(color, friendly) {
     return group;
 }
 
-function create3DUnit(name, type, x, z, friendly = true) {
+function create3DUnit(name, type, x, z, friendly = true, country = "BANGLADESH") {
     const group = new THREE.Group();
     const color = friendly ? 0x447744 : 0x884444;
 
     let model;
     switch(type) {
-        case 'TANK': model = create3DTank(color, friendly); break;
-        case 'ARTILLERY': model = create3DArtillery(color, friendly); break;
-        case 'AIR': model = create3DAircraft(color, friendly); break;
-        default: model = create3DInfantry(color, friendly);
+        case 'TANK': model = create3DTank(color); break;
+        case 'ARTILLERY': model = create3DArtillery(color); break;
+        case 'AIR': model = create3DAircraft(color); break;
+        default: model = create3DInfantry(color);
     }
     group.add(model);
 
@@ -651,7 +776,8 @@ function create3DUnit(name, type, x, z, friendly = true) {
     group.userData.hpFill = hpFill;
 
     const flagDiv = document.createElement('div');
-    flagDiv.textContent = friendly ? '🟢' : '🔴';
+    const countryData = nation[country] || nation["BANGLADESH"];
+    flagDiv.textContent = friendly ? countryData.flag : '🔴';
     flagDiv.style.fontSize = '14px';
     flagDiv.style.textShadow = '0 0 10px rgba(0,0,0,0.8)';
     const flagLabel = new CSS2DObject(flagDiv);
@@ -665,7 +791,7 @@ function create3DUnit(name, type, x, z, friendly = true) {
 
     const unit = {
         id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
-        name, type, friendly,
+        name, type, friendly, country,
         object: group,
         hp: 100, maxHp: 100,
         organization: type === 'AIR' ? 88 : 100,
@@ -701,64 +827,61 @@ function updateUnitHPBar(unit) {
 
 function deployInitialForces() {
     units.length = 0;
-    create3DUnit("1st Armored Division", "TANK", -40, -30, true);
-    create3DUnit("2nd Infantry Division", "INFANTRY", -30, -15, true);
-    create3DUnit("3rd Infantry Division", "INFANTRY", -20, -40, true);
-    create3DUnit("US Artillery Battery", "ARTILLERY", -50, -20, true);
-    create3DUnit("Air Wing Alpha", "AIR", -10, -30, true);
-    create3DUnit("Enemy Armor Group", "TANK", 30, 20, false);
-    create3DUnit("Enemy Infantry Corps", "INFANTRY", 20, 35, false);
-    create3DUnit("Enemy Defense Force", "INFANTRY", 40, 10, false);
-    create3DUnit("Enemy Artillery", "ARTILLERY", 45, 30, false);
-    create3DUnit("Enemy Air Wing", "AIR", 25, 5, false);
+    // Bangladesh Forces
+    create3DUnit("1st Infantry Division", "INFANTRY", -8, -18, true, "BANGLADESH");
+    create3DUnit("2nd Infantry Division", "INFANTRY", 0, -22, true, "BANGLADESH");
+    create3DUnit("Armored Brigade", "TANK", -5, -15, true, "BANGLADESH");
+    create3DUnit("Artillery Regiment", "ARTILLERY", -12, -20, true, "BANGLADESH");
+    create3DUnit("Air Wing", "AIR", -3, -25, true, "BANGLADESH");
+    
+    // Pakistan Forces (Friendly)
+    create3DUnit("Pakistani Infantry", "INFANTRY", 25, 18, true, "PAKISTAN");
+    create3DUnit("Pakistani Armor", "TANK", 30, 22, true, "PAKISTAN");
+    
+    // Turkey Forces (Friendly)
+    create3DUnit("Turkish Infantry", "INFANTRY", -55, 48, true, "TURKEY");
+    create3DUnit("Turkish Artillery", "ARTILLERY", -60, 45, true, "TURKEY");
+    
+    // Iran Forces (Friendly)
+    create3DUnit("Iranian Infantry", "INFANTRY", 18, 35, true, "IRAN");
+    create3DUnit("Iranian Armor", "TANK", 22, 38, true, "IRAN");
+    
+    // Saudi Forces (Friendly)
+    create3DUnit("Saudi Infantry", "INFANTRY", 18, 18, true, "SAUDI");
+    
+    // Egypt Forces (Friendly)
+    create3DUnit("Egyptian Infantry", "INFANTRY", -25, 12, true, "EGYPT");
+    
+    // Palestine Forces (Friendly)
+    create3DUnit("Palestinian Defense", "INFANTRY", -3, 30, true, "PALESTINE");
+    
+    // India Forces (Neutral)
+    create3DUnit("Indian Infantry", "INFANTRY", 10, -8, false, "INDIA");
+    create3DUnit("Indian Armor", "TANK", 15, -5, false, "INDIA");
+    
+    // China Forces (Neutral)
+    create3DUnit("Chinese Infantry", "INFANTRY", 55, 5, false, "CHINA");
+    create3DUnit("Chinese Armor", "TANK", 60, 10, false, "CHINA");
+    
+    // Russia Forces (Neutral)
+    create3DUnit("Russian Infantry", "INFANTRY", 35, 70, false, "RUSSIA");
+    
+    // USA Forces (Neutral)
+    create3DUnit("US Infantry", "INFANTRY", -130, -30, false, "USA");
+    create3DUnit("US Armor", "TANK", -125, -35, false, "USA");
+    
+    // UK Forces (Neutral)
+    create3DUnit("UK Infantry", "INFANTRY", -120, 35, false, "UK");
+    
+    // France Forces (Neutral)
+    create3DUnit("French Infantry", "INFANTRY", -45, 40, false, "FRANCE");
+    
+    // Germany Forces (Neutral)
+    create3DUnit("German Infantry", "INFANTRY", -10, 12, false, "GERMANY");
 }
 
 /* =========================================================
-   SELECTION / COMMAND
-   ========================================================== */
-
-function selectUnit(unit) {
-    if (!unit || unit.state === "DESTROYED") return;
-    if (selectedUnit) {
-        selectedUnit.selected = false;
-        clearSelectionVisual(selectedUnit);
-    }
-    selectedUnit = unit;
-    unit.selected = true;
-    createSelectionVisual(unit);
-    updateUnitPanel();
-    const panel = $("unitPanel");
-    if (panel) panel.classList.add("open");
-}
-
-function createSelectionVisual(unit) {
-    clearSelectionVisual(unit);
-    const ring = new THREE.Mesh(
-        new THREE.RingGeometry(2.5, 3.2, 32),
-        new THREE.MeshBasicMaterial({
-            color: unit.friendly ? 0xd5ad55 : 0xe45d5d,
-            transparent: true,
-            opacity: 0.9,
-            side: THREE.DoubleSide
-        })
-    );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = unit.type === 'AIR' ? -7.5 : 0.1;
-    ring.userData.selectionRing = true;
-    unit.object.add(ring);
-    unit.selectionRing = ring;
-}
-
-function clearSelectionVisual(unit) {
-    if (!unit?.selectionRing) return;
-    unit.object.remove(unit.selectionRing);
-    unit.selectionRing.geometry.dispose();
-    unit.selectionRing.material.dispose();
-    unit.selectionRing = null;
-}
-
-/* =========================================================
-   COMBAT SYSTEM
+   COMBAT SYSTEM (Same as before - optimized)
    ========================================================== */
 
 function getTerrainModifier(unit) {
@@ -823,7 +946,6 @@ function executeAttack(attacker, defender) {
     updateUnitHPBar(attacker);
 
     addBattleLog(`${attacker.name} attacked ${defender.name} for ${Math.round(damage)} damage`);
-    createMuzzleFlash(attacker.object.position);
 
     if (defender.hp <= 0 || defender.organization <= 0) {
         destroyUnit(defender, attacker);
@@ -865,43 +987,27 @@ function executeAirstrike(aircraft, target) {
     updateAllUI();
 }
 
-function createMuzzleFlash(position) {
-    const flash = new THREE.Mesh(
-        new THREE.SphereGeometry(0.8, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0xffdd44, transparent: true, opacity: 0.8 })
-    );
-    flash.position.copy(position);
-    flash.position.y += 1;
-    flash.userData.life = 0.1;
-    fxGroup.add(flash);
-    setTimeout(() => {
-        fxGroup.remove(flash);
-        flash.geometry.dispose();
-        flash.material.dispose();
-    }, 150);
-}
-
 function createExplosion(position) {
-    const count = 8;
+    const count = 10;
     for (let i = 0; i < count; i++) {
         const mesh = new THREE.Mesh(
-            new THREE.SphereGeometry(0.3 + Math.random() * 0.5, 6, 6),
+            new THREE.SphereGeometry(0.2 + Math.random() * 0.6, 6, 6),
             new THREE.MeshBasicMaterial({
-                color: new THREE.Color().setHSL(0.08 + Math.random() * 0.08, 1, 0.5 + Math.random() * 0.3),
+                color: new THREE.Color().setHSL(0.08 + Math.random() * 0.08, 1, 0.4 + Math.random() * 0.4),
                 transparent: true,
                 opacity: 0.9
             })
         );
         mesh.position.copy(position);
-        mesh.position.y += 0.5 + Math.random() * 1;
+        mesh.position.y += 0.5 + Math.random() * 1.5;
         const dir = new THREE.Vector3(
-            (Math.random() - 0.5) * 2,
-            Math.random() * 2,
-            (Math.random() - 0.5) * 2
+            (Math.random() - 0.5) * 3,
+            Math.random() * 3,
+            (Math.random() - 0.5) * 3
         ).normalize();
         mesh.userData = {
-            life: 0.4 + Math.random() * 0.3,
-            velocity: dir.multiplyScalar(2 + Math.random() * 4)
+            life: 0.3 + Math.random() * 0.4,
+            velocity: dir.multiplyScalar(2 + Math.random() * 5)
         };
         fxGroup.add(mesh);
     }
@@ -924,6 +1030,335 @@ function destroyUnit(unit, killer = null) {
         const panel = $("unitPanel");
         if (panel) panel.classList.remove("open");
     }
+}
+
+/* =========================================================
+   ECONOMY (Enhanced)
+   ========================================================== */
+
+function updateEconomy(dt) {
+    if (paused) return;
+    const civilianIncome = factories.civilian * 0.22 * dt * speed;
+    const taxIncome = civilianIncome * (tax / 20);
+    money += taxIncome;
+    oil += factories.military * 0.012 * dt * speed;
+    steel += factories.military * 0.018 * dt * speed;
+    food += 0.15 * dt * speed;
+    manpower += 0.8 * dt * speed;
+
+    if (tax > 35) {
+        stability = Math.max(0, stability - dt * 0.025);
+    } else if (tax < 18) {
+        stability = Math.min(100, stability + dt * 0.01);
+    }
+    if (stability < 35) {
+        political = Math.max(0, political - dt * 0.08);
+    } else {
+        political = Math.min(999, political + dt * 0.035);
+    }
+    construction = Math.min(20, construction + factories.civilian * 0.001 * dt * speed);
+}
+
+/* =========================================================
+   PRODUCTION (Enhanced - Easy Building)
+   ========================================================== */
+
+function updateProduction(dt) {
+    if (paused) return;
+    for (const key of Object.keys(production)) {
+        const p = production[key];
+        if (p.factories <= 0) continue;
+        let progress = p.factories * p.efficiency * 0.004 * dt * speed;
+        if (tech.INDUSTRY.completed) progress *= 1.12;
+        p.progress += progress;
+        if (p.progress >= 100) {
+            p.progress -= 100;
+            p.output += Math.max(1, Math.floor(p.factories * p.efficiency / 55));
+            applyProductionOutput(key, p.output);
+            p.output = 0;
+            p.efficiency = Math.min(100, p.efficiency + 0.15);
+        }
+    }
+}
+
+function applyProductionOutput(type, amount) {
+    if (type === "INFANTRY") {
+        manpower += amount * 12;
+    } else if (type === "TANK") {
+        for (const unit of units) {
+            if (unit.friendly && unit.type === "TANK" && unit.state !== "DESTROYED") {
+                unit.strength = Math.min(unit.maxStrength, unit.strength + amount * 0.7);
+                break;
+            }
+        }
+    } else if (type === "ARTILLERY") {
+        for (const unit of units) {
+            if (unit.friendly && unit.type === "ARTILLERY" && unit.state !== "DESTROYED") {
+                unit.strength = Math.min(unit.maxStrength, unit.strength + amount * 0.7);
+                break;
+            }
+        }
+    } else if (type === "AIR") {
+        for (const unit of units) {
+            if (unit.friendly && unit.type === "AIR" && unit.state !== "DESTROYED") {
+                unit.readiness = Math.min(100, unit.readiness + amount * 1.2);
+                break;
+            }
+        }
+    }
+}
+
+function assignFactory(type) {
+    const used = Object.values(production).reduce((sum, item) => sum + item.factories, 0);
+    if (used >= factories.military) {
+        toast("No free military factories");
+        return;
+    }
+    production[type].factories++;
+    toast(`${type} factory assigned`);
+    openPanel("production");
+}
+
+function quickBuildFactory() {
+    if (money < 500) {
+        toast("Need $500 to build factory");
+        return;
+    }
+    if (construction < 2) {
+        toast("Need 2 construction points");
+        return;
+    }
+    money -= 500;
+    construction -= 2;
+    factories.military++;
+    toast("🏭 Military factory built!");
+    updateAllUI();
+}
+
+/* =========================================================
+   RESEARCH
+   ========================================================== */
+
+function updateResearch(dt) {
+    if (paused) return;
+    for (const key of Object.keys(tech)) {
+        const t = tech[key];
+        if (!t.active || t.completed) continue;
+        t.progress += 0.18 * dt * speed;
+        if (t.progress >= 100) {
+            t.progress = 100;
+            t.completed = true;
+            t.active = false;
+            applyTechnology(key);
+            toast(`${t.name} completed`);
+        }
+    }
+}
+
+function startResearch(key) {
+    const t = tech[key];
+    if (t.completed) {
+        toast("Technology already completed");
+        return;
+    }
+    const active = Object.values(tech).filter(x => x.active).length;
+    if (!t.active && active >= 3) {
+        toast("All research slots are occupied");
+        return;
+    }
+    if (political < 10) {
+        toast("Need 10 political power");
+        return;
+    }
+    political -= 10;
+    t.active = true;
+    toast(`Research started: ${t.name}`);
+    openPanel("research");
+}
+
+function applyTechnology(key) {
+    if (key === "INDUSTRY") factories.civilian++;
+    if (key === "ELECTRONICS") intel = Math.min(100, intel + 10);
+    if (key === "LOGISTICS") {
+        for (const unit of units) {
+            unit.supply = Math.min(100, unit.supply + 10);
+        }
+    }
+}
+
+/* =========================================================
+   DIPLOMACY (Updated for all countries)
+   ========================================================== */
+
+function improveDiplomacy(country) {
+    if (political < 15) {
+        toast("Need political power");
+        return;
+    }
+    political -= 15;
+    diplomacy[country] = Math.min(100, diplomacy[country] + 8);
+    addDiplomaticMessage(`Relations improved with ${nation[country]?.name || country}`);
+    toast(`Relations improved with ${nation[country]?.name || country}`);
+    openPanel("diplomacy");
+}
+
+function diplomaticAction(country) {
+    const value = diplomacy[country] || 0;
+    if (value <= -50) {
+        diplomacy[country] = -100;
+        stability = Math.max(0, stability - 2);
+        addDiplomaticMessage(`War declared on ${nation[country]?.name || country}`);
+        toast(`War declared on ${nation[country]?.name || country}`);
+    } else {
+        diplomacy[country] = Math.min(100, value + 12);
+        political = Math.max(0, political - 8);
+        addDiplomaticMessage(`Pact proposed to ${nation[country]?.name || country}`);
+        toast(`Pact proposed to ${nation[country]?.name || country}`);
+    }
+    openPanel("diplomacy");
+}
+
+/* =========================================================
+   INTELLIGENCE
+   ========================================================== */
+
+function runRecon() {
+    if (money < 250) {
+        toast("Not enough money");
+        return;
+    }
+    money -= 250;
+    intel = Math.min(100, intel + 10);
+    for (const unit of units) {
+        if (!unit.friendly) {
+            unit.readiness = Math.max(0, unit.readiness - 2);
+        }
+    }
+    toast("Recon completed");
+    updateAllUI();
+}
+
+function expandSpyNetwork() {
+    if (money < 400) {
+        toast("Not enough money");
+        return;
+    }
+    money -= 400;
+    spy = Math.min(100, spy + 12);
+    intel = Math.min(100, intel + 4);
+    toast("Spy network expanded");
+    updateAllUI();
+}
+
+function improveCounterIntel() {
+    if (money < 350) {
+        toast("Not enough money");
+        return;
+    }
+    money -= 350;
+    counterIntel = Math.min(100, counterIntel + 12);
+    toast("Counter-intelligence improved");
+    updateAllUI();
+}
+
+/* =========================================================
+   WEATHER / MAP
+   ========================================================== */
+
+function changeWeather() {
+    if (weather === "CLEAR") weather = "RAIN";
+    else if (weather === "RAIN") weather = "SNOW";
+    else weather = "CLEAR";
+    if (ground) {
+        ground.material.color.setHex(weather === "SNOW" ? 0x8a9a9a : 0x52634d);
+    }
+    toast(`Weather: ${weather}`);
+}
+
+function setMapLayer(layer) {
+    mapLayer = layer;
+    if (ground) {
+        ground.material.color.setHex(mapColors[layer]);
+    }
+    toast(`Map layer: ${layer}`);
+}
+
+/* =========================================================
+   BATTLE LOG & DIPLOMATIC MESSAGES
+   ========================================================== */
+
+function addBattleLog(message) {
+    battleLog.unshift({ time: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, message });
+    if (battleLog.length > 20) battleLog.pop();
+}
+
+function addDiplomaticMessage(message) {
+    diplomaticMessages.unshift({ time: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, message });
+    if (diplomaticMessages.length > 10) diplomaticMessages.pop();
+}
+
+/* =========================================================
+   AUTO-SAVE
+   ========================================================== */
+
+function autosave() {
+    try {
+        const saveData = {
+            money, oil, steel, food, manpower,
+            political, stability, tax, construction,
+            intel, spy, counterIntel,
+            factories, diplomacy,
+            production, tech,
+            year, month, day, currentCountry,
+            units: units.map(u => ({
+                id: u.id, name: u.name, type: u.type, friendly: u.friendly, country: u.country,
+                hp: u.hp, organization: u.organization, morale: u.morale,
+                strength: u.strength, readiness: u.readiness, supply: u.supply,
+                attack: u.attack, defense: u.defense, speed: u.speed,
+                state: u.state, kills: u.kills, experience: u.experience,
+                entrenchment: u.entrenchment,
+                pos: u.object.position.toArray()
+            }))
+        };
+        localStorage.setItem('worldWarSave', JSON.stringify(saveData));
+    } catch (e) { /* silent fail */ }
+}
+
+function loadCampaign() {
+    try {
+        const raw = localStorage.getItem('worldWarSave');
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        money = data.money || money;
+        oil = data.oil || oil;
+        steel = data.steel || steel;
+        food = data.food || food;
+        manpower = data.manpower || manpower;
+        political = data.political || political;
+        stability = data.stability || stability;
+        tax = data.tax || tax;
+        construction = data.construction || construction;
+        intel = data.intel || intel;
+        spy = data.spy || spy;
+        counterIntel = data.counterIntel || counterIntel;
+        if (data.factories) Object.assign(factories, data.factories);
+        if (data.diplomacy) Object.assign(diplomacy, data.diplomacy);
+        if (data.production) Object.assign(production, data.production);
+        if (data.tech) Object.assign(tech, data.tech);
+        if (data.year) year = data.year;
+        if (data.month) month = data.month;
+        if (data.day) day = data.day;
+        if (data.currentCountry) currentCountry = data.currentCountry;
+        if (data.units) {
+            for (let i = 0; i < data.units.length && i < units.length; i++) {
+                const d = data.units[i];
+                const u = units[i];
+                if (u && d.pos) {
+                    u.object.position.fromArray(d.pos);
+                }
+            }
+        }
+    } catch (e) { /* silent fail */ }
 }
 
 /* =========================================================
@@ -1068,318 +1503,6 @@ function enemyAirstrike(aircraft, target) {
 }
 
 /* =========================================================
-   ECONOMY
-   ========================================================== */
-
-function updateEconomy(dt) {
-    if (paused) return;
-    const civilianIncome = factories.civilian * 0.22 * dt * speed;
-    const taxIncome = civilianIncome * (tax / 20);
-    money += taxIncome;
-    oil += factories.military * 0.012 * dt * speed;
-    steel += factories.military * 0.018 * dt * speed;
-    food += 0.15 * dt * speed;
-    manpower += 0.8 * dt * speed;
-
-    if (tax > 35) {
-        stability = Math.max(0, stability - dt * 0.025);
-    } else if (tax < 18) {
-        stability = Math.min(100, stability + dt * 0.01);
-    }
-    if (stability < 35) {
-        political = Math.max(0, political - dt * 0.08);
-    } else {
-        political = Math.min(999, political + dt * 0.035);
-    }
-    construction = Math.min(20, construction + factories.civilian * 0.001 * dt * speed);
-}
-
-/* =========================================================
-   PRODUCTION
-   ========================================================== */
-
-function updateProduction(dt) {
-    if (paused) return;
-    for (const key of Object.keys(production)) {
-        const p = production[key];
-        if (p.factories <= 0) continue;
-        let progress = p.factories * p.efficiency * 0.004 * dt * speed;
-        if (tech.INDUSTRY.completed) progress *= 1.12;
-        p.progress += progress;
-        if (p.progress >= 100) {
-            p.progress -= 100;
-            p.output += Math.max(1, Math.floor(p.factories * p.efficiency / 55));
-            applyProductionOutput(key, p.output);
-            p.output = 0;
-            p.efficiency = Math.min(100, p.efficiency + 0.15);
-        }
-    }
-}
-
-function applyProductionOutput(type, amount) {
-    if (type === "INFANTRY") {
-        manpower += amount * 12;
-    } else if (type === "TANK") {
-        for (const unit of units) {
-            if (unit.friendly && unit.type === "TANK" && unit.state !== "DESTROYED") {
-                unit.strength = Math.min(unit.maxStrength, unit.strength + amount * 0.7);
-                break;
-            }
-        }
-    } else if (type === "ARTILLERY") {
-        for (const unit of units) {
-            if (unit.friendly && unit.type === "ARTILLERY" && unit.state !== "DESTROYED") {
-                unit.strength = Math.min(unit.maxStrength, unit.strength + amount * 0.7);
-                break;
-            }
-        }
-    } else if (type === "AIR") {
-        for (const unit of units) {
-            if (unit.friendly && unit.type === "AIR" && unit.state !== "DESTROYED") {
-                unit.readiness = Math.min(100, unit.readiness + amount * 1.2);
-                break;
-            }
-        }
-    }
-}
-
-function assignFactory(type) {
-    const used = Object.values(production).reduce((sum, item) => sum + item.factories, 0);
-    if (used >= factories.military) {
-        toast("No free military factories");
-        return;
-    }
-    production[type].factories++;
-    toast(`${type} factory assigned`);
-    openPanel("production");
-}
-
-/* =========================================================
-   RESEARCH
-   ========================================================== */
-
-function updateResearch(dt) {
-    if (paused) return;
-    for (const key of Object.keys(tech)) {
-        const t = tech[key];
-        if (!t.active || t.completed) continue;
-        t.progress += 0.18 * dt * speed;
-        if (t.progress >= 100) {
-            t.progress = 100;
-            t.completed = true;
-            t.active = false;
-            applyTechnology(key);
-            toast(`${t.name} completed`);
-        }
-    }
-}
-
-function startResearch(key) {
-    const t = tech[key];
-    if (t.completed) {
-        toast("Technology already completed");
-        return;
-    }
-    const active = Object.values(tech).filter(x => x.active).length;
-    if (!t.active && active >= 3) {
-        toast("All research slots are occupied");
-        return;
-    }
-    if (political < 10) {
-        toast("Need 10 political power");
-        return;
-    }
-    political -= 10;
-    t.active = true;
-    toast(`Research started: ${t.name}`);
-    openPanel("research");
-}
-
-function applyTechnology(key) {
-    if (key === "INDUSTRY") factories.civilian++;
-    if (key === "ELECTRONICS") intel = Math.min(100, intel + 10);
-    if (key === "LOGISTICS") {
-        for (const unit of units) {
-            unit.supply = Math.min(100, unit.supply + 10);
-        }
-    }
-}
-
-/* =========================================================
-   DIPLOMACY
-   ========================================================== */
-
-function improveDiplomacy(country) {
-    if (political < 15) {
-        toast("Need political power");
-        return;
-    }
-    political -= 15;
-    diplomacy[country] = Math.min(100, diplomacy[country] + 8);
-    addDiplomaticMessage(`Relations improved with ${nation[country].name}`);
-    toast(`Relations improved with ${nation[country].name}`);
-    openPanel("diplomacy");
-}
-
-function diplomaticAction(country) {
-    const value = diplomacy[country];
-    if (value <= -50) {
-        diplomacy[country] = -100;
-        stability = Math.max(0, stability - 2);
-        addDiplomaticMessage(`War declared on ${nation[country].name}`);
-        toast(`War declared on ${nation[country].name}`);
-    } else {
-        diplomacy[country] = Math.min(100, value + 12);
-        political = Math.max(0, political - 8);
-        addDiplomaticMessage(`Diplomatic pact proposed to ${nation[country].name}`);
-        toast(`Diplomatic pact proposed to ${nation[country].name}`);
-    }
-    openPanel("diplomacy");
-}
-
-/* =========================================================
-   INTELLIGENCE
-   ========================================================== */
-
-function runRecon() {
-    if (money < 250) {
-        toast("Not enough money");
-        return;
-    }
-    money -= 250;
-    intel = Math.min(100, intel + 10);
-    for (const unit of units) {
-        if (!unit.friendly) {
-            unit.readiness = Math.max(0, unit.readiness - 2);
-        }
-    }
-    toast("Recon completed");
-    updateAllUI();
-}
-
-function expandSpyNetwork() {
-    if (money < 400) {
-        toast("Not enough money");
-        return;
-    }
-    money -= 400;
-    spy = Math.min(100, spy + 12);
-    intel = Math.min(100, intel + 4);
-    toast("Spy network expanded");
-    updateAllUI();
-}
-
-function improveCounterIntel() {
-    if (money < 350) {
-        toast("Not enough money");
-        return;
-    }
-    money -= 350;
-    counterIntel = Math.min(100, counterIntel + 12);
-    toast("Counter-intelligence improved");
-    updateAllUI();
-}
-
-/* =========================================================
-   WEATHER / MAP
-   ========================================================== */
-
-function changeWeather() {
-    if (weather === "CLEAR") weather = "RAIN";
-    else if (weather === "RAIN") weather = "SNOW";
-    else weather = "CLEAR";
-    if (ground) {
-        ground.material.color.setHex(weather === "SNOW" ? 0x8a9a9a : 0x52634d);
-    }
-    toast(`Weather: ${weather}`);
-}
-
-function setMapLayer(layer) {
-    mapLayer = layer;
-    if (ground) {
-        ground.material.color.setHex(mapColors[layer]);
-    }
-    toast(`Map layer: ${layer}`);
-}
-
-/* =========================================================
-   BATTLE LOG & DIPLOMATIC MESSAGES
-   ========================================================== */
-
-function addBattleLog(message) {
-    battleLog.unshift({ time: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, message });
-    if (battleLog.length > 20) battleLog.pop();
-}
-
-function addDiplomaticMessage(message) {
-    diplomaticMessages.unshift({ time: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, message });
-    if (diplomaticMessages.length > 10) diplomaticMessages.pop();
-}
-
-/* =========================================================
-   AUTO-SAVE
-   ========================================================== */
-
-function autosave() {
-    try {
-        const saveData = {
-            money, oil, steel, food, manpower,
-            political, stability, tax, construction,
-            intel, spy, counterIntel,
-            factories, diplomacy,
-            production, tech,
-            year, month, day,
-            units: units.map(u => ({
-                id: u.id, name: u.name, type: u.type, friendly: u.friendly,
-                hp: u.hp, organization: u.organization, morale: u.morale,
-                strength: u.strength, readiness: u.readiness, supply: u.supply,
-                attack: u.attack, defense: u.defense, speed: u.speed,
-                state: u.state, kills: u.kills, experience: u.experience,
-                entrenchment: u.entrenchment,
-                pos: u.object.position.toArray()
-            }))
-        };
-        localStorage.setItem('worldWarSave', JSON.stringify(saveData));
-    } catch (e) { /* silent fail */ }
-}
-
-function loadCampaign() {
-    try {
-        const raw = localStorage.getItem('worldWarSave');
-        if (!raw) return;
-        const data = JSON.parse(raw);
-        money = data.money || money;
-        oil = data.oil || oil;
-        steel = data.steel || steel;
-        food = data.food || food;
-        manpower = data.manpower || manpower;
-        political = data.political || political;
-        stability = data.stability || stability;
-        tax = data.tax || tax;
-        construction = data.construction || construction;
-        intel = data.intel || intel;
-        spy = data.spy || spy;
-        counterIntel = data.counterIntel || counterIntel;
-        if (data.factories) Object.assign(factories, data.factories);
-        if (data.diplomacy) Object.assign(diplomacy, data.diplomacy);
-        if (data.production) Object.assign(production, data.production);
-        if (data.tech) Object.assign(tech, data.tech);
-        if (data.year) year = data.year;
-        if (data.month) month = data.month;
-        if (data.day) day = data.day;
-        if (data.units) {
-            for (let i = 0; i < data.units.length && i < units.length; i++) {
-                const d = data.units[i];
-                const u = units[i];
-                if (u && d.pos) {
-                    u.object.position.fromArray(d.pos);
-                }
-            }
-        }
-    } catch (e) { /* silent fail */ }
-}
-
-/* =========================================================
    PANELS
    ========================================================== */
 
@@ -1415,7 +1538,8 @@ const panels = {
                 statRow("Enemy Forces", units.filter(u => !u.friendly && u.state !== "DESTROYED").length) +
                 statRow("Threat Level", threatLevel()) +
                 statRow("Weather", weather) +
-                statRow("Map Layer", mapLayer)
+                statRow("Map Layer", mapLayer) +
+                statRow("Your Country", `${nation[currentCountry]?.flag || '🏳️'} ${nation[currentCountry]?.name || currentCountry}`)
             ) +
             infoCard("Map Layers",
                 ["MILITARY", "POLITICAL", "TERRAIN", "SUPPLY", "RESOURCES", "INTEL"]
@@ -1438,7 +1562,7 @@ const panels = {
                 friendly.map(u => `
                     <button class="action-btn select-unit" data-id="${u.id}" style="text-align:left">
                         ${u.type === "TANK" ? "🛡️" : u.type === "ARTILLERY" ? "💥" : u.type === "AIR" ? "✈️" : "🪖"}
-                        ${u.name} — ${u.state}
+                        ${u.name} (${nation[u.country]?.flag || '🏳️'}) — ${u.state}
                     </button>
                 `).join("")
             ) +
@@ -1465,35 +1589,33 @@ const panels = {
                 progressRow("Stability", stability) +
                 statRow("Tax Rate", `${tax}%`) +
                 statRow("Political Power", Math.floor(political)) +
-                statRow("Construction", construction.toFixed(1))
+                statRow("Construction", construction.toFixed(1)) +
+                statRow("Civilian Factories", factories.civilian) +
+                statRow("Military Factories", factories.military)
             ) +
             actionButton("tax-down", "LOWER TAX — 2%") +
             actionButton("tax-up", "RAISE TAX — 2%") +
             actionButton("invest-industry", "INVEST IN INDUSTRY — $1000") +
-            actionButton("build-factory", "BUILD MILITARY FACTORY — 4 CONSTRUCTION")
+            actionButton("build-factory", "BUILD FACTORY — 4 CONSTRUCTION")
     },
     production: {
         title: "Military Production",
         kicker: "INDUSTRIAL COMMAND",
         html: () =>
-            infoCard("Factories",
-                statRow("Civilian", factories.civilian) +
-                statRow("Military", factories.military) +
-                statRow("Naval", factories.naval)
-            ) +
             infoCard("Production Lines",
                 Object.entries(production).map(([key, p]) =>
                     `<div>
                         ${statRow(p.name, `${p.factories} factories`)}
                         ${progressRow("Progress", p.progress)}
-                        ${actionButton(`factory-${key}`, `ASSIGN +1 ${key} FACTORY`)}
+                        ${actionButton(`factory-${key}`, `ASSIGN +1 ${key}`)}
                     </div>`
                 ).join("")
             ) +
-            actionButton("buy-tank", "BUY TANK — $800 / 80 STEEL") +
-            actionButton("buy-infantry", "BUY INFANTRY EQUIPMENT — $350 / 35 STEEL") +
-            actionButton("buy-artillery", "BUY ARTILLERY — $600 / 65 STEEL") +
-            actionButton("buy-air", "BUY AIRCRAFT — $1100 / 90 STEEL")
+            actionButton("buy-tank", "BUY TANK — $800 / 80 STEEL", "success") +
+            actionButton("buy-infantry", "BUY INFANTRY — $350 / 35 STEEL", "success") +
+            actionButton("buy-artillery", "BUY ARTILLERY — $600 / 65 STEEL", "success") +
+            actionButton("buy-air", "BUY AIRCRAFT — $1100 / 90 STEEL", "success") +
+            actionButton("quick-factory", "⚡ QUICK BUILD FACTORY — $500", "success")
     },
     research: {
         title: "Technology",
@@ -1502,10 +1624,10 @@ const panels = {
             infoCard("Research",
                 Object.entries(tech).map(([key, t]) =>
                     `<div>
-                        ${statRow(t.name, t.completed ? "COMPLETED" : t.active ? `${Math.round(t.progress)}%` : "AVAILABLE")}
-                        ${progressRow("Research", t.progress)}
+                        ${statRow(t.name, t.completed ? "✅ COMPLETED" : t.active ? `${Math.round(t.progress)}%` : "📖 AVAILABLE")}
+                        ${progressRow("Progress", t.progress)}
                         ${actionButton(`research-${key}`,
-                            t.completed ? "COMPLETED" : t.active ? "RESEARCHING" : "START RESEARCH"
+                            t.completed ? "COMPLETED ✓" : t.active ? "RESEARCHING..." : "START RESEARCH"
                         )}
                     </div>`
                 ).join("")
@@ -1516,13 +1638,14 @@ const panels = {
         kicker: "FOREIGN AFFAIRS",
         html: () =>
             infoCard("International Relations",
-                Object.entries(diplomacy).map(([key, value]) =>
-                    `<div>
+                Object.keys(nation).filter(key => key !== currentCountry).map(key => {
+                    const value = diplomacy[key] || 0;
+                    return `<div>
                         ${statRow(`${nation[key]?.flag || '🏳️'} ${nation[key]?.name || key}`, value)}
                         ${actionButton(`dip-${key}`, "IMPROVE RELATIONS")}
-                        ${actionButton(`diplomatic-${key}`, value < -50 ? "DECLARE WAR" : "PROPOSE PACT")}
-                    </div>`
-                ).join("")
+                        ${actionButton(`diplomatic-${key}`, value < -50 ? "⚔️ WAR" : "🤝 PACT")}
+                    </div>`;
+                }).join("")
             ) +
             infoCard("Diplomatic Log",
                 diplomaticMessages.map(m =>
@@ -1543,8 +1666,8 @@ const panels = {
                 statRow("Enemy Units Detected", units.filter(u => !u.friendly && u.state !== "DESTROYED").length)
             ) +
             actionButton("run-recon", "RUN RECON — $250") +
-            actionButton("expand-spy", "EXPAND SPY NETWORK — $400") +
-            actionButton("improve-counter", "IMPROVE COUNTER INTEL — $350")
+            actionButton("expand-spy", "EXPAND SPY — $400") +
+            actionButton("improve-counter", "IMPROVE COUNTER — $350")
     }
 };
 
@@ -1598,6 +1721,12 @@ function setupUI() {
     const airstrikeBtn = $("airstrikeCommand");
     if (airstrikeBtn) airstrikeBtn.addEventListener('click', commandAirstrike);
 
+    // Quick Factory
+    const quickFactory = $("quickFactory");
+    if (quickFactory) {
+        quickFactory.addEventListener('click', quickBuildFactory);
+    }
+
     const zoomIn = $("zoomIn");
     if (zoomIn) {
         zoomIn.addEventListener('click', () => {
@@ -1617,7 +1746,7 @@ function setupUI() {
     const resetCam = $("resetCamera");
     if (resetCam) {
         resetCam.addEventListener('click', () => {
-            camera.position.set(60, 70, 90);
+            camera.position.set(80, 80, 120);
             controls.target.set(0, 0, 0);
             controls.update();
         });
@@ -1651,6 +1780,7 @@ function setupUI() {
             const modal = $("countryModal");
             if (modal) modal.classList.remove('open');
             toast(`Switched to ${data.name}`);
+            updateAllUI();
         });
     });
     const closeCountry = $("closeCountryModal");
@@ -1663,7 +1793,7 @@ function setupUI() {
 
     let tutorialStep = 0;
     const tutorialData = [
-        { title: "Welcome, Commander", text: "Select a military unit and command it across the battlefield." },
+        { title: "Welcome, Commander!", text: "Select a military unit and command it across the global battlefield." },
         { title: "Movement", text: "Click a friendly unit, then click 'MOVE' and tap terrain to set destination." },
         { title: "Combat", text: "Select a unit, click 'ATTACK', then tap an enemy unit to engage." },
         { title: "Strategy", text: "Use the left panel to manage economy, production, research, and diplomacy." }
@@ -1733,6 +1863,11 @@ function setupUI() {
                 openPanel("economy");
                 return;
             }
+            if (target.id === 'quick-factory') {
+                quickBuildFactory();
+                openPanel("production");
+                return;
+            }
 
             if (target.id.startsWith('factory-')) {
                 const type = target.id.replace('factory-', '');
@@ -1748,9 +1883,9 @@ function setupUI() {
                     if (steel < p.steel) { toast("Not enough steel"); return; }
                     money -= p.cost;
                     steel -= p.steel;
-                    const pos = new THREE.Vector3((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40);
-                    create3DUnit(`New ${p.name} Unit`, type, pos.x, pos.z);
-                    toast(`${p.name} unit deployed`);
+                    const pos = new THREE.Vector3((Math.random() - 0.5) * 30, 0, (Math.random() - 0.5) * 30);
+                    create3DUnit(`New ${p.name} Unit`, type, pos.x, pos.z, true, currentCountry);
+                    toast(`${p.name} unit deployed!`);
                     openPanel("production");
                     updateAllUI();
                 }
@@ -1778,6 +1913,13 @@ function setupUI() {
             if (target.id === 'improve-counter') { improveCounterIntel(); return; }
         });
     }
+
+    // Set initial country
+    const data = nation[currentCountry] || { flag: "🏳️", name: currentCountry };
+    const flagEl = $("countryFlag");
+    const nameEl = $("countryName");
+    if (flagEl) flagEl.textContent = data.flag;
+    if (nameEl) nameEl.textContent = data.name;
 
     openPanel('overview');
     updateDateDisplay();
@@ -1976,6 +2118,46 @@ function handleWorldClick(event) {
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
+function selectUnit(unit) {
+    if (!unit || unit.state === "DESTROYED") return;
+    if (selectedUnit) {
+        selectedUnit.selected = false;
+        clearSelectionVisual(selectedUnit);
+    }
+    selectedUnit = unit;
+    unit.selected = true;
+    createSelectionVisual(unit);
+    updateUnitPanel();
+    const panel = $("unitPanel");
+    if (panel) panel.classList.add("open");
+}
+
+function createSelectionVisual(unit) {
+    clearSelectionVisual(unit);
+    const ring = new THREE.Mesh(
+        new THREE.RingGeometry(2.5, 3.2, 32),
+        new THREE.MeshBasicMaterial({
+            color: unit.friendly ? 0xd5ad55 : 0xe45d5d,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide
+        })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = unit.type === 'AIR' ? -7.5 : 0.1;
+    ring.userData.selectionRing = true;
+    unit.object.add(ring);
+    unit.selectionRing = ring;
+}
+
+function clearSelectionVisual(unit) {
+    if (!unit?.selectionRing) return;
+    unit.object.remove(unit.selectionRing);
+    unit.selectionRing.geometry.dispose();
+    unit.selectionRing.material.dispose();
+    unit.selectionRing = null;
+}
+
 function updateUnitPanel() {
     if (!selectedUnit) return;
     const u = selectedUnit;
@@ -1984,7 +2166,7 @@ function updateUnitPanel() {
     const stats = $("unitStats");
 
     if (type) type.textContent = `${u.type} • ${u.friendly ? "FRIENDLY" : "HOSTILE"}`;
-    if (name) name.textContent = u.name;
+    if (name) name.textContent = `${u.name} (${nation[u.country]?.flag || '🏳️'})`;
 
     if (stats) {
         stats.innerHTML =
