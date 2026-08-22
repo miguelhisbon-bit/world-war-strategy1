@@ -1,104 +1,185 @@
-/* =========================================================
-   WORLD WAR: BATTLEFIELD
-   3D STRATEGY GAME
-========================================================= */
-
-const canvas = document.getElementById("gameCanvas");
-
-let scene;
-let camera;
-let renderer;
-let clock;
-
-let selectedUnit = null;
-
-let units = [];
-let projectiles = [];
-let explosions = [];
-let effects = [];
-
-let money = 5000;
-let energy = 100;
-let score = 0;
-
-let gamePaused = false;
-let gameSpeed = 1;
-
-let enemyBase;
-let playerBase;
-
-let battlefieldSize = 180;
-
-let cameraTarget = new THREE.Vector3(0, 0, 0);
-
-let touchStart = null;
-
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 
 /* =========================================================
-   UNIT CONFIG
+   WORLD WAR — 3D GRAND STRATEGY
+   Complete browser/mobile prototype
 ========================================================= */
 
-const UNIT_TYPES = {
 
-    infantry: {
-        name: "Infantry",
-        icon: "🪖",
-        type: "SOLDIER",
-        hp: 100,
-        attack: 15,
-        defense: 10,
-        speed: 7,
-        range: 18,
-        cost: 500,
-        color: 0x556b45
+/* ================= GAME STATE ================= */
+
+const state = {
+
+    country: {
+        id: "USA",
+        name: "United States",
+        flag: "🇺🇸"
     },
 
-    tank: {
-        name: "Heavy Tank",
-        icon: "🛡️",
-        type: "ARMORED",
-        hp: 300,
-        attack: 45,
-        defense: 40,
-        speed: 4,
-        range: 30,
-        cost: 1500,
-        color: 0x394b38
+    money: 12500,
+    oil: 850,
+    steel: 1250,
+    food: 1600,
+    manpower: 85000,
+
+    date: new Date(1940, 0, 1),
+
+    paused: false,
+    speed: 1,
+
+    selectedUnit: null,
+    units: [],
+
+    battles: [],
+
+    technology: {
+        infantry: 0,
+        armor: 0,
+        aviation: 0,
+        naval: 0,
+        logistics: 0
     },
 
-    artillery: {
-        name: "Artillery",
-        icon: "💥",
-        type: "ARTILLERY",
-        hp: 180,
-        attack: 70,
-        defense: 20,
-        speed: 2.5,
-        range: 55,
-        cost: 2000,
-        color: 0x4d5140
+    production: [],
+
+    diplomacy: {
+        Germany: -20,
+        UK: 55,
+        Japan: -15,
+        USSR: 10,
+        France: 45
+    },
+
+    settings: {
+        graphics: "High",
+        fps: 60,
+        cameraSensitivity: 1,
+        vibration: true,
+        cinematic: true,
+        autoCombat: false
     }
 
 };
 
 
-/* =========================================================
-   INIT
-========================================================= */
+/* ================= THREE.JS ================= */
 
-function init() {
+let scene;
+let camera;
+let renderer;
+let controls;
+
+let raycaster;
+let pointer;
+
+let clock;
+
+let terrain;
+
+let unitsGroup;
+let effectsGroup;
+let projectileGroup;
+let cityGroup;
+
+let selectedMarker;
+
+let battlefieldMode = false;
+
+let groundObjects = [];
+
+let dragStart = null;
+
+
+/* ================= DOM ================= */
+
+const $ = id => document.getElementById(id);
+
+
+/* ================= INITIALIZATION ================= */
+
+async function boot() {
+
+    await loadingSequence();
+
+    setupThree();
+
+    createWorld();
+
+    createUnits();
+
+    setupEvents();
+
+    updateUI();
+
+    animate();
+
+    startTutorial();
+
+}
+
+
+async function loadingSequence() {
+
+    const progress = $("loadingProgress");
+    const status = $("loadingStatus");
+    const tip = $("loadingTip");
+
+    const steps = [
+        ["Initializing command system...", 12],
+        ["Loading world map...", 27],
+        ["Building terrain...", 42],
+        ["Deploying armies...", 58],
+        ["Preparing battlefield...", 72],
+        ["Loading combat systems...", 86],
+        ["Synchronizing campaign...", 100]
+    ];
+
+    const tips = [
+        "TIP: Supply lines are essential for long campaigns.",
+        "TIP: Terrain affects movement and combat.",
+        "TIP: Use airstrikes to weaken enemy formations.",
+        "TIP: Research can unlock stronger military units.",
+        "TIP: Diplomacy can prevent wars on multiple fronts."
+    ];
+
+    for (let i = 0; i < steps.length; i++) {
+
+        await wait(350);
+
+        status.textContent = steps[i][0];
+        progress.style.width = steps[i][1] + "%";
+
+        tip.textContent =
+            tips[i % tips.length];
+
+    }
+
+    await wait(700);
+
+    $("loadingScreen").classList.add("hidden");
+
+}
+
+
+function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+
+/* ================= THREE SETUP ================= */
+
+function setupThree() {
 
     scene = new THREE.Scene();
 
-    scene.background = new THREE.Color(0x78908a);
+    scene.background = new THREE.Color(0x78919a);
 
     scene.fog = new THREE.Fog(
-        0x78908a,
+        0x78919a,
         80,
-        250
+        320
     );
 
 
@@ -106,902 +187,110 @@ function init() {
         55,
         window.innerWidth / window.innerHeight,
         0.1,
-        500
+        1000
     );
 
     camera.position.set(
         0,
-        75,
-        70
-    );
-
-    camera.lookAt(
-        cameraTarget
+        70,
+        75
     );
 
 
     renderer = new THREE.WebGLRenderer({
-        canvas: canvas,
-        antialias: true
+        canvas: $("gameCanvas"),
+        antialias: true,
+        powerPreference: "high-performance"
     });
-
-    renderer.setPixelRatio(
-        Math.min(window.devicePixelRatio, 2)
-    );
 
     renderer.setSize(
         window.innerWidth,
         window.innerHeight
     );
 
+    renderer.setPixelRatio(
+        Math.min(window.devicePixelRatio, 1.8)
+    );
+
+    renderer.shadowMap.enabled = true;
+
+    renderer.shadowMap.type =
+        THREE.PCFSoftShadowMap;
+
+
+    controls = new OrbitControls(
+        camera,
+        renderer.domElement
+    );
+
+    controls.enableDamping = true;
+
+    controls.dampingFactor = 0.08;
+
+    controls.minDistance = 18;
+
+    controls.maxDistance = 180;
+
+    controls.maxPolarAngle =
+        Math.PI / 2.12;
+
+    controls.target.set(0,0,0);
+
+
+    raycaster = new THREE.Raycaster();
+
+    pointer = new THREE.Vector2();
 
     clock = new THREE.Clock();
 
 
-    setupLighting();
+    unitsGroup = new THREE.Group();
+    effectsGroup = new THREE.Group();
+    projectileGroup = new THREE.Group();
+    cityGroup = new THREE.Group();
 
-    createBattlefield();
-
-    createBases();
-
-    createEnvironment();
-
-    createInitialArmy();
-
-    createEnemyArmy();
-
-    setupEvents();
-
-    animate();
-
-}
+    scene.add(unitsGroup);
+    scene.add(effectsGroup);
+    scene.add(projectileGroup);
+    scene.add(cityGroup);
 
 
-/* =========================================================
-   LIGHTING
-========================================================= */
+    /* LIGHTING */
 
-function setupLighting() {
-
-    const hemi = new THREE.HemisphereLight(
-        0xb8d1c3,
-        0x20251f,
-        1.8
-    );
+    const hemi =
+        new THREE.HemisphereLight(
+            0xdde9ed,
+            0x243029,
+            2.1
+        );
 
     scene.add(hemi);
 
 
-    const sun = new THREE.DirectionalLight(
-        0xffffff,
-        2
-    );
+    const sun =
+        new THREE.DirectionalLight(
+            0xfff0d0,
+            3
+        );
 
     sun.position.set(
-        -50,
+        50,
         100,
-        50
+        30
     );
 
     sun.castShadow = true;
 
+    sun.shadow.mapSize.width = 2048;
+    sun.shadow.mapSize.height = 2048;
+
+    sun.shadow.camera.left = -100;
+    sun.shadow.camera.right = 100;
+    sun.shadow.camera.top = 100;
+    sun.shadow.camera.bottom = -100;
+
     scene.add(sun);
 
-
-    const moon = new THREE.DirectionalLight(
-        0x8fa9ff,
-        .3
-    );
-
-    moon.position.set(
-        50,
-        30,
-        -80
-    );
-
-    scene.add(moon);
-
-}
-
-
-/* =========================================================
-   BATTLEFIELD
-========================================================= */
-
-function createBattlefield() {
-
-    const groundGeometry =
-        new THREE.PlaneGeometry(
-            battlefieldSize,
-            battlefieldSize,
-            60,
-            60
-        );
-
-    const groundMaterial =
-        new THREE.MeshStandardMaterial({
-            color: 0x596653,
-            roughness: 1
-        });
-
-    const ground =
-        new THREE.Mesh(
-            groundGeometry,
-            groundMaterial
-        );
-
-    ground.rotation.x = -Math.PI / 2;
-
-    ground.receiveShadow = true;
-
-    scene.add(ground);
-
-
-    /* GRID */
-
-    const grid =
-        new THREE.GridHelper(
-            battlefieldSize,
-            36,
-            0x344038,
-            0x465348
-        );
-
-    grid.position.y = .03;
-
-    grid.material.opacity = .25;
-    grid.material.transparent = true;
-
-    scene.add(grid);
-
-
-    /* TERRAIN */
-
-    for (let i = 0; i < 60; i++) {
-
-        const rock =
-            createRock();
-
-        rock.position.set(
-            randomTerrain(),
-            .5,
-            randomTerrain()
-        );
-
-        scene.add(rock);
-    }
-
-
-    /* ROAD */
-
-    createRoad(
-        0,
-        0,
-        battlefieldSize,
-        9,
-        0x3d4038
-    );
-
-}
-
-
-/* =========================================================
-   ROAD
-========================================================= */
-
-function createRoad(
-    x,
-    z,
-    length,
-    width,
-    color
-) {
-
-    const geo =
-        new THREE.PlaneGeometry(
-            width,
-            length
-        );
-
-    const mat =
-        new THREE.MeshStandardMaterial({
-            color,
-            roughness: 1
-        });
-
-    const road =
-        new THREE.Mesh(
-            geo,
-            mat
-        );
-
-    road.rotation.x =
-        -Math.PI / 2;
-
-    road.position.set(
-        x,
-        .04,
-        z
-    );
-
-    scene.add(road);
-
-}
-
-
-/* =========================================================
-   ROCK
-========================================================= */
-
-function createRock() {
-
-    const geo =
-        new THREE.DodecahedronGeometry(
-            Math.random() * 2 + 1,
-            0
-        );
-
-    const mat =
-        new THREE.MeshStandardMaterial({
-            color:
-                0x555b52
-        });
-
-    const rock =
-        new THREE.Mesh(
-            geo,
-            mat
-        );
-
-    rock.scale.y =
-        Math.random() * .6 + .4;
-
-    return rock;
-
-}
-
-
-/* =========================================================
-   TREES
-========================================================= */
-
-function createTree(
-    x,
-    z
-) {
-
-    const group =
-        new THREE.Group();
-
-
-    const trunk =
-        new THREE.Mesh(
-            new THREE.CylinderGeometry(
-                .35,
-                .5,
-                3
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x55412e
-            })
-        );
-
-    trunk.position.y = 1.5;
-
-    group.add(trunk);
-
-
-    for (
-        let i = 0;
-        i < 3;
-        i++
-    ) {
-
-        const leaves =
-            new THREE.Mesh(
-                new THREE.ConeGeometry(
-                    2.5 - i * .4,
-                    4,
-                    7
-                ),
-                new THREE.MeshStandardMaterial({
-                    color: 0x273c28
-                })
-            );
-
-        leaves.position.y =
-            3 + i * 1.5;
-
-        group.add(leaves);
-    }
-
-
-    group.position.set(
-        x,
-        0,
-        z
-    );
-
-    scene.add(group);
-
-}
-
-
-/* =========================================================
-   ENVIRONMENT
-========================================================= */
-
-function createEnvironment() {
-
-    for (let i = 0; i < 40; i++) {
-
-        let x =
-            randomTerrain();
-
-        let z =
-            randomTerrain();
-
-        if (
-            Math.abs(x) < 15 &&
-            Math.abs(z) < 15
-        ) {
-            continue;
-        }
-
-        createTree(x, z);
-
-    }
-
-
-    /* destroyed vehicles */
-
-    for (let i = 0; i < 8; i++) {
-
-        const wreck =
-            createTankMesh(
-                0x222823
-            );
-
-        wreck.rotation.y =
-            Math.random() * Math.PI;
-
-        wreck.position.set(
-            randomTerrain(),
-            .4,
-            randomTerrain()
-        );
-
-        scene.add(wreck);
-    }
-
-}
-
-
-/* =========================================================
-   BASES
-========================================================= */
-
-function createBases() {
-
-    playerBase =
-        createBase(
-            -65,
-            0,
-            0x375b38,
-            "PLAYER BASE"
-        );
-
-    enemyBase =
-        createBase(
-            65,
-            0,
-            0x6b3630,
-            "ENEMY BASE"
-        );
-
-}
-
-
-/* =========================================================
-   BASE
-========================================================= */
-
-function createBase(
-    x,
-    z,
-    color,
-    name
-) {
-
-    const group =
-        new THREE.Group();
-
-
-    const platform =
-        new THREE.Mesh(
-            new THREE.CylinderGeometry(
-                9,
-                11,
-                1,
-                24
-            ),
-            new THREE.MeshStandardMaterial({
-                color
-            })
-        );
-
-    platform.position.y = .5;
-
-    group.add(platform);
-
-
-    const tower =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                5,
-                6,
-                5
-            ),
-            new THREE.MeshStandardMaterial({
-                color:
-                    color
-            })
-        );
-
-    tower.position.y = 3.5;
-
-    group.add(tower);
-
-
-    const flag =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                .2,
-                8,
-                .2
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x222222
-            })
-        );
-
-    flag.position.set(
-        0,
-        7,
-        0
-    );
-
-    group.add(flag);
-
-
-    const flagCloth =
-        new THREE.Mesh(
-            new THREE.PlaneGeometry(
-                3,
-                1.5
-            ),
-            new THREE.MeshStandardMaterial({
-                color,
-                side: THREE.DoubleSide
-            })
-        );
-
-    flagCloth.position.set(
-        1.4,
-        8,
-        0
-    );
-
-    group.add(flagCloth);
-
-
-    group.position.set(
-        x,
-        0,
-        z
-    );
-
-    scene.add(group);
-
-    return group;
-
-}
-
-
-/* =========================================================
-   INITIAL ARMY
-========================================================= */
-
-function createInitialArmy() {
-
-    spawnUnit(
-        "infantry",
-        -45,
-        -8,
-        true
-    );
-
-    spawnUnit(
-        "infantry",
-        -48,
-        0,
-        true
-    );
-
-    spawnUnit(
-        "infantry",
-        -45,
-        8,
-        true
-    );
-
-    spawnUnit(
-        "tank",
-        -38,
-        0,
-        true
-    );
-
-    spawnUnit(
-        "artillery",
-        -42,
-        15,
-        true
-    );
-
-}
-
-
-/* =========================================================
-   ENEMY ARMY
-========================================================= */
-
-function createEnemyArmy() {
-
-    spawnUnit(
-        "infantry",
-        45,
-        -8,
-        false
-    );
-
-    spawnUnit(
-        "infantry",
-        48,
-        0,
-        false
-    );
-
-    spawnUnit(
-        "infantry",
-        45,
-        8,
-        false
-    );
-
-    spawnUnit(
-        "tank",
-        38,
-        0,
-        false
-    );
-
-    spawnUnit(
-        "artillery",
-        42,
-        15,
-        false
-    );
-
-}
-
-
-/* =========================================================
-   SPAWN UNIT
-========================================================= */
-
-function spawnUnit(
-    type,
-    x,
-    z,
-    player
-) {
-
-    const data =
-        UNIT_TYPES[type];
-
-    const mesh =
-        type === "tank"
-            ? createTankMesh(data.color)
-            : type === "artillery"
-                ? createArtilleryMesh(data.color)
-                : createInfantryMesh(data.color);
-
-
-    mesh.position.set(
-        x,
-        0,
-        z
-    );
-
-
-    mesh.userData.unit = {
-
-        type,
-
-        player,
-
-        hp: data.hp,
-
-        maxHP: data.hp,
-
-        attack: data.attack,
-
-        defense: data.defense,
-
-        speed: data.speed,
-
-        range: data.range,
-
-        target: null,
-
-        moving: false,
-
-        cooldown: 0,
-
-        selected: false
-
-    };
-
-
-    scene.add(mesh);
-
-    units.push(mesh);
-
-    return mesh;
-
-}
-
-
-/* =========================================================
-   INFANTRY
-========================================================= */
-
-function createInfantryMesh(color) {
-
-    const group =
-        new THREE.Group();
-
-
-    const body =
-        new THREE.Mesh(
-            new THREE.CapsuleGeometry(
-                .45,
-                1.2,
-                4,
-                8
-            ),
-            new THREE.MeshStandardMaterial({
-                color
-            })
-        );
-
-    body.position.y = 1;
-
-    group.add(body);
-
-
-    const head =
-        new THREE.Mesh(
-            new THREE.SphereGeometry(
-                .4,
-                12,
-                8
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0xb89a76
-            })
-        );
-
-    head.position.y = 2;
-
-    group.add(head);
-
-
-    const helmet =
-        new THREE.Mesh(
-            new THREE.SphereGeometry(
-                .43,
-                12,
-                8
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x343a30
-            })
-        );
-
-    helmet.scale.y = .55;
-
-    helmet.position.y = 2.15;
-
-    group.add(helmet);
-
-
-    const weapon =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                .12,
-                .12,
-                1.5
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x191c19
-            })
-        );
-
-    weapon.position.set(
-        .45,
-        1.1,
-        -.45
-    );
-
-    weapon.rotation.x = -.3;
-
-    group.add(weapon);
-
-
-    return group;
-
-}
-
-
-/* =========================================================
-   TANK
-========================================================= */
-
-function createTankMesh(color) {
-
-    const group =
-        new THREE.Group();
-
-
-    const body =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                4,
-                1.4,
-                5
-            ),
-            new THREE.MeshStandardMaterial({
-                color
-            })
-        );
-
-    body.position.y = 1;
-
-    group.add(body);
-
-
-    /* tracks */
-
-    for (
-        const side of [-1, 1]
-    ) {
-
-        const track =
-            new THREE.Mesh(
-                new THREE.BoxGeometry(
-                    1,
-                    1.2,
-                    5.4
-                ),
-                new THREE.MeshStandardMaterial({
-                    color: 0x181b18
-                })
-            );
-
-        track.position.set(
-            side * 2,
-            .8,
-            0
-        );
-
-        group.add(track);
-
-    }
-
-
-    const turret =
-        new THREE.Mesh(
-            new THREE.CylinderGeometry(
-                1.5,
-                1.5,
-                .8,
-                12
-            ),
-            new THREE.MeshStandardMaterial({
-                color:
-                    color
-            })
-        );
-
-    turret.position.y = 2;
-
-    group.add(turret);
-
-
-    const barrel =
-        new THREE.Mesh(
-            new THREE.CylinderGeometry(
-                .18,
-                .18,
-                4,
-                8
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x151815
-            })
-        );
-
-    barrel.rotation.x =
-        Math.PI / 2;
-
-    barrel.position.set(
-        0,
-        2,
-        -2.3
-    );
-
-    group.add(barrel);
-
-
-    group.userData.turret = turret;
-
-    return group;
-
-}
-
-
-/* =========================================================
-   ARTILLERY
-========================================================= */
-
-function createArtilleryMesh(color) {
-
-    const group =
-        createTankMesh(color);
-
-    group.scale.set(
-        1.05,
-        .85,
-        1.15
-    );
-
-    return group;
-
-}
-
-
-/* =========================================================
-   RANDOM TERRAIN
-========================================================= */
-
-function randomTerrain() {
-
-    return (
-        Math.random()
-        * battlefieldSize
-        - battlefieldSize / 2
-    );
-
-}
-
-
-/* =========================================================
-   EVENTS
-========================================================= */
-
-function setupEvents() {
 
     window.addEventListener(
         "resize",
@@ -1009,261 +298,1141 @@ function setupEvents() {
     );
 
 
-    canvas.addEventListener(
+    renderer.domElement.addEventListener(
         "pointerdown",
         onPointerDown
     );
 
-    canvas.addEventListener(
-        "pointermove",
-        onPointerMove
-    );
-
-    canvas.addEventListener(
+    renderer.domElement.addEventListener(
         "pointerup",
         onPointerUp
     );
 
-
-    document
-        .getElementById("attackButton")
-        .onclick =
-        attackSelected;
+}
 
 
-    document
-        .getElementById("bombButton")
-        .onclick =
-        artilleryStrike;
+/* ================= WORLD ================= */
 
+function createWorld() {
 
-    document
-        .getElementById("moveButton")
-        .onclick =
-        enableMoveMode;
+    createTerrain();
 
+    createRoads();
 
-    document
-        .getElementById("closeUnit")
-        .onclick =
-        deselectUnit;
+    createRivers();
 
+    createMountains();
 
-    document
-        .getElementById("pauseButton")
-        .onclick =
-        togglePause;
+    createForest();
 
+    createCities();
 
-    document
-        .getElementById("speedButton")
-        .onclick =
-        changeSpeed;
+    createStrategicBorders();
 
-
-    document
-        .getElementById("resetButton")
-        .onclick =
-        () => location.reload();
-
-
-    document
-        .querySelectorAll(".produce")
-        .forEach(button => {
-
-            button.addEventListener(
-                "click",
-                () => {
-
-                    produceUnit(
-                        button.dataset.unit
-                    );
-
-                }
-            );
-
-        });
-
-
-    document
-        .getElementById("messageButton")
-        .onclick =
-        () => {
-
-            document
-                .getElementById("gameMessage")
-                .classList.remove("show");
-
-        };
-
-
-    document
-        .getElementById("camUp")
-        .onclick =
-        () => moveCamera(0, -5);
-
-    document
-        .getElementById("camDown")
-        .onclick =
-        () => moveCamera(0, 5);
-
-    document
-        .getElementById("camLeft")
-        .onclick =
-        () => moveCamera(-5, 0);
-
-    document
-        .getElementById("camRight")
-        .onclick =
-        () => moveCamera(5, 0);
+    createOceanDecoration();
 
 }
 
 
-/* =========================================================
-   POINTER
-========================================================= */
+function createTerrain() {
 
-function onPointerDown(e) {
+    const geometry =
+        new THREE.PlaneGeometry(
+            240,
+            180,
+            80,
+            60
+        );
 
-    touchStart = {
-        x: e.clientX,
-        y: e.clientY
+    const material =
+        new THREE.MeshStandardMaterial({
+            color: 0x4f654e,
+            roughness: .95,
+            metalness: 0
+        });
+
+
+    terrain =
+        new THREE.Mesh(
+            geometry,
+            material
+        );
+
+    terrain.rotation.x =
+        -Math.PI / 2;
+
+    terrain.receiveShadow = true;
+
+    scene.add(terrain);
+
+
+    const pos =
+        geometry.attributes.position;
+
+    for (
+        let i = 0;
+        i < pos.count;
+        i++
+    ) {
+
+        const x = pos.getX(i);
+        const z = pos.getZ(i);
+
+        const h =
+            Math.sin(x * .055) * 1.4 +
+            Math.cos(z * .07) * 1.2 +
+            Math.sin((x + z) * .025) * 2;
+
+        pos.setY(i, h);
+
+    }
+
+    geometry.computeVertexNormals();
+
+
+    /* GRID */
+
+    const grid =
+        new THREE.GridHelper(
+            240,
+            24,
+            0x788d72,
+            0x62755f
+        );
+
+    grid.position.y = .05;
+
+    grid.material.opacity = .18;
+    grid.material.transparent = true;
+
+    scene.add(grid);
+
+    groundObjects.push(terrain);
+
+}
+
+
+function createRoads() {
+
+    const roadMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x343c39,
+            roughness: 1
+        });
+
+
+    const roads = [
+        [0,0,100,.8],
+        [-30,5,65,.5],
+        [35,-20,75,.55],
+        [10,30,50,.45]
+    ];
+
+
+    roads.forEach(r => {
+
+        const g =
+            new THREE.PlaneGeometry(
+                r[3] * 2,
+                r[2]
+            );
+
+        const m =
+            new THREE.Mesh(
+                g,
+                roadMaterial
+            );
+
+        m.rotation.x =
+            -Math.PI / 2;
+
+        m.rotation.z =
+            r[1] * .02;
+
+        m.position.set(
+            r[0],
+            .08,
+            r[1]
+        );
+
+        scene.add(m);
+
+    });
+
+}
+
+
+function createRivers() {
+
+    const riverMat =
+        new THREE.MeshStandardMaterial({
+            color: 0x315d76,
+            roughness: .2,
+            metalness: .1,
+            transparent: true,
+            opacity: .9
+        });
+
+
+    const river =
+        new THREE.Mesh(
+            new THREE.PlaneGeometry(
+                14,
+                180,
+                20,
+                20
+            ),
+            riverMat
+        );
+
+    river.rotation.x =
+        -Math.PI / 2;
+
+    river.rotation.z =
+        -.15;
+
+    river.position.set(
+        -27,
+        .11,
+        0
+    );
+
+    scene.add(river);
+
+}
+
+
+function createMountains() {
+
+    const mountainMat =
+        new THREE.MeshStandardMaterial({
+            color: 0x4a504b,
+            roughness: 1
+        });
+
+
+    for (let i = 0; i < 28; i++) {
+
+        const height =
+            4 + Math.random() * 13;
+
+        const mountain =
+            new THREE.Mesh(
+                new THREE.ConeGeometry(
+                    4 + Math.random() * 5,
+                    height,
+                    7
+                ),
+                mountainMat
+            );
+
+        mountain.position.set(
+            -75 + Math.random() * 45,
+            height / 2,
+            -55 + Math.random() * 110
+        );
+
+        mountain.rotation.y =
+            Math.random() * Math.PI;
+
+        mountain.castShadow = true;
+
+        scene.add(mountain);
+
+    }
+
+}
+
+
+function createForest() {
+
+    const trunkMat =
+        new THREE.MeshStandardMaterial({
+            color: 0x493b2a
+        });
+
+    const leafMat =
+        new THREE.MeshStandardMaterial({
+            color: 0x1e3b29
+        });
+
+
+    for (let i = 0; i < 70; i++) {
+
+        const group =
+            new THREE.Group();
+
+        const trunk =
+            new THREE.Mesh(
+                new THREE.CylinderGeometry(
+                    .18,
+                    .28,
+                    2.2,
+                    6
+                ),
+                trunkMat
+            );
+
+        trunk.position.y = 1.1;
+
+        const leaves =
+            new THREE.Mesh(
+                new THREE.ConeGeometry(
+                    1.3,
+                    3.4,
+                    7
+                ),
+                leafMat
+            );
+
+        leaves.position.y = 3;
+
+        group.add(trunk);
+        group.add(leaves);
+
+        group.position.set(
+            35 + Math.random() * 55,
+            0,
+            -55 + Math.random() * 110
+        );
+
+        group.scale.setScalar(
+            .65 + Math.random() * .7
+        );
+
+        group.traverse(
+            o => o.castShadow = true
+        );
+
+        scene.add(group);
+
+    }
+
+}
+
+
+function createCities() {
+
+    const cities = [
+        ["CAPITAL", -5, 10],
+        ["NORTH CITY", -38, -28],
+        ["EAST CITY", 48, 17],
+        ["SOUTH CITY", 20, 53],
+        ["PORT", -45, 47],
+        ["INDUSTRIAL", 42, -42]
+    ];
+
+
+    const buildingMat =
+        new THREE.MeshStandardMaterial({
+            color: 0x77736a,
+            roughness: .9
+        });
+
+
+    cities.forEach(city => {
+
+        const group =
+            new THREE.Group();
+
+        for (let i = 0; i < 7; i++) {
+
+            const height =
+                2 + Math.random() * 6;
+
+            const building =
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        2 + Math.random() * 2,
+                        height,
+                        2 + Math.random() * 2
+                    ),
+                    buildingMat
+                );
+
+            building.position.set(
+                (Math.random() - .5) * 10,
+                height / 2,
+                (Math.random() - .5) * 10
+            );
+
+            building.castShadow = true;
+
+            group.add(building);
+
+        }
+
+        group.position.set(
+            city[1],
+            0,
+            city[2]
+        );
+
+        cityGroup.add(group);
+
+        addCityLabel(
+            city[0],
+            city[1],
+            city[2]
+        );
+
+    });
+
+}
+
+
+function addCityLabel(name,x,z) {
+
+    const canvas =
+        document.createElement("canvas");
+
+    canvas.width = 512;
+    canvas.height = 128;
+
+    const ctx =
+        canvas.getContext("2d");
+
+    ctx.fillStyle =
+        "rgba(0,0,0,.6)";
+
+    ctx.fillRect(
+        0,25,512,78
+    );
+
+    ctx.font =
+        "bold 42px Arial";
+
+    ctx.fillStyle =
+        "#e8edf0";
+
+    ctx.textAlign =
+        "center";
+
+    ctx.fillText(
+        name,
+        256,
+        77
+    );
+
+
+    const texture =
+        new THREE.CanvasTexture(canvas);
+
+    const material =
+        new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true
+        });
+
+    const sprite =
+        new THREE.Sprite(material);
+
+    sprite.scale.set(
+        10,
+        2.5,
+        1
+    );
+
+    sprite.position.set(
+        x,
+        9,
+        z
+    );
+
+    scene.add(sprite);
+
+}
+
+
+function createStrategicBorders() {
+
+    const borderMaterial =
+        new THREE.LineBasicMaterial({
+            color: 0xd4ae5c,
+            transparent: true,
+            opacity: .45
+        });
+
+
+    const shapes = [
+
+        [
+            [-65,-55],
+            [-15,-55],
+            [-15,-5],
+            [-65,-5],
+            [-65,-55]
+        ],
+
+        [
+            [10,-55],
+            [65,-55],
+            [65,-5],
+            [10,-5],
+            [10,-55]
+        ],
+
+        [
+            [-65,8],
+            [-8,8],
+            [-8,55],
+            [-65,55],
+            [-65,8]
+        ]
+
+    ];
+
+
+    shapes.forEach(points => {
+
+        const geometry =
+            new THREE.BufferGeometry();
+
+        const vertices = [];
+
+        points.forEach(p => {
+
+            vertices.push(
+                p[0],
+                .15,
+                p[1]
+            );
+
+        });
+
+        geometry.setAttribute(
+            "position",
+            new THREE.Float32BufferAttribute(
+                vertices,
+                3
+            )
+        );
+
+        const line =
+            new THREE.Line(
+                geometry,
+                borderMaterial
+            );
+
+        scene.add(line);
+
+    });
+
+}
+
+
+function createOceanDecoration() {
+
+    const ocean =
+        new THREE.Mesh(
+            new THREE.PlaneGeometry(
+                500,
+                500
+            ),
+            new THREE.MeshStandardMaterial({
+                color: 0x244a60,
+                roughness: .7
+            })
+        );
+
+    ocean.rotation.x =
+        -Math.PI / 2;
+
+    ocean.position.y =
+        -2;
+
+    scene.add(ocean);
+
+}
+
+
+/* ================= UNIT SYSTEM ================= */
+
+const UNIT_TYPES = {
+
+    infantry: {
+        name: "Infantry Division",
+        icon: "🪖",
+        color: 0x3e6b47,
+        hp: 100,
+        attack: 25,
+        defense: 45,
+        speed: .08,
+        cost: 100
+    },
+
+    tank: {
+        name: "Armored Division",
+        icon: "🛡️",
+        color: 0x4c5650,
+        hp: 180,
+        attack: 70,
+        defense: 80,
+        speed: .13,
+        cost: 250
+    },
+
+    artillery: {
+        name: "Artillery Regiment",
+        icon: "💥",
+        color: 0x5b5548,
+        hp: 110,
+        attack: 85,
+        defense: 30,
+        speed: .055,
+        cost: 180
+    },
+
+    aircraft: {
+        name: "Air Wing",
+        icon: "✈️",
+        color: 0x59676d,
+        hp: 80,
+        attack: 95,
+        defense: 40,
+        speed: .25,
+        cost: 350
+    },
+
+    enemy: {
+        name: "Enemy Army",
+        icon: "⚔️",
+        color: 0x7d3030,
+        hp: 120,
+        attack: 40,
+        defense: 35,
+        speed: .07,
+        cost: 0
+    }
+
+};
+
+
+function createUnits() {
+
+    const friendly = [
+
+        ["infantry","1st Infantry", -30, 18],
+        ["infantry","2nd Infantry", -21, 12],
+        ["tank","1st Armored", -22, 25],
+        ["tank","2nd Armored", -12, 22],
+        ["artillery","1st Artillery", -30, 28],
+        ["aircraft","Air Wing Alpha", -4, 32]
+
+    ];
+
+
+    friendly.forEach(
+        data =>
+            createUnit(
+                data[0],
+                data[1],
+                data[2],
+                data[3],
+                "friendly"
+            )
+    );
+
+
+    const enemies = [
+
+        ["enemy","Enemy Army Alpha", 25, 18],
+        ["enemy","Enemy Army Bravo", 34, 25],
+        ["enemy","Enemy Armor", 40, 10],
+        ["enemy","Enemy Infantry", 47, 30]
+
+    ];
+
+
+    enemies.forEach(
+        data =>
+            createUnit(
+                data[0],
+                data[1],
+                data[2],
+                data[3],
+                "enemy"
+            )
+    );
+
+}
+
+
+function createUnit(
+    type,
+    name,
+    x,
+    z,
+    faction
+) {
+
+    const data =
+        UNIT_TYPES[type];
+
+    const group =
+        new THREE.Group();
+
+    group.userData = {
+
+        isUnit: true,
+
+        id:
+            crypto.randomUUID
+                ? crypto.randomUUID()
+                : Math.random().toString(36),
+
+        type,
+
+        name,
+
+        faction,
+
+        hp: data.hp,
+
+        maxHp: data.hp,
+
+        attack: data.attack,
+
+        defense: data.defense,
+
+        speed: data.speed,
+
+        target: null,
+
+        state: "idle",
+
+        fireCooldown: 0,
+
+        selected: false
+
+    };
+
+
+    buildUnitModel(
+        group,
+        type,
+        faction
+    );
+
+
+    group.position.set(
+        x,
+        1,
+        z
+    );
+
+
+    group.traverse(
+        obj => {
+
+            obj.castShadow = true;
+
+            obj.userData.unitRoot =
+                group;
+
+        }
+    );
+
+
+    unitsGroup.add(group);
+
+    state.units.push(group);
+
+    return group;
+
+}
+
+
+/* ================= 3D UNIT MODELS ================= */
+
+function buildUnitModel(
+    group,
+    type,
+    faction
+) {
+
+    const data =
+        UNIT_TYPES[type];
+
+
+    const color =
+        faction === "enemy"
+            ? 0x8b3434
+            : data.color;
+
+
+    const bodyMat =
+        new THREE.MeshStandardMaterial({
+            color,
+            roughness: .85
+        });
+
+
+    const darkMat =
+        new THREE.MeshStandardMaterial({
+            color: 0x171b1c,
+            roughness: .9
+        });
+
+
+    if (type === "infantry" ||
+        type === "enemy") {
+
+        for (let i = 0; i < 5; i++) {
+
+            const soldier =
+                new THREE.Group();
+
+            const body =
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        .55,
+                        1.35,
+                        .38
+                    ),
+                    bodyMat
+                );
+
+            body.position.y = 1.25;
+
+            const head =
+                new THREE.Mesh(
+                    new THREE.SphereGeometry(
+                        .27,
+                        10,
+                        8
+                    ),
+                    darkMat
+                );
+
+            head.position.y = 2.12;
+
+            const rifle =
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        .1,
+                        .1,
+                        1.1
+                    ),
+                    darkMat
+                );
+
+            rifle.position.set(
+                .28,
+                1.45,
+                -.25
+            );
+
+            rifle.rotation.x =
+                -.15;
+
+            soldier.add(
+                body,
+                head,
+                rifle
+            );
+
+            soldier.position.x =
+                (i - 2) * .7;
+
+            soldier.position.z =
+                (i % 2) * .7;
+
+            soldier.userData.walkOffset =
+                i * .4;
+
+            group.add(soldier);
+
+        }
+
+        return;
+
+    }
+
+
+    if (type === "tank") {
+
+        const body =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    3.4,
+                    1.1,
+                    2.1
+                ),
+                bodyMat
+            );
+
+        body.position.y = 1;
+
+        group.add(body);
+
+
+        const turret =
+            new THREE.Group();
+
+        const top =
+            new THREE.Mesh(
+                new THREE.CylinderGeometry(
+                    .95,
+                    1.05,
+                    .65,
+                    12
+                ),
+                bodyMat
+            );
+
+        top.position.y = 1.8;
+
+        turret.add(top);
+
+
+        const cannon =
+            new THREE.Mesh(
+                new THREE.CylinderGeometry(
+                    .15,
+                    .18,
+                    3.4,
+                    10
+                ),
+                darkMat
+            );
+
+        cannon.rotation.z =
+            Math.PI / 2;
+
+        cannon.position.set(
+            1.8,
+            1.8,
+            0
+        );
+
+        turret.add(cannon);
+
+        turret.userData.isTurret = true;
+
+        group.add(turret);
+
+
+        for (
+            let side = -1;
+            side <= 1;
+            side += 2
+        ) {
+
+            for (let i = -1; i <= 1; i++) {
+
+                const wheel =
+                    new THREE.Mesh(
+                        new THREE.CylinderGeometry(
+                            .48,
+                            .48,
+                            .32,
+                            12
+                        ),
+                        darkMat
+                    );
+
+                wheel.rotation.z =
+                    Math.PI / 2;
+
+                wheel.position.set(
+                    i * 1.1,
+                    .45,
+                    side * 1.1
+                );
+
+                group.add(wheel);
+
+            }
+
+        }
+
+        return;
+
+    }
+
+
+    if (type === "artillery") {
+
+        const base =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    2.5,
+                    .7,
+                    1.8
+                ),
+                bodyMat
+            );
+
+        base.position.y = .6;
+
+        group.add(base);
+
+
+        const gun =
+            new THREE.Mesh(
+                new THREE.CylinderGeometry(
+                    .14,
+                    .18,
+                    3.5,
+                    10
+                ),
+                darkMat
+            );
+
+        gun.rotation.z =
+            Math.PI / 2;
+
+        gun.position.set(
+            1.4,
+            1.35,
+            0
+        );
+
+        group.add(gun);
+
+        return;
+
+    }
+
+
+    if (type === "aircraft") {
+
+        const fuselage =
+            new THREE.Mesh(
+                new THREE.CylinderGeometry(
+                    .38,
+                    .5,
+                    4.2,
+                    12
+                ),
+                bodyMat
+            );
+
+        fuselage.rotation.z =
+            Math.PI / 2;
+
+        fuselage.position.y = 7;
+
+        group.add(fuselage);
+
+
+        const wing =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    1,
+                    .12,
+                    6
+                ),
+                bodyMat
+            );
+
+        wing.position.y = 7;
+
+        group.add(wing);
+
+
+        const tail =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    .8,
+                    1.1,
+                    .12
+                ),
+                bodyMat
+            );
+
+        tail.position.set(
+            -1.7,
+            7.5,
+            0
+        );
+
+        group.add(tail);
+
+        return;
+
+    }
+
+}
+
+
+/* ================= POINTER / TOUCH ================= */
+
+function onPointerDown(event) {
+
+    dragStart = {
+        x: event.clientX,
+        y: event.clientY
     };
 
 }
 
 
-function onPointerMove(e) {
+function onPointerUp(event) {
 
-    if (!touchStart)
-        return;
-
+    if (!dragStart) return;
 
     const dx =
-        e.clientX -
-        touchStart.x;
+        event.clientX -
+        dragStart.x;
 
     const dy =
-        e.clientY -
-        touchStart.y;
+        event.clientY -
+        dragStart.y;
 
+    const distance =
+        Math.sqrt(dx * dx + dy * dy);
 
-    if (
-        Math.abs(dx) > 10 ||
-        Math.abs(dy) > 10
-    ) {
+    dragStart = null;
 
-        cameraTarget.x -= dx * .08;
-        cameraTarget.z -= dy * .08;
+    if (distance > 12) return;
 
-        clampCamera();
-
-        touchStart.x =
-            e.clientX;
-
-        touchStart.y =
-            e.clientY;
-
-    }
+    selectFromScreen(
+        event.clientX,
+        event.clientY
+    );
 
 }
 
 
-function onPointerUp(e) {
+function selectFromScreen(x,y) {
 
-    if (!touchStart)
-        return;
+    pointer.x =
+        (x / window.innerWidth) * 2 - 1;
 
-
-    const dx =
-        e.clientX -
-        touchStart.x;
-
-    const dy =
-        e.clientY -
-        touchStart.y;
-
-
-    if (
-        Math.abs(dx) < 12 &&
-        Math.abs(dy) < 12
-    ) {
-
-        handleTap(
-            e.clientX,
-            e.clientY
-        );
-
-    }
-
-
-    touchStart = null;
-
-}
-
-
-/* =========================================================
-   TAP
-========================================================= */
-
-function handleTap(
-    clientX,
-    clientY
-) {
-
-    mouse.x =
-        (clientX / window.innerWidth)
-        * 2 - 1;
-
-    mouse.y =
-        -(clientY / window.innerHeight)
-        * 2 + 1;
+    pointer.y =
+        -(y / window.innerHeight) * 2 + 1;
 
 
     raycaster.setFromCamera(
-        mouse,
+        pointer,
         camera
     );
 
 
-    const meshes =
-        units.filter(
-            unit =>
-                unit.userData.unit.hp > 0
-        );
-
-
-    const hits =
+    const objects =
         raycaster.intersectObjects(
-            meshes,
+            unitsGroup.children,
             true
         );
 
 
-    if (hits.length) {
+    if (objects.length) {
 
-        let object =
-            hits[0].object;
-
+        let root =
+            objects[0].object;
 
         while (
-            object.parent &&
-            !object.userData.unit
+            root &&
+            !root.userData.isUnit
         ) {
-
-            object =
-                object.parent;
-
+            root = root.parent;
         }
 
+        if (root) {
 
-        if (
-            object.userData.unit &&
-            object.userData.unit.player
-        ) {
-
-            selectUnit(object);
+            selectUnit(root);
 
             return;
 
@@ -1272,299 +1441,339 @@ function handleTap(
     }
 
 
-    if (selectedUnit) {
+    /* Terrain command */
+
+    const groundHits =
+        raycaster.intersectObject(
+            terrain
+        );
+
+
+    if (
+        groundHits.length &&
+        state.selectedUnit
+    ) {
 
         const point =
-            getGroundPoint(
-                clientX,
-                clientY
-            );
+            groundHits[0].point;
 
-        if (point) {
-
-            selectedUnit.userData.unit.target =
-                point;
-
-            selectedUnit.userData.unit.moving =
-                true;
-
-        }
+        commandMove(
+            state.selectedUnit,
+            point
+        );
 
     }
 
 }
 
 
-/* =========================================================
-   GROUND POINT
-========================================================= */
+/* ================= UNIT SELECTION ================= */
 
-function getGroundPoint(
-    clientX,
-    clientY
-) {
+function selectUnit(unit) {
 
-    mouse.x =
-        clientX /
-        window.innerWidth * 2 - 1;
-
-    mouse.y =
-        -(clientY /
-            window.innerHeight) * 2 + 1;
-
-
-    raycaster.setFromCamera(
-        mouse,
-        camera
-    );
-
-
-    const plane =
-        new THREE.Plane(
-            new THREE.Vector3(
-                0,
-                1,
-                0
-            ),
-            0
+    if (
+        state.selectedUnit &&
+        state.selectedUnit !== unit
+    ) {
+        deselectUnit(
+            state.selectedUnit
         );
+    }
 
 
-    const point =
-        new THREE.Vector3();
+    state.selectedUnit = unit;
+
+    unit.userData.selected =
+        true;
 
 
-    raycaster.ray.intersectPlane(
-        plane,
-        point
+    createSelectionMarker(
+        unit
     );
 
 
-    return point;
+    updateUnitPanel();
+
+    showToast(
+        `${UNIT_TYPES[unit.userData.type].icon} ${unit.userData.name} selected`
+    );
 
 }
 
 
-/* =========================================================
-   SELECT
-========================================================= */
+function deselectUnit(unit) {
 
-function selectUnit(unit) {
+    if (!unit) return;
 
-    deselectUnit();
+    unit.userData.selected =
+        false;
 
-    selectedUnit = unit;
+    if (selectedMarker) {
 
-    unit.userData.unit.selected =
-        true;
+        scene.remove(
+            selectedMarker
+        );
+
+        selectedMarker = null;
+
+    }
+
+}
 
 
-    const ring =
+function createSelectionMarker(unit) {
+
+    if (selectedMarker) {
+
+        scene.remove(
+            selectedMarker
+        );
+
+    }
+
+
+    selectedMarker =
         new THREE.Mesh(
             new THREE.RingGeometry(
-                1.5,
-                1.8,
-                32
+                2.5,
+                2.8,
+                40
             ),
             new THREE.MeshBasicMaterial({
-                color: 0x5dff8a,
-                side:
-                    THREE.DoubleSide
+                color: 0xd5ad55,
+                transparent: true,
+                opacity: .8,
+                side: THREE.DoubleSide
             })
         );
 
 
-    ring.rotation.x =
+    selectedMarker.rotation.x =
         -Math.PI / 2;
 
-    ring.position.y =
-        .08;
-
-
-    unit.add(ring);
-
-    unit.userData.selectionRing =
-        ring;
-
-
-    updateUnitUI();
-
-}
-
-
-/* =========================================================
-   DESELECT
-========================================================= */
-
-function deselectUnit() {
-
-    if (!selectedUnit)
-        return;
-
-
-    const ring =
-        selectedUnit.userData.selectionRing;
-
-
-    if (ring) {
-
-        selectedUnit.remove(ring);
-
-        ring.geometry.dispose();
-        ring.material.dispose();
-
-    }
-
-
-    selectedUnit.userData.unit.selected =
-        false;
-
-
-    selectedUnit = null;
-
-
-    document
-        .getElementById("unitInfo")
-        .classList.add("hidden");
-
-}
-
-
-/* =========================================================
-   UI
-========================================================= */
-
-function updateUnitUI() {
-
-    if (!selectedUnit)
-        return;
-
-
-    const data =
-        selectedUnit.userData.unit;
-
-    const config =
-        UNIT_TYPES[data.type];
-
-
-    document
-        .getElementById("unitInfo")
-        .classList.remove("hidden");
-
-
-    document
-        .getElementById("selectedIcon")
-        .textContent =
-        config.icon;
-
-
-    document
-        .getElementById("selectedName")
-        .textContent =
-        config.name;
-
-
-    document
-        .getElementById("selectedType")
-        .textContent =
-        config.type;
-
-
-    document
-        .getElementById("attackStat")
-        .textContent =
-        data.attack;
-
-
-    document
-        .getElementById("defenseStat")
-        .textContent =
-        data.defense;
-
-
-    document
-        .getElementById("speedStat")
-        .textContent =
-        data.speed;
-
-
-    updateHPUI();
-
-}
-
-
-function updateHPUI() {
-
-    if (!selectedUnit)
-        return;
-
-
-    const data =
-        selectedUnit.userData.unit;
-
-
-    const percent =
-        Math.max(
-            0,
-            data.hp /
-            data.maxHP * 100
-        );
-
-
-    document
-        .getElementById("selectedHP")
-        .style.width =
-        percent + "%";
-
-
-    document
-        .getElementById("selectedHPText")
-        .textContent =
-        Math.ceil(data.hp)
-        + "/" +
-        data.maxHP;
-
-}
-
-
-/* =========================================================
-   MOVE MODE
-========================================================= */
-
-function enableMoveMode() {
-
-    if (!selectedUnit)
-        return;
-
-    showMessage(
-        "MOVE UNIT",
-        "Tap anywhere on the battlefield to move your selected unit."
+    selectedMarker.position.copy(
+        unit.position
+    );
+
+    selectedMarker.position.y =
+        .15;
+
+    scene.add(
+        selectedMarker
     );
 
 }
 
 
-/* =========================================================
-   ATTACK
-========================================================= */
+/* ================= MOVEMENT ================= */
 
-function attackSelected() {
+function commandMove(
+    unit,
+    target
+) {
 
-    if (!selectedUnit)
+    if (
+        unit.userData.faction !==
+        "friendly"
+    ) {
+
+        showToast(
+            "Enemy units cannot be directly commanded."
+        );
+
         return;
+
+    }
+
+
+    unit.userData.target =
+        target.clone();
+
+    unit.userData.state =
+        "moving";
+
+
+    showToast(
+        `Moving ${unit.userData.name}`
+    );
+
+    updateBattleStatus(
+        "ARMY MOVING"
+    );
+
+}
+
+
+function updateUnitMovement(delta) {
+
+    state.units.forEach(unit => {
+
+        const data =
+            unit.userData;
+
+        if (
+            data.state !== "moving" ||
+            !data.target
+        ) return;
+
+
+        const target =
+            data.target;
+
+
+        const direction =
+            target.clone()
+                .sub(unit.position);
+
+        direction.y = 0;
+
+
+        const distance =
+            direction.length();
+
+
+        if (distance < .6) {
+
+            data.target = null;
+
+            data.state = "idle";
+
+            showToast(
+                `${data.name} reached destination`
+            );
+
+            return;
+
+        }
+
+
+        direction.normalize();
+
+
+        const movement =
+            data.speed *
+            state.speed *
+            delta *
+            60;
+
+
+        unit.position.add(
+            direction.multiplyScalar(
+                movement
+            )
+        );
+
+
+        const targetRotation =
+            Math.atan2(
+                direction.x,
+                direction.z
+            );
+
+
+        unit.rotation.y +=
+            normalizeAngle(
+                targetRotation -
+                unit.rotation.y
+            ) * .12;
+
+
+        animateUnit(
+            unit,
+            delta
+        );
+
+
+        if (
+            data.type === "aircraft"
+        ) {
+
+            unit.position.y =
+                7 +
+                Math.sin(
+                    performance.now() * .002
+                ) * .3;
+
+        }
+
+    });
+
+}
+
+
+function normalizeAngle(angle) {
+
+    while (angle > Math.PI)
+        angle -= Math.PI * 2;
+
+    while (angle < -Math.PI)
+        angle += Math.PI * 2;
+
+    return angle;
+
+}
+
+
+function animateUnit(unit,delta) {
+
+    const data =
+        unit.userData;
+
+    if (
+        data.type === "infantry" ||
+        data.type === "enemy"
+    ) {
+
+        unit.children.forEach(
+            (child,index) => {
+
+                if (
+                    child.userData.walkOffset ===
+                    undefined
+                ) return;
+
+                child.position.y =
+                    Math.sin(
+                        performance.now() * .012 +
+                        child.userData.walkOffset
+                    ) * .08;
+
+            }
+        );
+
+    }
+
+}
+
+
+/* ================= COMBAT ================= */
+
+function commandAttack() {
+
+    const attacker =
+        state.selectedUnit;
+
+    if (!attacker) {
+
+        showToast(
+            "Select a friendly unit first."
+        );
+
+        return;
+
+    }
 
 
     const enemy =
         findNearestEnemy(
-            selectedUnit
+            attacker
         );
 
 
     if (!enemy) {
 
-        showMessage(
-            "NO TARGET",
-            "No enemy is within attack range."
+        showToast(
+            "No enemy detected nearby."
         );
 
         return;
@@ -1572,41 +1781,44 @@ function attackSelected() {
     }
 
 
-    fireWeapon(
-        selectedUnit,
-        enemy
+    attacker.userData.target =
+        enemy.position.clone();
+
+    attacker.userData.combatTarget =
+        enemy;
+
+    attacker.userData.state =
+        "combat";
+
+
+    showToast(
+        `${attacker.userData.name} engaging enemy`
+    );
+
+    updateBattleStatus(
+        "COMBAT ACTIVE"
     );
 
 }
 
 
-/* =========================================================
-   FIND ENEMY
-========================================================= */
+function findNearestEnemy(unit) {
 
-function findNearestEnemy(
-    unit
-) {
-
-    const data =
-        unit.userData.unit;
-
-
-    let closest = null;
+    let nearest = null;
     let distance = Infinity;
 
 
-    units.forEach(other => {
+    state.units.forEach(other => {
 
-        const otherData =
-            other.userData.unit;
+        if (
+            other.userData.faction ===
+            unit.userData.faction
+        ) return;
 
 
         if (
-            otherData.hp <= 0 ||
-            otherData.player === data.player
-        )
-            return;
+            other.userData.hp <= 0
+        ) return;
 
 
         const d =
@@ -1615,45 +1827,168 @@ function findNearestEnemy(
             );
 
 
-        if (
-            d < distance &&
-            d <= data.range
-        ) {
+        if (d < distance) {
 
             distance = d;
-            closest = other;
+            nearest = other;
 
         }
 
     });
 
 
-    return closest;
+    return nearest;
 
 }
 
 
-/* =========================================================
-   FIRE WEAPON
-========================================================= */
+function updateCombat(delta) {
 
-function fireWeapon(
-    attacker,
-    target
-) {
+    state.units.forEach(unit => {
 
-    const data =
-        attacker.userData.unit;
+        const data =
+            unit.userData;
 
 
-    if (data.cooldown > 0)
-        return;
+        if (
+            data.state !== "combat"
+        ) return;
+
+
+        const target =
+            data.combatTarget;
+
+
+        if (
+            !target ||
+            target.userData.hp <= 0
+        ) {
+
+            data.state = "idle";
+            data.combatTarget = null;
+
+            return;
+
+        }
+
+
+        const distance =
+            unit.position.distanceTo(
+                target.position
+            );
+
+
+        /* Move into combat range */
+
+        if (
+            distance >
+            getAttackRange(data.type)
+        ) {
+
+            const direction =
+                target.position.clone()
+                    .sub(unit.position);
+
+            direction.y = 0;
+
+            direction.normalize();
+
+
+            unit.position.add(
+                direction.multiplyScalar(
+                    data.speed *
+                    state.speed *
+                    delta *
+                    60
+                )
+            );
+
+
+            unit.rotation.y =
+                Math.atan2(
+                    direction.x,
+                    direction.z
+                );
+
+
+            return;
+
+        }
+
+
+        data.fireCooldown -=
+            delta *
+            state.speed;
+
+
+        if (
+            data.fireCooldown <= 0
+        ) {
+
+            fireAt(
+                unit,
+                target
+            );
+
+            data.fireCooldown =
+                getFireRate(
+                    data.type
+                );
+
+        }
+
+    });
+
+}
+
+
+function getAttackRange(type) {
+
+    if (type === "artillery")
+        return 22;
+
+    if (type === "aircraft")
+        return 45;
+
+    if (type === "tank")
+        return 15;
+
+    return 10;
+
+}
+
+
+function getFireRate(type) {
+
+    if (type === "artillery")
+        return 2.8;
+
+    if (type === "aircraft")
+        return 2;
+
+    if (type === "tank")
+        return 1.6;
+
+    return 1.1;
+
+}
+
+
+/* ================= FIRING ================= */
+
+function fireAt(attacker,target) {
+
+    const type =
+        attacker.userData.type;
 
 
     const start =
         attacker.position.clone();
 
-    start.y += 2;
+    start.y +=
+        type === "aircraft"
+            ? 7
+            : 2;
 
 
     const end =
@@ -1665,335 +2000,217 @@ function fireWeapon(
     createProjectile(
         start,
         end,
-        attacker,
-        target
-    );
-
-
-    data.cooldown =
-        attacker.userData.unit.type ===
-            "artillery"
-            ? 3
-            : 1.2;
-
-}
-
-
-/* =========================================================
-   PROJECTILE
-========================================================= */
-
-function createProjectile(
-    start,
-    end,
-    attacker,
-    target
-) {
-
-    const geo =
-        new THREE.SphereGeometry(
-            .15,
-            8,
-            8
-        );
-
-    const mat =
-        new THREE.MeshBasicMaterial({
-            color: 0xffcc66
-        });
-
-
-    const bullet =
-        new THREE.Mesh(
-            geo,
-            mat
-        );
-
-
-    bullet.position.copy(
-        start
-    );
-
-
-    bullet.userData = {
-
-        start:
-            start.clone(),
-
-        end:
-            end.clone(),
-
-        progress: 0,
-
-        attacker,
-
-        target
-
-    };
-
-
-    scene.add(bullet);
-
-    projectiles.push(
-        bullet
+        type
     );
 
 
     createMuzzleFlash(
-        start
+        attacker
     );
+
+
+    const damage =
+        attacker.userData.attack *
+        (.75 + Math.random() * .5);
+
+
+    setTimeout(() => {
+
+        if (
+            !target ||
+            target.userData.hp <= 0
+        ) return;
+
+
+        target.userData.hp -=
+            damage;
+
+
+        createHitEffect(
+            target.position
+        );
+
+
+        if (
+            target.userData.hp <= 0
+        ) {
+
+            destroyUnit(
+                target
+            );
+
+        }
+
+        updateUnitPanel();
+
+    }, 400);
 
 }
 
 
-/* =========================================================
-   MUZZLE FLASH
-========================================================= */
-
-function createMuzzleFlash(
-    position
+function createProjectile(
+    start,
+    end,
+    type
 ) {
 
-    const flash =
+    const color =
+        type === "aircraft"
+            ? 0xffd56a
+            : 0xff8b42;
+
+
+    const mesh =
         new THREE.Mesh(
             new THREE.SphereGeometry(
-                .6,
+                type === "artillery"
+                    ? .22
+                    : .12,
                 8,
                 8
             ),
             new THREE.MeshBasicMaterial({
-                color: 0xffaa44,
-                transparent: true
+                color
             })
         );
 
 
-    flash.position.copy(
-        position
-    );
+    mesh.position.copy(start);
+
+    projectileGroup.add(mesh);
 
 
-    scene.add(flash);
+    const velocity =
+        end.clone()
+            .sub(start)
+            .normalize();
 
 
-    effects.push({
-        mesh: flash,
-        life: .12
-    });
-
-}
+    const distance =
+        start.distanceTo(end);
 
 
-/* =========================================================
-   UPDATE PROJECTILES
-========================================================= */
-
-function updateProjectiles(
-    delta
-) {
-
-    for (
-        let i = projectiles.length - 1;
-        i >= 0;
-        i--
-    ) {
-
-        const bullet =
-            projectiles[i];
+    const duration =
+        type === "artillery"
+            ? 650
+            : 350;
 
 
-        bullet.userData.progress +=
-            delta * 4 * gameSpeed;
+    const startTime =
+        performance.now();
 
 
-        const p =
+    function fly() {
+
+        const t =
             Math.min(
-                1,
-                bullet.userData.progress
+                (performance.now() -
+                    startTime) /
+                duration,
+                1
             );
 
 
-        bullet.position.lerpVectors(
-            bullet.userData.start,
-            bullet.userData.end,
-            p
+        mesh.position.lerpVectors(
+            start,
+            end,
+            t
         );
 
 
-        if (p >= 1) {
+        if (
+            type === "artillery"
+        ) {
 
-            const target =
-                bullet.userData.target;
-
-
-            if (
-                target &&
-                target.userData.unit.hp > 0
-            ) {
-
-                damageUnit(
-                    target,
-                    bullet.userData.attacker
+            mesh.position.y +=
+                Math.sin(t * Math.PI) *
+                Math.min(
+                    distance * .25,
+                    8
                 );
 
-            }
+        }
 
 
-            createExplosion(
-                bullet.position.clone(),
-                .8
+        if (t < 1) {
+
+            requestAnimationFrame(
+                fly
             );
 
+        } else {
 
-            scene.remove(
-                bullet
-            );
-
-
-            bullet.geometry.dispose();
-            bullet.material.dispose();
-
-
-            projectiles.splice(
-                i,
-                1
+            projectileGroup.remove(
+                mesh
             );
 
         }
 
     }
 
+
+    fly();
+
 }
 
 
-/* =========================================================
-   DAMAGE
-========================================================= */
+/* ================= MUZZLE ================= */
 
-function damageUnit(
-    target,
-    attacker
-) {
+function createMuzzleFlash(unit) {
 
-    const targetData =
-        target.userData.unit;
-
-    const attackerData =
-        attacker.userData.unit;
-
-
-    let damage =
-        attackerData.attack *
-        (100 /
-            (100 +
-                targetData.defense));
-
-
-    damage *=
-        .8 +
-        Math.random() * .4;
-
-
-    targetData.hp -= damage;
-
-
-    if (
-        target === selectedUnit
-    ) {
-
-        updateHPUI();
-
-        flashDamage();
-
-    }
-
-
-    if (
-        targetData.hp <= 0
-    ) {
-
-        destroyUnit(
-            target
+    const flash =
+        new THREE.Mesh(
+            new THREE.SphereGeometry(
+                .45,
+                8,
+                8
+            ),
+            new THREE.MeshBasicMaterial({
+                color: 0xffc15a
+            })
         );
 
-    }
+
+    flash.position.copy(
+        unit.position
+    );
+
+    flash.position.y += 2;
 
 
-    updateScore();
-
-}
-
-
-/* =========================================================
-   DESTROY UNIT
-========================================================= */
-
-function destroyUnit(
-    unit
-) {
-
-    createExplosion(
-        unit.position.clone(),
-        2
+    effectsGroup.add(
+        flash
     );
 
 
-    unit.visible = false;
+    setTimeout(() => {
 
-    unit.userData.unit.hp = 0;
-
-
-    if (
-        selectedUnit === unit
-    ) {
-
-        deselectUnit();
-
-    }
-
-
-    const index =
-        units.indexOf(unit);
-
-
-    if (index !== -1) {
-
-        units.splice(
-            index,
-            1
+        effectsGroup.remove(
+            flash
         );
 
-    }
-
-
-    checkVictory();
+    }, 100);
 
 }
 
 
-/* =========================================================
-   EXPLOSION
-========================================================= */
+/* ================= EXPLOSION ================= */
 
-function createExplosion(
-    position,
-    size = 1
-) {
+function createHitEffect(position) {
 
     const group =
         new THREE.Group();
 
 
-    const fire =
+    const core =
         new THREE.Mesh(
             new THREE.SphereGeometry(
-                size,
-                12,
-                8
+                .6,
+                10,
+                10
             ),
             new THREE.MeshBasicMaterial({
-                color: 0xff7b22,
-                transparent: true
+                color: 0xff9e39
             })
         );
 
@@ -2001,23 +2218,20 @@ function createExplosion(
     const smoke =
         new THREE.Mesh(
             new THREE.SphereGeometry(
-                size * .8,
-                10,
+                .75,
+                8,
                 8
             ),
             new THREE.MeshBasicMaterial({
-                color: 0x333333,
-                transparent: true
+                color: 0x3a3731,
+                transparent: true,
+                opacity: .7
             })
         );
 
 
-    smoke.position.y =
-        size * .5;
-
-
     group.add(
-        fire,
+        core,
         smoke
     );
 
@@ -2026,115 +2240,150 @@ function createExplosion(
         position
     );
 
+    group.position.y += .7;
 
-    scene.add(
+
+    effectsGroup.add(
         group
     );
 
 
-    explosions.push({
-        group,
-        fire,
-        smoke,
-        life: .65,
-        maxLife: .65
-    });
-
-}
+    const start =
+        performance.now();
 
 
-/* =========================================================
-   UPDATE EXPLOSIONS
-========================================================= */
+    function animateExplosion() {
 
-function updateExplosions(
-    delta
-) {
-
-    for (
-        let i = explosions.length - 1;
-        i >= 0;
-        i--
-    ) {
-
-        const e =
-            explosions[i];
+        const t =
+            (performance.now() -
+                start) /
+            650;
 
 
-        e.life -=
-            delta *
-            gameSpeed;
+        if (t >= 1) {
 
-
-        const p =
-            1 -
-            e.life /
-            e.maxLife;
-
-
-        e.fire.scale.setScalar(
-            1 + p * 2
-        );
-
-
-        e.smoke.scale.setScalar(
-            1 + p * 3
-        );
-
-
-        e.fire.material.opacity =
-            1 - p;
-
-
-        e.smoke.material.opacity =
-            .7 - p * .7;
-
-
-        e.group.position.y +=
-            delta * 4;
-
-
-        if (
-            e.life <= 0
-        ) {
-
-            scene.remove(
-                e.group
+            effectsGroup.remove(
+                group
             );
 
-            explosions.splice(
-                i,
-                1
-            );
+            return;
 
         }
 
+
+        const scale =
+            1 + t * 4;
+
+
+        core.scale.setScalar(
+            scale
+        );
+
+        smoke.scale.setScalar(
+            1 + t * 2
+        );
+
+        core.material.opacity =
+            1 - t;
+
+        smoke.material.opacity =
+            .7 * (1 - t);
+
+
+        requestAnimationFrame(
+            animateExplosion
+        );
+
+    }
+
+
+    animateExplosion();
+
+}
+
+
+function destroyUnit(unit) {
+
+    createLargeExplosion(
+        unit.position
+    );
+
+
+    showToast(
+        `${unit.userData.name} destroyed`
+    );
+
+
+    if (
+        state.selectedUnit === unit
+    ) {
+
+        state.selectedUnit = null;
+
+        $("unitPanel")
+            .classList.remove("open");
+
+    }
+
+
+    unitsGroup.remove(
+        unit
+    );
+
+
+    const index =
+        state.units.indexOf(
+            unit
+        );
+
+
+    if (index !== -1) {
+
+        state.units.splice(
+            index,
+            1
+        );
+
     }
 
 }
 
 
-/* =========================================================
-   BOMBING
-========================================================= */
+function createLargeExplosion(position) {
 
-function artilleryStrike() {
+    for (let i = 0; i < 5; i++) {
 
-    if (!selectedUnit)
-        return;
+        setTimeout(() => {
+
+            const offset =
+                new THREE.Vector3(
+                    (Math.random()-.5)*3,
+                    0,
+                    (Math.random()-.5)*3
+                );
+
+            createHitEffect(
+                position.clone()
+                    .add(offset)
+            );
+
+        }, i * 120);
+
+    }
+
+}
 
 
-    const data =
-        selectedUnit.userData.unit;
+/* ================= AIRSTRIKE ================= */
 
+function launchAirstrike() {
 
     if (
-        data.type !== "artillery"
+        state.oil < 50
     ) {
 
-        showMessage(
-            "ARTILLERY REQUIRED",
-            "Select an artillery unit first."
+        showToast(
+            "Not enough oil for airstrike."
         );
 
         return;
@@ -2142,17 +2391,23 @@ function artilleryStrike() {
     }
 
 
+    state.oil -= 50;
+
+    updateUI();
+
+
     const target =
-        findNearestEnemy(
-            selectedUnit
-        );
+        state.selectedUnit
+            ? findNearestEnemy(
+                state.selectedUnit
+            )
+            : null;
 
 
     if (!target) {
 
-        showMessage(
-            "NO TARGET",
-            "No enemy is close enough."
+        showToast(
+            "No enemy target available."
         );
 
         return;
@@ -2160,456 +2415,1765 @@ function artilleryStrike() {
     }
 
 
-    const center =
+    showToast(
+        "✈️ Airstrike inbound!"
+    );
+
+
+    const plane =
+        createUnit(
+            "aircraft",
+            "Airstrike",
+            -80,
+            target.position.z - 25,
+            "friendly"
+        );
+
+
+    plane.position.y =
+        12;
+
+
+    plane.userData.target =
         target.position.clone();
 
 
-    /* multiple shells */
-
-    for (
-        let i = 0;
-        i < 5;
-        i++
-    ) {
-
-        setTimeout(
-            () => {
-
-                const offset =
-                    new THREE.Vector3(
-                        (Math.random() - .5) * 8,
-                        0,
-                        (Math.random() - .5) * 8
-                    );
-
-
-                const impact =
-                    center.clone()
-                    .add(offset);
-
-
-                createBomb(
-                    selectedUnit.position.clone()
-                    .add(
-                        new THREE.Vector3(
-                            0,
-                            3,
-                            0
-                        )
-                    ),
-                    impact,
-                    target
-                );
-
-            },
-            i * 180
-        );
-
-    }
+    plane.userData.state =
+        "airstrike";
 
 }
 
 
-/* =========================================================
-   BOMB
-========================================================= */
+function updateAirstrikes(delta) {
 
-function createBomb(
-    start,
-    end,
-    target
-) {
+    state.units.forEach(unit => {
 
-    const bomb =
-        new THREE.Mesh(
-            new THREE.SphereGeometry(
-                .2,
-                8,
-                8
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x151515
-            })
+        if (
+            unit.userData.state !==
+            "airstrike"
+        ) return;
+
+
+        const target =
+            unit.userData.target;
+
+
+        const direction =
+            target.clone()
+                .sub(unit.position);
+
+        direction.y = 0;
+
+
+        if (
+            direction.length() < 4
+        ) {
+
+            createAirBomb(
+                target
+            );
+
+
+            unit.userData.state =
+                "retreat";
+
+            unit.userData.target =
+                new THREE.Vector3(
+                    -100,
+                    12,
+                    target.z
+                );
+
+            return;
+
+        }
+
+
+        direction.normalize();
+
+
+        unit.position.add(
+            direction.multiplyScalar(
+                .45 *
+                delta *
+                60
+            )
         );
 
 
-    bomb.position.copy(
-        start
-    );
+        unit.position.y =
+            12 +
+            Math.sin(
+                performance.now()*.004
+            ) * .4;
 
 
-    bomb.userData = {
-        start,
-        end,
-        target,
-        progress: 0
-    };
+        unit.rotation.y =
+            Math.atan2(
+                direction.x,
+                direction.z
+            );
 
-
-    scene.add(
-        bomb
-    );
-
-
-    effects.push({
-        bomb,
-        bombEffect: true
     });
 
 }
 
 
-/* =========================================================
-   UPDATE BOMB
-========================================================= */
+function createAirBomb(target) {
 
-function updateBombs(
-    delta
-) {
+    showToast(
+        "💥 AIRSTRIKE IMPACT!"
+    );
 
-    effects.forEach(
-        effect => {
+
+    createLargeExplosion(
+        target.clone()
+    );
+
+
+    state.units.forEach(unit => {
+
+        if (
+            unit.userData.faction !==
+            "enemy"
+        ) return;
+
+
+        if (
+            unit.position.distanceTo(
+                target
+            ) < 18
+        ) {
+
+            unit.userData.hp -=
+                65;
 
             if (
-                !effect.bombEffect
+                unit.userData.hp <= 0
+            ) {
+
+                destroyUnit(
+                    unit
+                );
+
+            }
+
+        }
+
+    });
+
+}
+
+
+/* ================= UI ================= */
+
+function updateUI() {
+
+    $("money").textContent =
+        Math.floor(state.money)
+            .toLocaleString();
+
+    $("oil").textContent =
+        Math.floor(state.oil)
+            .toLocaleString();
+
+    $("steel").textContent =
+        Math.floor(state.steel)
+            .toLocaleString();
+
+    $("food").textContent =
+        Math.floor(state.food)
+            .toLocaleString();
+
+    $("manpower").textContent =
+        Math.floor(state.manpower)
+            .toLocaleString();
+
+
+    $("countryName").textContent =
+        state.country.name;
+
+    $("countryFlag").textContent =
+        state.country.flag;
+
+
+    const month =
+        state.date
+            .toLocaleString(
+                "en-US",
+                {
+                    month: "short"
+                }
             )
-                return;
+            .toUpperCase();
 
 
-            const bomb =
-                effect.bomb;
+    $("gameDate").textContent =
+        `${state.date.getFullYear()} • ${month} ${String(
+            state.date.getDate()
+        ).padStart(2,"0")}`;
+
+}
 
 
-            const d =
-                bomb.userData;
+function updateUnitPanel() {
+
+    const unit =
+        state.selectedUnit;
 
 
-            d.progress +=
-                delta *
-                1.4 *
-                gameSpeed;
+    if (!unit) {
+
+        $("unitPanel")
+            .classList.remove("open");
+
+        return;
+
+    }
 
 
-            const p =
-                Math.min(
-                    1,
-                    d.progress
+    $("unitPanel")
+        .classList.add("open");
+
+
+    const data =
+        unit.userData;
+
+
+    const type =
+        UNIT_TYPES[
+            data.type
+        ];
+
+
+    $("selectedUnitType")
+        .textContent =
+        `${type.icon} ${data.type.toUpperCase()}`;
+
+
+    $("selectedUnitName")
+        .textContent =
+        data.name;
+
+
+    const hp =
+        Math.max(
+            0,
+            Math.round(
+                data.hp
+            )
+        );
+
+
+    $("unitStats").innerHTML = `
+
+        <div class="unit-stat">
+            <span>HEALTH</span>
+            <div class="progress">
+                <i style="width:${(hp/data.maxHp)*100}%"></i>
+            </div>
+            <b>${hp}</b>
+        </div>
+
+        <div class="unit-stat">
+            <span>ATTACK</span>
+            <div class="progress">
+                <i style="width:${Math.min(data.attack,100)}%"></i>
+            </div>
+            <b>${Math.round(data.attack)}</b>
+        </div>
+
+        <div class="unit-stat">
+            <span>DEFENSE</span>
+            <div class="progress">
+                <i style="width:${Math.min(data.defense,100)}%"></i>
+            </div>
+            <b>${Math.round(data.defense)}</b>
+        </div>
+
+        <div class="stat-row">
+            <span>STATUS</span>
+            <b>${data.state.toUpperCase()}</b>
+        </div>
+
+        <div class="stat-row">
+            <span>FACTION</span>
+            <b>${data.faction.toUpperCase()}</b>
+        </div>
+
+    `;
+
+}
+
+
+/* ================= PANELS ================= */
+
+function openPanel(name) {
+
+    $("mainPanel")
+        .classList.add("open");
+
+
+    const content =
+        $("panelContent");
+
+
+    const title =
+        $("panelTitle");
+
+    const kicker =
+        $("panelKicker");
+
+
+    if (name === "overview") {
+
+        kicker.textContent =
+            "STRATEGIC COMMAND";
+
+        title.textContent =
+            "World Overview";
+
+
+        content.innerHTML = `
+
+            <div class="info-card">
+
+                <h3>🌍 Global Situation</h3>
+
+                <p>
+                    Your nation is preparing for a major
+                    continental conflict. Build your economy,
+                    research new technology and secure your
+                    borders.
+                </p>
+
+            </div>
+
+            <div class="info-card">
+
+                <h3>⚔️ Military Strength</h3>
+
+                <div class="stat-row">
+                    <span>Friendly Units</span>
+                    <b>${countFaction("friendly")}</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Enemy Units</span>
+                    <b>${countFaction("enemy")}</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Active Battles</span>
+                    <b>${state.battles.length}</b>
+                </div>
+
+            </div>
+
+            <div class="info-card">
+
+                <h3>🌦️ Battlefield</h3>
+
+                <div class="stat-row">
+                    <span>Weather</span>
+                    <b>Clear</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Visibility</span>
+                    <b>High</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Time</span>
+                    <b>Day</b>
+                </div>
+
+            </div>
+
+        `;
+
+    }
+
+
+    if (name === "army") {
+
+        kicker.textContent =
+            "MILITARY COMMAND";
+
+        title.textContent =
+            "Army";
+
+
+        content.innerHTML = `
+
+            <div class="info-card">
+
+                <h3>🪖 Army Overview</h3>
+
+                ${state.units
+                    .filter(u =>
+                        u.userData.faction ===
+                        "friendly"
+                    )
+                    .map(u => `
+
+                        <div class="stat-row">
+                            <span>
+                                ${UNIT_TYPES[
+                                    u.userData.type
+                                ].icon}
+                                ${u.userData.name}
+                            </span>
+
+                            <b>
+                                ${Math.round(
+                                    u.userData.hp
+                                )} HP
+                            </b>
+                        </div>
+
+                    `)
+                    .join("")}
+
+            </div>
+
+            <button class="action-btn"
+                    id="recruitBtn">
+                + RECRUIT INFANTRY
+            </button>
+
+            <button class="action-btn"
+                    id="tankBtn">
+                + PRODUCE TANK
+            </button>
+
+        `;
+
+
+        setTimeout(() => {
+
+            $("recruitBtn")
+                ?.addEventListener(
+                    "click",
+                    recruitInfantry
                 );
 
-
-            bomb.position.lerpVectors(
-                d.start,
-                d.end,
-                p
-            );
-
-
-            bomb.position.y +=
-                Math.sin(
-                    p * Math.PI
-                ) * 18;
-
-
-            if (p >= 1) {
-
-                createExplosion(
-                    d.end,
-                    4
+            $("tankBtn")
+                ?.addEventListener(
+                    "click",
+                    produceTank
                 );
 
+        });
 
-                /* area damage */
+    }
 
-                units.forEach(
-                    unit => {
+
+    if (name === "economy") {
+
+        kicker.textContent =
+            "NATIONAL ECONOMY";
+
+        title.textContent =
+            "Economy";
+
+
+        content.innerHTML = `
+
+            <div class="info-card">
+
+                <h3>💰 Treasury</h3>
+
+                <div class="stat-row">
+                    <span>Money</span>
+                    <b>₿ ${Math.floor(state.money).toLocaleString()}</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Oil</span>
+                    <b>${Math.floor(state.oil)}</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Steel</span>
+                    <b>${Math.floor(state.steel)}</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Food</span>
+                    <b>${Math.floor(state.food)}</b>
+                </div>
+
+            </div>
+
+            <div class="info-card">
+
+                <h3>📈 Daily Production</h3>
+
+                <div class="stat-row">
+                    <span>Money</span>
+                    <b>+150</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Oil</span>
+                    <b>+12</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Steel</span>
+                    <b>+25</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Food</span>
+                    <b>+35</b>
+                </div>
+
+            </div>
+
+        `;
+
+    }
+
+
+    if (name === "production") {
+
+        kicker.textContent =
+            "WAR INDUSTRY";
+
+        title.textContent =
+            "Production";
+
+
+        content.innerHTML = `
+
+            <div class="info-card">
+
+                <h3>🏭 Production Queue</h3>
+
+                <div class="stat-row">
+                    <span>Infantry</span>
+                    <b>READY</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Armored Vehicles</span>
+                    <b>35%</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Aircraft</span>
+                    <b>18%</b>
+                </div>
+
+            </div>
+
+            <button class="action-btn"
+                    id="factoryBtn">
+                BUILD MILITARY FACTORY — $2500
+            </button>
+
+        `;
+
+        setTimeout(() => {
+
+            $("factoryBtn")
+                ?.addEventListener(
+                    "click",
+                    () => {
 
                         if (
-                            unit.userData.unit
-                                .player
-                        )
-                            return;
-
-
-                        const distance =
-                            unit.position
-                                .distanceTo(
-                                    d.end
-                                );
-
-
-                        if (
-                            distance < 10
+                            state.money < 2500
                         ) {
 
-                            unit.userData.unit.hp
-                                -= 80;
+                            showToast(
+                                "Not enough money."
+                            );
 
-                            if (
-                                unit.userData.unit.hp
-                                <= 0
-                            ) {
-
-                                destroyUnit(
-                                    unit
-                                );
-
-                            }
+                            return;
 
                         }
+
+                        state.money -= 2500;
+
+                        showToast(
+                            "Military factory construction started."
+                        );
+
+                        updateUI();
 
                     }
                 );
 
+        });
 
-                scene.remove(
-                    bomb
-                );
+    }
 
-                const index =
-                    effects.indexOf(
-                        effect
+
+    if (name === "research") {
+
+        kicker.textContent =
+            "TECHNOLOGY";
+
+        title.textContent =
+            "Research";
+
+
+        content.innerHTML = `
+
+            ${researchCard(
+                "infantry",
+                "🪖",
+                "Infantry Weapons"
+            )}
+
+            ${researchCard(
+                "armor",
+                "🛡️",
+                "Advanced Armor"
+            )}
+
+            ${researchCard(
+                "aviation",
+                "✈️",
+                "Air Technology"
+            )}
+
+            ${researchCard(
+                "naval",
+                "🚢",
+                "Naval Engineering"
+            )}
+
+            ${researchCard(
+                "logistics",
+                "🚚",
+                "Logistics"
+            )}
+
+        `;
+
+
+        setTimeout(() => {
+
+            document
+                .querySelectorAll(
+                    "[data-research]"
+                )
+                .forEach(button => {
+
+                    button.addEventListener(
+                        "click",
+                        () => {
+
+                            const key =
+                                button.dataset
+                                    .research;
+
+                            researchTechnology(
+                                key
+                            );
+
+                        }
                     );
 
-                if (index !== -1) {
+                });
 
-                    effects.splice(
-                        index,
-                        1
+        });
+
+    }
+
+
+    if (name === "diplomacy") {
+
+        kicker.textContent =
+            "FOREIGN AFFAIRS";
+
+        title.textContent =
+            "Diplomacy";
+
+
+        content.innerHTML = `
+
+            ${Object.entries(
+                state.diplomacy
+            )
+                .map(([country, relation]) => `
+
+                    <div class="info-card">
+
+                        <div class="stat-row">
+                            <span>${country}</span>
+                            <b>${relation}</b>
+                        </div>
+
+                        <button class="action-btn"
+                            data-diplomacy="${country}">
+                            OPEN DIPLOMACY
+                        </button>
+
+                    </div>
+
+                `)
+                .join("")}
+
+        `;
+
+
+        setTimeout(() => {
+
+            document
+                .querySelectorAll(
+                    "[data-diplomacy]"
+                )
+                .forEach(button => {
+
+                    button.addEventListener(
+                        "click",
+                        () => {
+
+                            const country =
+                                button.dataset
+                                    .diplomacy;
+
+                            showToast(
+                                `Diplomatic channel opened with ${country}`
+                            );
+
+                        }
+                    );
+
+                });
+
+        });
+
+    }
+
+
+    if (name === "intel") {
+
+        kicker.textContent =
+            "INTELLIGENCE AGENCY";
+
+        title.textContent =
+            "Intelligence";
+
+
+        content.innerHTML = `
+
+            <div class="info-card">
+
+                <h3>🕵️ Reconnaissance</h3>
+
+                <p>
+                    Enemy formations detected near
+                    the eastern frontier.
+                </p>
+
+                <div class="stat-row">
+                    <span>Enemy Units Detected</span>
+                    <b>${countFaction("enemy")}</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Intel Confidence</span>
+                    <b>74%</b>
+                </div>
+
+            </div>
+
+            <button class="action-btn"
+                    id="reconBtn">
+                RUN RECON MISSION — $500
+            </button>
+
+        `;
+
+
+        setTimeout(() => {
+
+            $("reconBtn")
+                ?.addEventListener(
+                    "click",
+                    runRecon
+                );
+
+        });
+
+    }
+
+
+    if (name === "settings") {
+
+        kicker.textContent =
+            "SYSTEM";
+
+        title.textContent =
+            "Settings";
+
+
+        content.innerHTML = `
+
+            <div class="info-card">
+
+                <h3>🎮 Graphics</h3>
+
+                <div class="stat-row">
+                    <span>Quality</span>
+                    <b>${state.settings.graphics}</b>
+                </div>
+
+                <button class="action-btn"
+                        id="graphicsBtn">
+                    CHANGE GRAPHICS
+                </button>
+
+            </div>
+
+            <div class="info-card">
+
+                <h3>📱 Controls</h3>
+
+                <div class="stat-row">
+                    <span>Camera Sensitivity</span>
+                    <b>${state.settings.cameraSensitivity}</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Vibration</span>
+                    <b>${state.settings.vibration ? "ON" : "OFF"}</b>
+                </div>
+
+                <div class="stat-row">
+                    <span>Cinematic Camera</span>
+                    <b>${state.settings.cinematic ? "ON" : "OFF"}</b>
+                </div>
+
+                <button class="action-btn"
+                        id="vibrationBtn">
+                    TOGGLE VIBRATION
+                </button>
+
+                <button class="action-btn"
+                        id="cinematicBtn">
+                    TOGGLE CINEMATIC CAMERA
+                </button>
+
+            </div>
+
+        `;
+
+
+        setTimeout(() => {
+
+            $("graphicsBtn")
+                ?.addEventListener(
+                    "click",
+                    cycleGraphics
+                );
+
+            $("vibrationBtn")
+                ?.addEventListener(
+                    "click",
+                    () => {
+
+                        state.settings.vibration =
+                            !state.settings.vibration;
+
+                        openPanel(
+                            "settings"
+                        );
+
+                    }
+                );
+
+            $("cinematicBtn")
+                ?.addEventListener(
+                    "click",
+                    () => {
+
+                        state.settings.cinematic =
+                            !state.settings.cinematic;
+
+                        openPanel(
+                            "settings"
+                        );
+
+                    }
+                );
+
+        });
+
+    }
+
+}
+
+
+function researchCard(
+    key,
+    icon,
+    title
+) {
+
+    const level =
+        state.technology[key];
+
+
+    return `
+
+        <div class="info-card">
+
+            <div class="stat-row">
+
+                <span>
+                    ${icon} ${title}
+                </span>
+
+                <b>
+                    LV.${level}
+                </b>
+
+            </div>
+
+            <div class="progress">
+                <i style="
+                    width:${Math.min(
+                        level * 25,
+                        100
+                    )}%
+                "></i>
+            </div>
+
+            <button
+                class="action-btn"
+                data-research="${key}">
+                RESEARCH — $1000
+            </button>
+
+        </div>
+
+    `;
+
+}
+
+
+/* ================= ACTIONS ================= */
+
+function recruitInfantry() {
+
+    if (
+        state.money < 100
+    ) {
+
+        showToast(
+            "Not enough money."
+        );
+
+        return;
+
+    }
+
+
+    if (
+        state.manpower < 1000
+    ) {
+
+        showToast(
+            "Not enough manpower."
+        );
+
+        return;
+
+    }
+
+
+    state.money -= 100;
+
+    state.manpower -= 1000;
+
+
+    const unit =
+        createUnit(
+            "infantry",
+            `Infantry Division ${state.units.length + 1}`,
+            -15,
+            5 + Math.random()*10,
+            "friendly"
+        );
+
+
+    selectUnit(unit);
+
+    updateUI();
+
+    showToast(
+        "New infantry division recruited."
+    );
+
+    openPanel(
+        "army"
+    );
+
+}
+
+
+function produceTank() {
+
+    if (
+        state.money < 250
+    ) {
+
+        showToast(
+            "Not enough money."
+        );
+
+        return;
+
+    }
+
+
+    if (
+        state.steel < 120
+    ) {
+
+        showToast(
+            "Not enough steel."
+        );
+
+        return;
+
+    }
+
+
+    state.money -= 250;
+
+    state.steel -= 120;
+
+
+    const unit =
+        createUnit(
+            "tank",
+            `Armored Division ${state.units.length + 1}`,
+            -12,
+            0 + Math.random()*15,
+            "friendly"
+        );
+
+
+    selectUnit(unit);
+
+    updateUI();
+
+    showToast(
+        "New tank division produced."
+    );
+
+}
+
+
+function researchTechnology(key) {
+
+    if (
+        state.money < 1000
+    ) {
+
+        showToast(
+            "Not enough money."
+        );
+
+        return;
+
+    }
+
+
+    state.money -= 1000;
+
+    state.technology[key]++;
+
+
+    showToast(
+        `${key.toUpperCase()} technology upgraded to level ${state.technology[key]}`
+    );
+
+
+    updateUI();
+
+    openPanel(
+        "research"
+    );
+
+}
+
+
+function runRecon() {
+
+    if (
+        state.money < 500
+    ) {
+
+        showToast(
+            "Not enough money."
+        );
+
+        return;
+
+    }
+
+
+    state.money -= 500;
+
+
+    showToast(
+        "🕵️ Recon mission completed. Enemy positions revealed."
+    );
+
+
+    updateUI();
+
+}
+
+
+function cycleGraphics() {
+
+    const options = [
+        "Low",
+        "Medium",
+        "High",
+        "Ultra"
+    ];
+
+
+    let index =
+        options.indexOf(
+            state.settings.graphics
+        );
+
+
+    index =
+        (index + 1) %
+        options.length;
+
+
+    state.settings.graphics =
+        options[index];
+
+
+    applyGraphics();
+
+    openPanel(
+        "settings"
+    );
+
+}
+
+
+function applyGraphics() {
+
+    const quality =
+        state.settings.graphics;
+
+
+    let pixelRatio = 1;
+
+
+    if (quality === "Medium")
+        pixelRatio = 1.25;
+
+    if (quality === "High")
+        pixelRatio = 1.6;
+
+    if (quality === "Ultra")
+        pixelRatio = 2;
+
+
+    renderer.setPixelRatio(
+        Math.min(
+            pixelRatio,
+            window.devicePixelRatio * 1.2
+        )
+    );
+
+
+    showToast(
+        `Graphics: ${quality}`
+    );
+
+}
+
+
+/* ================= GAME TIME ================= */
+
+let gameTimeAccumulator = 0;
+
+
+function updateGameTime(delta) {
+
+    if (
+        state.paused
+    ) return;
+
+
+    gameTimeAccumulator +=
+        delta *
+        state.speed;
+
+
+    if (
+        gameTimeAccumulator >= 3
+    ) {
+
+        gameTimeAccumulator = 0;
+
+
+        state.date.setDate(
+            state.date.getDate() + 1
+        );
+
+
+        state.money += 150;
+
+        state.oil += 12;
+
+        state.steel += 25;
+
+        state.food += 35;
+
+
+        updateUI();
+
+    }
+
+}
+
+
+/* ================= SPEED ================= */
+
+function togglePause() {
+
+    state.paused =
+        !state.paused;
+
+
+    $("pauseBtn")
+        .textContent =
+        state.paused
+            ? "▶"
+            : "Ⅱ";
+
+
+    showToast(
+        state.paused
+            ? "Game paused"
+            : "Game resumed"
+    );
+
+}
+
+
+function cycleSpeed() {
+
+    const speeds = [
+        1,
+        2,
+        4,
+        8
+    ];
+
+
+    let index =
+        speeds.indexOf(
+            state.speed
+        );
+
+
+    index =
+        (index + 1) %
+        speeds.length;
+
+
+    state.speed =
+        speeds[index];
+
+
+    $("speedBtn")
+        .textContent =
+        `${state.speed}×`;
+
+}
+
+
+/* ================= UNIT COMMANDS ================= */
+
+function setupCommandButtons() {
+
+    $("moveCommand")
+        .addEventListener(
+            "click",
+            () => {
+
+                if (
+                    !state.selectedUnit
+                ) {
+
+                    showToast(
+                        "Select a unit."
+                    );
+
+                    return;
+
+                }
+
+                showToast(
+                    "Tap the battlefield to move the selected unit."
+                );
+
+            }
+        );
+
+
+    $("attackCommand")
+        .addEventListener(
+            "click",
+            commandAttack
+        );
+
+
+    $("defendCommand")
+        .addEventListener(
+            "click",
+            () => {
+
+                if (
+                    !state.selectedUnit
+                ) return;
+
+                state.selectedUnit
+                    .userData.state =
+                    "defending";
+
+                showToast(
+                    `${state.selectedUnit.userData.name} is defending.`
+                );
+
+                updateUnitPanel();
+
+            }
+        );
+
+
+    $("holdCommand")
+        .addEventListener(
+            "click",
+            () => {
+
+                if (
+                    !state.selectedUnit
+                ) return;
+
+                state.selectedUnit
+                    .userData.target =
+                    null;
+
+                state.selectedUnit
+                    .userData.state =
+                    "idle";
+
+                showToast(
+                    "Unit holding position."
+                );
+
+                updateUnitPanel();
+
+            }
+        );
+
+
+    $("retreatCommand")
+        .addEventListener(
+            "click",
+            () => {
+
+                if (
+                    !state.selectedUnit
+                ) return;
+
+
+                commandMove(
+                    state.selectedUnit,
+                    new THREE.Vector3(
+                        -50,
+                        0,
+                        55
+                    )
+                );
+
+                showToast(
+                    "Retreat order issued."
+                );
+
+            }
+        );
+
+
+    $("airstrikeCommand")
+        .addEventListener(
+            "click",
+            launchAirstrike
+        );
+
+}
+
+
+/* ================= CAMERA ================= */
+
+function setupCameraButtons() {
+
+    $("zoomIn")
+        .addEventListener(
+            "click",
+            () => {
+
+                camera.position.y *= .85;
+                camera.position.z *= .85;
+
+            }
+        );
+
+
+    $("zoomOut")
+        .addEventListener(
+            "click",
+            () => {
+
+                camera.position.y *= 1.15;
+                camera.position.z *= 1.15;
+
+            }
+        );
+
+
+    $("resetCamera")
+        .addEventListener(
+            "click",
+            () => {
+
+                camera.position.set(
+                    0,
+                    70,
+                    75
+                );
+
+                controls.target.set(
+                    0,
+                    0,
+                    0
+                );
+
+            }
+        );
+
+}
+
+
+/* ================= COUNTRY ================= */
+
+function selectCountry(id) {
+
+    const countries = {
+
+        USA: {
+            name: "United States",
+            flag: "🇺🇸"
+        },
+
+        GERMANY: {
+            name: "Germany",
+            flag: "🇩🇪"
+        },
+
+        UK: {
+            name: "United Kingdom",
+            flag: "🇬🇧"
+        },
+
+        JAPAN: {
+            name: "Japan",
+            flag: "🇯🇵"
+        },
+
+        USSR: {
+            name: "Soviet Union",
+            flag: "☭"
+        },
+
+        FRANCE: {
+            name: "France",
+            flag: "🇫🇷"
+        }
+
+    };
+
+
+    if (
+        !countries[id]
+    ) return;
+
+
+    state.country = {
+        id,
+        ...countries[id]
+    };
+
+
+    $("countryModal")
+        .classList.remove(
+            "open"
+        );
+
+
+    updateUI();
+
+
+    showToast(
+        `${state.country.flag} ${state.country.name} selected`
+    );
+
+}
+
+
+/* ================= EVENTS ================= */
+
+function setupEvents() {
+
+    document
+        .querySelectorAll(
+            ".panel-button"
+        )
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    document
+                        .querySelectorAll(
+                            ".panel-button"
+                        )
+                        .forEach(b =>
+                            b.classList.remove(
+                                "active"
+                            )
+                        );
+
+                    button.classList.add(
+                        "active"
+                    );
+
+
+                    openPanel(
+                        button.dataset.panel
+                    );
+
+                }
+            );
+
+        });
+
+
+    $("closePanel")
+        .addEventListener(
+            "click",
+            () => {
+
+                $("mainPanel")
+                    .classList.remove(
+                        "open"
+                    );
+
+            }
+        );
+
+
+    $("closeUnit")
+        .addEventListener(
+            "click",
+            () => {
+
+                if (
+                    state.selectedUnit
+                ) {
+
+                    deselectUnit(
+                        state.selectedUnit
                     );
 
                 }
 
-            }
+                state.selectedUnit = null;
 
-        }
-    );
-
-}
-
-
-/* =========================================================
-   MOVEMENT
-========================================================= */
-
-function updateUnits(
-    delta
-) {
-
-    units.forEach(
-        unit => {
-
-            const data =
-                unit.userData.unit;
-
-
-            if (data.hp <= 0)
-                return;
-
-
-            if (data.cooldown > 0) {
-
-                data.cooldown -=
-                    delta *
-                    gameSpeed;
+                $("unitPanel")
+                    .classList.remove(
+                        "open"
+                    );
 
             }
-
-
-            if (
-                data.target &&
-                data.moving
-            ) {
-
-                moveUnit(
-                    unit,
-                    delta
-                );
-
-            }
-
-
-            /* automatic combat */
-
-            const enemy =
-                findNearestEnemy(
-                    unit
-                );
-
-
-            if (
-                enemy &&
-                data.cooldown <= 0
-            ) {
-
-                fireWeapon(
-                    unit,
-                    enemy
-                );
-
-            }
-
-
-            /* enemy AI */
-
-            if (
-                !data.player &&
-                !data.target
-            ) {
-
-                data.target =
-                    playerBase.position.clone();
-
-                data.moving = true;
-
-            }
-
-        }
-    );
-
-}
-
-
-/* =========================================================
-   MOVE UNIT
-========================================================= */
-
-function moveUnit(
-    unit,
-    delta
-) {
-
-    const data =
-        unit.userData.unit;
-
-
-    const target =
-        data.target;
-
-
-    const direction =
-        new THREE.Vector3()
-        .subVectors(
-            target,
-            unit.position
         );
 
 
-    direction.y = 0;
+    $("pauseBtn")
+        .addEventListener(
+            "click",
+            togglePause
+        );
 
 
-    const distance =
-        direction.length();
+    $("speedBtn")
+        .addEventListener(
+            "click",
+            cycleSpeed
+        );
 
 
-    if (
-        distance < 1
-    ) {
+    setupCommandButtons();
 
-        data.moving = false;
-
-        data.target = null;
-
-        return;
-
-    }
+    setupCameraButtons();
 
 
-    direction.normalize();
-
-
-    const movement =
-        data.speed *
-        delta *
-        gameSpeed;
-
-
-    unit.position.add(
-        direction.multiplyScalar(
-            movement
+    document
+        .querySelectorAll(
+            ".country-card"
         )
-    );
+        .forEach(card => {
+
+            card.addEventListener(
+                "click",
+                () => {
+
+                    selectCountry(
+                        card.dataset.country
+                    );
+
+                }
+            );
+
+        });
 
 
-    /* smooth rotation */
+    $("closeCountryModal")
+        .addEventListener(
+            "click",
+            () => {
 
-    const targetRotation =
-        Math.atan2(
-            direction.x,
-            direction.z
+                $("countryModal")
+                    .classList.remove(
+                        "open"
+                    );
+
+            }
         );
 
 
-    unit.rotation.y +=
-        normalizeAngle(
-            targetRotation -
-            unit.rotation.y
-        ) * .12;
-
-
-    /* walking/battle animation */
-
-    const bob =
-        Math.sin(
-            performance.now() *
-            .012
-        ) * .04;
-
-
-    unit.position.y =
-        Math.max(
-            0,
-            bob
+    $("tutorialNext")
+        .addEventListener(
+            "click",
+            nextTutorial
         );
 
 }
 
 
-/* =========================================================
-   ANGLE
-========================================================= */
+/* ================= TUTORIAL ================= */
 
-function normalizeAngle(
-    angle
-) {
+let tutorialStep = 0;
 
-    while (
-        angle > Math.PI
-    )
-        angle -=
-            Math.PI * 2;
 
-    while (
-        angle < -Math.PI
-    )
-        angle +=
-            Math.PI * 2;
+const tutorialSteps = [
 
-    return angle;
+    [
+        "Welcome, Commander",
+        "This is your strategic world. Tap a military unit to select it."
+    ],
+
+    [
+        "Move Your Army",
+        "After selecting a unit, tap anywhere on the terrain to issue a movement order."
+    ],
+
+    [
+        "Attack",
+        "Use ATTACK to engage the nearest enemy. Units will move into range and fire automatically."
+    ],
+
+    [
+        "Build Your Nation",
+        "Use Economy, Production and Research to strengthen your country."
+    ],
+
+    [
+        "Command Complete",
+        "You are ready. Build your army, control the battlefield and expand your nation."
+    ]
+
+];
+
+
+function startTutorial() {
+
+    $("tutorial")
+        .style.display =
+        "grid";
+
+
+    showTutorial();
 
 }
 
 
-/* =========================================================
-   PRODUCE UNIT
-========================================================= */
+function showTutorial() {
 
-function produceUnit(
-    type
-) {
+    const step =
+        tutorialSteps[
+            tutorialStep
+        ];
 
-    const data =
-        UNIT_TYPES[type];
+
+    $("tutorialTitle")
+        .textContent =
+        step[0];
+
+    $("tutorialText")
+        .textContent =
+        step[1];
+
+
+    $("tutorialNext")
+        .textContent =
+        tutorialStep ===
+        tutorialSteps.length - 1
+            ? "START"
+            : "NEXT";
+
+}
+
+
+function nextTutorial() {
+
+    tutorialStep++;
 
 
     if (
-        money < data.cost
+        tutorialStep >=
+        tutorialSteps.length
     ) {
 
-        showMessage(
-            "INSUFFICIENT FUNDS",
-            "You need $" +
-            data.cost +
-            " to deploy this unit."
+        $("tutorial")
+            .style.display =
+            "none";
+
+        showToast(
+            "Welcome to the battlefield, Commander."
         );
 
         return;
@@ -2617,522 +4181,139 @@ function produceUnit(
     }
 
 
-    money -=
-        data.cost;
-
-
-    const unit =
-        spawnUnit(
-            type,
-            playerBase.position.x + 10,
-            playerBase.position.z +
-            (Math.random() - .5) * 15,
-            true
-        );
-
-
-    unit.userData.unit.target =
-        new THREE.Vector3(
-            0,
-            0,
-            (Math.random() - .5) * 20
-        );
-
-
-    unit.userData.unit.moving =
-        true;
-
-
-    updateHUD();
+    showTutorial();
 
 }
 
 
-/* =========================================================
-   SCORE
-========================================================= */
+/* ================= TOAST ================= */
 
-function updateScore() {
-
-    score += 10;
-
-    document
-        .getElementById("score")
-        .textContent =
-        score;
-
-}
+let toastTimer;
 
 
-/* =========================================================
-   INCOME
-========================================================= */
+function showToast(message) {
 
-setInterval(
-    () => {
-
-        if (gamePaused)
-            return;
-
-        money += 100;
-
-        energy =
-            Math.min(
-                100,
-                energy + 5
-            );
-
-        updateHUD();
-
-    },
-    5000
-);
+    const toast =
+        $("toast");
 
 
-/* =========================================================
-   HUD
-========================================================= */
-
-function updateHUD() {
-
-    document
-        .getElementById("money")
-        .textContent =
-        money;
-
-    document
-        .getElementById("energy")
-        .textContent =
-        energy;
-
-    document
-        .getElementById("score")
-        .textContent =
-        score;
-
-}
+    toast.textContent =
+        message;
 
 
-/* =========================================================
-   CAMERA
-========================================================= */
-
-function updateCamera(
-    delta
-) {
-
-    const desired =
-        new THREE.Vector3(
-            cameraTarget.x,
-            75,
-            cameraTarget.z + 70
-        );
-
-
-    camera.position.lerp(
-        desired,
-        .06
+    toast.classList.add(
+        "show"
     );
 
 
-    camera.lookAt(
-        cameraTarget
+    clearTimeout(
+        toastTimer
     );
 
-}
 
+    toastTimer =
+        setTimeout(
+            () => {
 
-/* =========================================================
-   CAMERA MOVE
-========================================================= */
+                toast.classList.remove(
+                    "show"
+                );
 
-function moveCamera(
-    x,
-    z
-) {
-
-    cameraTarget.x += x;
-    cameraTarget.z += z;
-
-    clampCamera();
-
-}
-
-
-/* =========================================================
-   CAMERA LIMIT
-========================================================= */
-
-function clampCamera() {
-
-    cameraTarget.x =
-        THREE.MathUtils.clamp(
-            cameraTarget.x,
-            -70,
-            70
-        );
-
-    cameraTarget.z =
-        THREE.MathUtils.clamp(
-            cameraTarget.z,
-            -60,
-            60
+            },
+            2200
         );
 
 }
 
 
-/* =========================================================
-   PAUSE
-========================================================= */
+/* ================= STATUS ================= */
 
-function togglePause() {
+function updateBattleStatus(text) {
 
-    gamePaused =
-        !gamePaused;
-
-
-    document
-        .getElementById("pauseButton")
-        .textContent =
-        gamePaused
-            ? "▶"
-            : "⏸";
-
-}
-
-
-/* =========================================================
-   SPEED
-========================================================= */
-
-function changeSpeed() {
-
-    if (gameSpeed === 1)
-        gameSpeed = 2;
-
-    else if (gameSpeed === 2)
-        gameSpeed = .5;
-
-    else
-        gameSpeed = 1;
-
-
-    document
-        .getElementById("speedButton")
-        .textContent =
-        gameSpeed + "x";
-
-}
-
-
-/* =========================================================
-   DAMAGE FLASH
-========================================================= */
-
-function flashDamage() {
-
-    const flash =
-        document
-            .getElementById(
-                "damageFlash"
-            );
-
-
-    flash.classList.remove(
-        "flash"
-    );
-
-
-    void flash.offsetWidth;
-
-
-    flash.classList.add(
-        "flash"
-    );
-
-}
-
-
-/* =========================================================
-   MESSAGE
-========================================================= */
-
-function showMessage(
-    title,
-    text
-) {
-
-    document
-        .getElementById(
-            "messageTitle"
-        )
-        .textContent =
-        title;
-
-
-    document
-        .getElementById(
-            "messageText"
-        )
+    $("battleStatus")
         .textContent =
         text;
 
+}
 
-    document
-        .getElementById(
-            "gameMessage"
-        )
-        .classList.add(
-            "show"
-        );
+
+function countFaction(faction) {
+
+    return state.units.filter(
+        u =>
+            u.userData.faction ===
+            faction
+    ).length;
 
 }
 
 
-/* =========================================================
-   VICTORY
-========================================================= */
+/* ================= MINI MAP ================= */
 
-function checkVictory() {
+function updateMiniMap() {
 
-    const enemyUnits =
-        units.filter(
-            unit =>
-                !unit.userData.unit.player &&
-                unit.userData.unit.hp > 0
+    const container =
+        $("miniUnits");
+
+
+    if (!container)
+        return;
+
+
+    container.innerHTML =
+        "";
+
+
+    state.units.forEach(unit => {
+
+        const dot =
+            document.createElement(
+                "div"
+            );
+
+
+        const x =
+            ((unit.position.x + 90) / 180) * 100;
+
+        const z =
+            ((unit.position.z + 70) / 140) * 100;
+
+
+        dot.style.position =
+            "absolute";
+
+        dot.style.width =
+            "4px";
+
+        dot.style.height =
+            "4px";
+
+        dot.style.borderRadius =
+            "50%";
+
+        dot.style.left =
+            `${Math.max(0,Math.min(98,x))}%`;
+
+        dot.style.top =
+            `${Math.max(0,Math.min(98,z))}%`;
+
+        dot.style.background =
+            unit.userData.faction ===
+            "enemy"
+                ? "#e45d5d"
+                : "#59c9ff";
+
+
+        container.appendChild(
+            dot
         );
 
-
-    if (
-        enemyUnits.length === 0
-    ) {
-
-        setTimeout(
-            () => {
-
-                showMessage(
-                    "VICTORY",
-                    "Enemy forces have been destroyed. Battlefield secured."
-                );
-
-            },
-            500
-        );
-
-    }
-
-
-    const playerUnits =
-        units.filter(
-            unit =>
-                unit.userData.unit.player &&
-                unit.userData.unit.hp > 0
-        );
-
-
-    if (
-        playerUnits.length === 0
-    ) {
-
-        setTimeout(
-            () => {
-
-                showMessage(
-                    "DEFEAT",
-                    "Your army has been eliminated."
-                );
-
-            },
-            500
-        );
-
-    }
+    });
 
 }
 
 
-/* =========================================================
-   MINIMAP
-========================================================= */
-
-function updateMinimap() {
-
-    const mini =
-        document
-            .getElementById(
-                "miniCanvas"
-            );
-
-
-    const ctx =
-        mini.getContext(
-            "2d"
-        );
-
-
-    ctx.clearRect(
-        0,
-        0,
-        150,
-        100
-    );
-
-
-    ctx.fillStyle =
-        "#253128";
-
-    ctx.fillRect(
-        0,
-        0,
-        150,
-        100
-    );
-
-
-    /* bases */
-
-    ctx.fillStyle =
-        "#56b56b";
-
-    ctx.fillRect(
-        7,
-        43,
-        8,
-        8
-    );
-
-
-    ctx.fillStyle =
-        "#d64b42";
-
-    ctx.fillRect(
-        135,
-        43,
-        8,
-        8
-    );
-
-
-    units.forEach(
-        unit => {
-
-            if (
-                unit.userData.unit.hp <= 0
-            )
-                return;
-
-
-            const x =
-                (unit.position.x +
-                    battlefieldSize / 2)
-                / battlefieldSize
-                * 150;
-
-
-            const y =
-                (unit.position.z +
-                    battlefieldSize / 2)
-                / battlefieldSize
-                * 100;
-
-
-            ctx.fillStyle =
-                unit.userData.unit.player
-                    ? "#62d878"
-                    : "#ef5148";
-
-
-            ctx.beginPath();
-
-            ctx.arc(
-                x,
-                y,
-                3,
-                0,
-                Math.PI * 2
-            );
-
-            ctx.fill();
-
-        }
-    );
-
-}
-
-
-/* =========================================================
-   EFFECTS
-========================================================= */
-
-function updateEffects(
-    delta
-) {
-
-    for (
-        let i = effects.length - 1;
-        i >= 0;
-        i--
-    ) {
-
-        const effect =
-            effects[i];
-
-
-        if (
-            effect.bombEffect
-        )
-            continue;
-
-
-        effect.life -=
-            delta *
-            gameSpeed;
-
-
-        if (
-            effect.mesh
-        ) {
-
-            effect.mesh.scale
-                .multiplyScalar(
-                    1.05
-                );
-
-            effect.mesh.material
-                .opacity =
-                Math.max(
-                    0,
-                    effect.life /
-                    .12
-                );
-
-        }
-
-
-        if (
-            effect.life <= 0
-        ) {
-
-            scene.remove(
-                effect.mesh
-            );
-
-            effects.splice(
-                i,
-                1
-            );
-
-        }
-
-    }
-
-}
-
-
-/* =========================================================
-   ANIMATION
-========================================================= */
+/* ================= ANIMATION LOOP ================= */
 
 function animate() {
 
@@ -3148,36 +4329,49 @@ function animate() {
         );
 
 
-    if (!gamePaused) {
+    controls.update();
 
-        updateUnits(
+
+    if (!state.paused) {
+
+        updateGameTime(
             delta
         );
 
-        updateProjectiles(
+        updateUnitMovement(
             delta
         );
 
-        updateBombs(
+        updateCombat(
             delta
         );
 
-        updateExplosions(
-            delta
-        );
-
-        updateEffects(
-            delta
-        );
-
-        updateCamera(
+        updateAirstrikes(
             delta
         );
 
     }
 
 
-    updateMinimap();
+    if (
+        selectedMarker &&
+        state.selectedUnit
+    ) {
+
+        selectedMarker.position.copy(
+            state.selectedUnit.position
+        );
+
+        selectedMarker.position.y =
+            .16;
+
+        selectedMarker.rotation.z +=
+            delta * .8;
+
+    }
+
+
+    updateMiniMap();
 
 
     renderer.render(
@@ -3188,9 +4382,7 @@ function animate() {
 }
 
 
-/* =========================================================
-   RESIZE
-========================================================= */
+/* ================= RESIZE ================= */
 
 function onResize() {
 
@@ -3210,94 +4402,6 @@ function onResize() {
 }
 
 
-/* =========================================================
-   LOADING SCREEN
-========================================================= */
+/* ================= START ================= */
 
-function startLoading() {
-
-    let progress = 0;
-
-
-    const interval =
-        setInterval(
-            () => {
-
-                progress +=
-                    Math.random() * 8 + 4;
-
-
-                progress =
-                    Math.min(
-                        100,
-                        progress
-                    );
-
-
-                document
-                    .getElementById(
-                        "loadingProgress"
-                    )
-                    .style.width =
-                    progress + "%";
-
-
-                document
-                    .getElementById(
-                        "loadingPercent"
-                    )
-                    .textContent =
-                    Math.floor(
-                        progress
-                    ) + "%";
-
-
-                if (
-                    progress >= 100
-                ) {
-
-                    clearInterval(
-                        interval
-                    );
-
-
-                    setTimeout(
-                        () => {
-
-                            document
-                                .getElementById(
-                                    "loadingScreen"
-                                )
-                                .classList.add(
-                                    "hide"
-                                );
-
-                        },
-                        500
-                    );
-
-                }
-
-            },
-            120
-        );
-
-}
-
-
-/* =========================================================
-   START
-========================================================= */
-
-window.addEventListener(
-    "load",
-    () => {
-
-        init();
-
-        updateHUD();
-
-        startLoading();
-
-    }
-);
+boot();
