@@ -1,574 +1,1417 @@
 * {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 html,
 body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #05090b;
+    color: #ffffff;
+    font-family: Arial, Helvetica, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+}
 
-  background: #050a0c;
-
-  color: white;
-
-  font-family:
-    Arial,
-    Helvetica,
-    sans-serif;
+body {
+    touch-action: manipulation;
 }
 
 
-/* ================= GAME CANVAS ================= */
+/* =========================================================
+   GAME
+========================================================= */
 
-canvas {
-  display: block;
-
-  width: 100%;
-  height: 100%;
+#game {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background:
+        radial-gradient(
+            circle at center,
+            #182d25 0%,
+            #091512 55%,
+            #030607 100%
+        );
 }
 
 
-/* ================= LOADING SCREEN ================= */
+/* =========================================================
+   LOADING SCREEN
+========================================================= */
 
-#loading {
+#loadingScreen {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
 
-  position: fixed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
-  inset: 0;
+    background:
+        radial-gradient(
+            circle at center,
+            #173b43 0%,
+            #071317 42%,
+            #020405 100%
+        );
 
-  z-index: 100;
-
-  display: flex;
-
-  align-items: center;
-
-  justify-content: center;
-
-  text-align: center;
-
-  background:
-
-    radial-gradient(
-      circle at center,
-      #17343d 0%,
-      #071216 45%,
-      #020405 100%
-    );
-
-  transition:
-    opacity 0.8s ease;
+    transition:
+        opacity .7s ease;
 }
 
-
-.loading-content {
-
-  width: min(520px, 85vw);
+.loading-panel {
+    width: min(560px, 88vw);
+    text-align: center;
 }
 
+.loading-logo {
+    font-size: clamp(48px, 12vw, 100px);
+    font-weight: 1000;
+    letter-spacing: 9px;
 
-.game-logo {
-
-  font-size:
-    clamp(48px, 11vw, 100px);
-
-  font-weight: 900;
-
-  letter-spacing: 8px;
-
-  color: #ffffff;
-
-  text-shadow:
-
-    0 0 10px #19dfff,
-    0 0 25px #19dfff,
-    0 0 50px #19dfff;
+    text-shadow:
+        0 0 12px #20dfff,
+        0 0 30px rgba(32,223,255,.8),
+        0 0 70px rgba(32,223,255,.4);
 }
 
+.loading-subtitle {
+    margin-top: 6px;
 
-.game-subtitle {
+    font-size: 10px;
+    letter-spacing: 6px;
 
-  margin-top: 8px;
-
-  font-size: 11px;
-
-  letter-spacing: 5px;
-
-  color: #8eaab3;
+    color: #8caab2;
 }
 
+.loading-status {
+    margin-top: 30px;
 
-.loading-line {
+    font-size: 10px;
+    letter-spacing: 2px;
 
-  width: 100%;
-
-  height: 1px;
-
-  margin: 30px auto;
-
-  background:
-    linear-gradient(
-      90deg,
-      transparent,
-      #20dfff,
-      transparent
-    );
+    color: #78949d;
 }
-
 
 .loading-bar {
+    width: 100%;
+    height: 5px;
 
-  width: 100%;
+    margin-top: 12px;
 
-  height: 5px;
+    overflow: hidden;
 
-  overflow: hidden;
+    background: #15262c;
+    border-radius: 20px;
+}
 
-  background: #14242a;
+#loadingProgress {
+    width: 0%;
+    height: 100%;
 
-  border-radius: 10px;
+    background: #20dfff;
+
+    box-shadow:
+        0 0 12px #20dfff,
+        0 0 25px #20dfff;
+
+    transition:
+        width .15s linear;
+}
+
+.loading-percent {
+    margin-top: 10px;
+
+    font-size: 8px;
+    letter-spacing: 3px;
+
+    color: #536d75;
 }
 
 
-#progress {
+/* =========================================================
+   TOP BAR
+========================================================= */
 
-  width: 0%;
+.topbar {
+    position: absolute;
 
-  height: 100%;
+    top: 0;
+    left: 0;
+    right: 0;
 
-  background: #20dfff;
+    z-index: 100;
 
-  box-shadow:
-    0 0 15px #20dfff,
-    0 0 30px #20dfff;
+    min-height: 66px;
 
-  transition:
-    width 0.15s linear;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 10px 16px;
+
+    background:
+        linear-gradient(
+            90deg,
+            rgba(2,8,10,.96),
+            rgba(2,8,10,.72),
+            rgba(2,8,10,.35)
+        );
+
+    border-bottom:
+        1px solid rgba(255,255,255,.08);
+
+    backdrop-filter: blur(8px);
 }
 
-
-#loadText {
-
-  margin-top: 12px;
-
-  color: #78939c;
-
-  font-size: 10px;
-
-  letter-spacing: 2px;
+.brand {
+    display: flex;
+    flex-direction: column;
 }
 
-
-/* ================= HUD ================= */
-
-#hud {
-
-  position: fixed;
-
-  inset: 0;
-
-  z-index: 10;
-
-  pointer-events: none;
+.brand strong {
+    font-size: 21px;
+    letter-spacing: 4px;
 }
 
+.brand span {
+    margin-top: 3px;
 
-/* ================= HEADER ================= */
+    font-size: 7px;
+    letter-spacing: 3px;
 
-header {
-
-  height: 68px;
-
-  display: flex;
-
-  align-items: center;
-
-  justify-content: space-between;
-
-  padding: 10px 18px;
-
-  background:
-    linear-gradient(
-      90deg,
-      rgba(2, 8, 10, 0.95),
-      rgba(2, 8, 10, 0.55),
-      transparent
-    );
-
-  border-bottom:
-    1px solid rgba(255,255,255,0.08);
+    color: #728c94;
 }
-
-
-.brand-title {
-
-  font-size: 21px;
-
-  font-weight: 900;
-
-  letter-spacing: 4px;
-}
-
-
-.brand-subtitle {
-
-  margin-top: 2px;
-
-  font-size: 8px;
-
-  letter-spacing: 3px;
-
-  color: #728b94;
-}
-
 
 .resources {
+    display: flex;
+    gap: 7px;
+}
 
-  display: flex;
+.resource {
+    min-width: 70px;
 
-  gap: 14px;
+    padding: 8px 10px;
 
-  padding: 9px 12px;
+    text-align: center;
 
-  background:
-    rgba(5,15,19,0.85);
+    background:
+        rgba(5,17,21,.88);
 
-  border:
-    1px solid rgba(255,255,255,0.12);
+    border:
+        1px solid rgba(255,255,255,.12);
 
-  border-radius: 7px;
+    border-radius: 6px;
 
-  font-size: 11px;
+    font-size: 11px;
+
+    box-shadow:
+        inset 0 0 15px rgba(255,255,255,.025);
 }
 
 
-.resources span {
+/* =========================================================
+   BATTLEFIELD
+========================================================= */
 
-  white-space: nowrap;
+#battlefield {
+    position: absolute;
+
+    inset: 0;
+
+    overflow: hidden;
+
+    perspective: 900px;
+
+    background:
+        linear-gradient(
+            #223d34,
+            #0d2019
+        );
+}
+
+.terrain {
+    position: absolute;
+
+    width: 150%;
+    height: 150%;
+
+    left: -25%;
+    top: -15%;
+
+    transform:
+        rotateX(57deg)
+        rotateZ(-3deg)
+        scale(1);
+
+    transform-origin: center;
+
+    background-color: #29472d;
+
+    background-image:
+        linear-gradient(
+            rgba(255,255,255,.025) 1px,
+            transparent 1px
+        ),
+        linear-gradient(
+            90deg,
+            rgba(255,255,255,.025) 1px,
+            transparent 1px
+        );
+
+    background-size: 48px 48px;
+
+    box-shadow:
+        inset 0 0 100px rgba(0,0,0,.5);
+
+    transition:
+        transform .35s ease,
+        margin .25s ease;
 }
 
 
-/* ================= MISSION ================= */
+/* =========================================================
+   TERRAIN DETAILS
+========================================================= */
 
-#mission {
+.river {
+    position: absolute;
 
-  position: absolute;
+    width: 13%;
+    height: 100%;
 
-  top: 83px;
+    left: 45%;
+    top: 0;
 
-  left: 16px;
+    transform: rotate(8deg);
 
-  padding: 10px 14px;
+    background:
+        linear-gradient(
+            90deg,
+            #12526a,
+            #2086a0,
+            #12566e
+        );
 
-  background:
-    rgba(4,13,16,0.90);
+    opacity: .9;
 
-  border-left:
-    3px solid #20dfff;
+    box-shadow:
+        inset 8px 0 15px rgba(0,0,0,.3),
+        inset -8px 0 15px rgba(0,0,0,.3);
+}
 
-  border-radius: 0 5px 5px 0;
+.road {
+    position: absolute;
 
-  font-size: 10px;
+    background:
+        repeating-linear-gradient(
+            90deg,
+            #575548 0 45px,
+            #4b4a40 45px 90px
+        );
 
-  letter-spacing: 1px;
+    box-shadow:
+        inset 0 0 20px rgba(0,0,0,.3);
+}
 
-  box-shadow:
-    0 0 20px rgba(0,0,0,0.25);
+.road-main {
+    width: 100%;
+    height: 8%;
+
+    top: 48%;
+    left: 0;
+
+    transform: rotate(-3deg);
+}
+
+.road-side {
+    width: 8%;
+    height: 100%;
+
+    left: 27%;
+    top: 0;
+
+    transform: rotate(3deg);
 }
 
 
-/* ================= INFORMATION ================= */
+/* =========================================================
+   BASES
+========================================================= */
 
-#info {
+.base {
+    position: absolute;
 
-  position: absolute;
+    width: 120px;
+    height: 100px;
 
-  left: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 
-  bottom: 16px;
+    transform-style: preserve-3d;
 
-  max-width: 360px;
+    border:
+        2px solid rgba(255,255,255,.18);
 
-  padding: 10px 13px;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(30,50,53,.95),
+            rgba(8,15,17,.95)
+        );
 
-  background:
-    rgba(4,13,16,0.90);
+    box-shadow:
+        0 15px 30px rgba(0,0,0,.45),
+        inset 0 0 20px rgba(255,255,255,.04);
+}
 
-  border-left:
-    3px solid #20dfff;
+.base-building {
+    width: 55px;
+    height: 45px;
 
-  border-radius: 0 5px 5px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
-  color: #b5c5ca;
+    background:
+        linear-gradient(
+            145deg,
+            #596568,
+            #20282a
+        );
 
-  font-size: 10px;
+    border:
+        2px solid #6e7b7e;
+
+    box-shadow:
+        0 8px 12px rgba(0,0,0,.4);
+
+    font-size: 20px;
+    font-weight: 900;
+}
+
+.base-label {
+    margin-top: 8px;
+
+    font-size: 8px;
+    letter-spacing: 1px;
+
+    color: #b8c8cc;
+}
+
+.player-base {
+    left: 8%;
+    top: 63%;
+
+    border-color: #1fdcff;
+}
+
+.air-base {
+    left: 22%;
+    top: 22%;
+
+    border-color: #39e59a;
+}
+
+.enemy-base {
+    right: 8%;
+    top: 17%;
+
+    border-color: #ff4353;
+}
+
+.naval-base {
+    right: 18%;
+    bottom: 13%;
+
+    border-color: #32a9e0;
 }
 
 
-/* ================= BUTTONS ================= */
+/* =========================================================
+   UNITS
+========================================================= */
 
-#controls {
+.unit {
+    position: absolute;
 
-  position: absolute;
+    width: 48px;
+    height: 48px;
 
-  right: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
-  bottom: 16px;
+    font-size: 30px;
 
-  display: flex;
+    cursor: pointer;
 
-  gap: 7px;
+    transform:
+        translateZ(20px);
 
-  flex-wrap: wrap;
+    filter:
+        drop-shadow(0 9px 5px rgba(0,0,0,.65));
 
-  justify-content: flex-end;
+    transition:
+        transform .25s ease,
+        opacity .3s ease,
+        filter .25s ease;
 
-  pointer-events: auto;
+    z-index: 20;
+}
+
+.unit:hover {
+    transform:
+        translateZ(25px)
+        scale(1.15);
+}
+
+.player-unit {
+    text-shadow:
+        0 0 8px #19dfff;
+}
+
+.enemy {
+    text-shadow:
+        0 0 9px #ff3147;
+}
+
+.tank {
+    font-size: 35px;
+}
+
+.infantry {
+    font-size: 27px;
+}
+
+.aircraft {
+    font-size: 32px;
+
+    animation:
+        aircraftFlight 4s ease-in-out infinite;
+}
+
+#tank1 {
+    left: 30%;
+    top: 58%;
+}
+
+#tank2 {
+    left: 36%;
+    top: 64%;
+}
+
+#infantry1 {
+    left: 32%;
+    top: 69%;
+}
+
+#infantry2 {
+    left: 39%;
+    top: 71%;
+}
+
+#aircraft1 {
+    left: 43%;
+    top: 27%;
+}
+
+#enemyTank1 {
+    right: 32%;
+    top: 30%;
+}
+
+#enemyInfantry1 {
+    right: 27%;
+    top: 37%;
+}
+
+#enemyAircraft1 {
+    right: 38%;
+    top: 19%;
+}
+
+@keyframes aircraftFlight {
+    0% {
+        transform:
+            translate3d(0,0,25px)
+            rotate(-5deg);
+    }
+
+    50% {
+        transform:
+            translate3d(20px,-12px,35px)
+            rotate(5deg);
+    }
+
+    100% {
+        transform:
+            translate3d(0,0,25px)
+            rotate(-5deg);
+    }
 }
 
 
-button {
+/* =========================================================
+   TREES
+========================================================= */
 
-  padding: 11px 14px;
+.tree {
+    position: absolute;
 
-  border-radius: 6px;
+    font-size: 32px;
 
-  border:
-    1px solid #34515a;
+    filter:
+        drop-shadow(
+            0 8px 5px rgba(0,0,0,.55)
+        );
 
-  background:
-    rgba(7,22,27,0.94);
+    z-index: 10;
+}
 
-  color: white;
+.tree1 {
+    left: 12%;
+    top: 31%;
+}
 
-  font-size: 10px;
+.tree2 {
+    left: 53%;
+    top: 68%;
+}
 
-  font-weight: 800;
+.tree3 {
+    right: 10%;
+    top: 49%;
+}
 
-  letter-spacing: 0.5px;
+.tree4 {
+    right: 34%;
+    top: 12%;
+}
 
-  cursor: pointer;
-
-  transition:
-    0.2s ease;
+.tree5 {
+    left: 58%;
+    top: 17%;
 }
 
 
-button:hover {
+/* =========================================================
+   EFFECTS
+========================================================= */
 
-  border-color: #20dfff;
+#effects {
+    position: absolute;
+    inset: 0;
 
-  box-shadow:
-    0 0 18px rgba(32,223,255,0.25);
+    pointer-events: none;
 
-  transform:
-    translateY(-1px);
+    z-index: 80;
+}
+
+.explosion {
+    position: absolute;
+
+    width: 35px;
+    height: 35px;
+
+    border-radius: 50%;
+
+    background:
+        radial-gradient(
+            circle,
+            #fff 0%,
+            #ffd23c 15%,
+            #ff671c 40%,
+            rgba(255,40,0,.2) 70%,
+            transparent 72%
+        );
+
+    transform:
+        translate(-50%,-50%);
+
+    animation:
+        explosion .8s ease-out forwards;
+}
+
+.smoke {
+    position: absolute;
+
+    width: 32px;
+    height: 32px;
+
+    border-radius: 50%;
+
+    background:
+        radial-gradient(
+            circle,
+            #3c4543,
+            #151b1a 65%,
+            transparent 70%
+        );
+
+    animation:
+        smoke 2.2s ease-out forwards;
+}
+
+@keyframes explosion {
+    0% {
+        opacity: 1;
+        transform:
+            translate(-50%,-50%)
+            scale(.2);
+    }
+
+    100% {
+        opacity: 0;
+        transform:
+            translate(-50%,-50%)
+            scale(3);
+    }
+}
+
+@keyframes smoke {
+    0% {
+        opacity: .8;
+        transform: scale(.5);
+    }
+
+    100% {
+        opacity: 0;
+        transform:
+            translateY(-50px)
+            scale(2.5);
+    }
 }
 
 
-button:active {
+/* =========================================================
+   MISSION PANEL
+========================================================= */
 
-  transform:
-    scale(0.96);
+.mission-panel {
+    position: absolute;
+
+    top: 82px;
+    left: 14px;
+
+    z-index: 100;
+
+    width: min(330px, 45vw);
+
+    padding: 12px 14px;
+
+    background:
+        rgba(3,11,14,.88);
+
+    border-left:
+        3px solid #20dfff;
+
+    border-radius:
+        0 7px 7px 0;
+
+    backdrop-filter:
+        blur(8px);
+
+    box-shadow:
+        0 10px 30px rgba(0,0,0,.25);
 }
 
+.mission-title {
+    font-size: 9px;
 
-/* ================= MINIMAP ================= */
-
-#minimap {
-
-  position: absolute;
-
-  right: 16px;
-
-  top: 83px;
-
-  width: 155px;
-
-  height: 105px;
-
-  overflow: hidden;
-
-  background:
-    rgba(12,39,28,0.86);
-
-  border:
-    1px solid rgba(255,255,255,0.3);
-
-  border-radius: 6px;
-
-  box-shadow:
-    0 0 20px rgba(0,0,0,0.3);
-}
-
-
-.map-grid {
-
-  position: absolute;
-
-  inset: 0;
-
-  background-image:
-
-    linear-gradient(
-      rgba(255,255,255,0.08) 1px,
-      transparent 1px
-    ),
-
-    linear-gradient(
-      90deg,
-      rgba(255,255,255,0.08) 1px,
-      transparent 1px
-    );
-
-  background-size: 20px 20px;
-}
-
-
-.player-marker {
-
-  position: absolute;
-
-  left: 35%;
-
-  top: 58%;
-
-  width: 8px;
-
-  height: 8px;
-
-  border-radius: 50%;
-
-  background: #18dfff;
-
-  box-shadow:
-    0 0 10px #18dfff;
-}
-
-
-.enemy-marker {
-
-  position: absolute;
-
-  right: 25%;
-
-  top: 25%;
-
-  width: 8px;
-
-  height: 8px;
-
-  border-radius: 50%;
-
-  background: #ff3348;
-
-  box-shadow:
-    0 0 10px #ff3348;
-}
-
-
-/* ================= MOBILE ================= */
-
-@media (max-width: 700px) {
-
-  header {
-
-    height: 56px;
-
-    padding:
-      8px 10px;
-  }
-
-
-  .brand-title {
-
-    font-size: 16px;
-
-    letter-spacing: 3px;
-  }
-
-
-  .brand-subtitle {
-
-    font-size: 6px;
+    font-weight: 900;
 
     letter-spacing: 2px;
-  }
 
+    color: #20dfff;
+}
 
-  .resources {
+#missionText {
+    margin-top: 6px;
+
+    font-size: 10px;
+
+    line-height: 1.5;
+
+    color: #b8c6ca;
+}
+
+.score-panel {
+    margin-top: 9px;
+
+    display: flex;
+    align-items: center;
 
     gap: 7px;
 
-    padding: 7px;
+    font-size: 7px;
 
-    font-size: 8px;
-  }
+    color: #8ba2a8;
+}
 
+.score-panel strong {
+    color: white;
+}
 
-  #mission {
-
-    top: 68px;
-
-    left: 9px;
-
-    font-size: 8px;
-
-    padding: 8px 10px;
-  }
-
-
-  #minimap {
-
-    top: 68px;
-
-    right: 9px;
-
-    width: 105px;
-
-    height: 72px;
-  }
-
-
-  #controls {
-
-    left: 8px;
-
-    right: 8px;
-
-    bottom: 46px;
-
-    gap: 5px;
-  }
-
-
-  button {
-
+.score-bar {
     flex: 1;
 
-    min-width: 70px;
+    height: 5px;
 
-    padding: 9px 4px;
+    overflow: hidden;
+
+    background: #241c20;
+
+    border-radius: 10px;
+}
+
+#allyBar {
+    width: 50%;
+    height: 100%;
+
+    background:
+        linear-gradient(
+            90deg,
+            #17cde9,
+            #3ef5c3
+        );
+
+    box-shadow:
+        0 0 8px rgba(32,223,255,.7);
+}
+
+
+/* =========================================================
+   UNIT PANEL
+========================================================= */
+
+.unit-panel {
+    position: absolute;
+
+    left: 14px;
+    bottom: 74px;
+
+    z-index: 100;
+
+    width: min(330px, 43vw);
+
+    padding: 10px;
+
+    background:
+        rgba(3,11,14,.88);
+
+    border:
+        1px solid rgba(255,255,255,.1);
+
+    border-radius: 8px;
+
+    backdrop-filter:
+        blur(8px);
+}
+
+.panel-title {
+    margin-bottom: 8px;
 
     font-size: 8px;
-  }
+
+    font-weight: 900;
+
+    letter-spacing: 2px;
+
+    color: #8eaab2;
+}
+
+.unit-list {
+    display: grid;
+
+    grid-template-columns:
+        repeat(5, 1fr);
+
+    gap: 5px;
+}
+
+.unit-card {
+    min-width: 0;
+
+    padding: 6px 3px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    background:
+        rgba(8,23,27,.85);
+
+    border:
+        1px solid #263f46;
+
+    color: white;
+
+    cursor: pointer;
+}
+
+.unit-card.selected {
+    border-color: #20dfff;
+
+    box-shadow:
+        0 0 12px rgba(32,223,255,.22);
+
+    background:
+        rgba(15,46,53,.95);
+}
+
+.unit-icon {
+    font-size: 19px;
+}
+
+.unit-card b {
+    margin-top: 4px;
+
+    font-size: 6px;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    max-width: 100%;
+}
+
+.unit-card small {
+    margin-top: 2px;
+
+    font-size: 5px;
+
+    color: #718a91;
+}
 
 
-  #info {
+/* =========================================================
+   COMMAND PANEL
+========================================================= */
 
-    left: 8px;
+.command-panel {
+    position: absolute;
 
-    right: 8px;
+    right: 14px;
+    bottom: 72px;
 
-    bottom: 8px;
+    z-index: 100;
 
-    max-width: none;
+    width: min(360px, 45vw);
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 6px;
+
+    padding: 8px;
+
+    background:
+        rgba(3,11,14,.88);
+
+    border:
+        1px solid rgba(255,255,255,.1);
+
+    border-radius: 8px;
+
+    backdrop-filter:
+        blur(8px);
+}
+
+.command-panel button {
+    min-height: 48px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    gap: 3px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #0c2026,
+            #071216
+        );
+
+    border:
+        1px solid #29434b;
+
+    color: white;
+
+    font-size: 18px;
+}
+
+.command-panel button span {
+    font-size: 6px;
+
+    letter-spacing: 1px;
+
+    color: #8eaab2;
+}
+
+.command-panel button:hover {
+    border-color: #20dfff;
+
+    box-shadow:
+        0 0 15px rgba(32,223,255,.22);
+
+    transform:
+        translateY(-2px);
+}
+
+
+/* =========================================================
+   CAMERA
+========================================================= */
+
+.camera-panel {
+    position: absolute;
+
+    right: 14px;
+    top: 82px;
+
+    z-index: 100;
+
+    display: flex;
+    align-items: center;
+
+    gap: 5px;
+
+    padding: 5px;
+
+    background:
+        rgba(3,11,14,.88);
+
+    border:
+        1px solid rgba(255,255,255,.12);
+
+    border-radius: 7px;
+
+    backdrop-filter:
+        blur(8px);
+}
+
+.camera-panel span {
+    padding: 0 5px;
+
+    font-size: 6px;
+
+    letter-spacing: 1px;
+
+    color: #738c93;
+}
+
+.camera-panel button {
+    width: 30px;
+    height: 28px;
+
+    padding: 0;
+
+    font-size: 16px;
+}
+
+
+/* =========================================================
+   NOTIFICATION
+========================================================= */
+
+#notification {
+    position: absolute;
+
+    left: 50%;
+    bottom: 14px;
+
+    transform:
+        translateX(-50%);
+
+    z-index: 300;
+
+    max-width: 90vw;
+
+    padding: 8px 14px;
+
+    background:
+        rgba(3,11,14,.92);
+
+    border:
+        1px solid rgba(32,223,255,.25);
+
+    border-radius: 6px;
+
+    color: #b9cbd0;
 
     font-size: 8px;
+
+    letter-spacing: .5px;
+
+    text-align: center;
+
+    pointer-events: none;
+}
+
+
+/* =========================================================
+   STATUS
+========================================================= */
+
+.battle-status {
+    position: absolute;
+
+    right: 14px;
+    top: 137px;
+
+    z-index: 100;
+
+    display: flex;
+
+    gap: 6px;
 
     padding: 7px 9px;
-  }
 
+    background:
+        rgba(3,11,14,.8);
+
+    border:
+        1px solid rgba(255,255,255,.1);
+
+    border-radius: 6px;
+
+    font-size: 7px;
+
+    color: #728b92;
+}
+
+.battle-status b {
+    color: #ffffff;
+}
+
+
+/* =========================================================
+   MODAL
+========================================================= */
+
+#modal {
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 500;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    background:
+        rgba(0,0,0,.7);
+
+    backdrop-filter:
+        blur(5px);
+}
+
+#modal.hidden {
+    display: none;
+}
+
+.modal-box {
+    position: relative;
+
+    width: min(500px, 92vw);
+    max-height: 80vh;
+
+    overflow: auto;
+
+    padding: 25px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #11262b,
+            #071114
+        );
+
+    border:
+        1px solid #294c55;
+
+    border-radius: 10px;
+
+    box-shadow:
+        0 25px 70px rgba(0,0,0,.6);
+}
+
+.modal-box h2 {
+    margin-bottom: 20px;
+
+    font-size: 18px;
+
+    letter-spacing: 2px;
+}
+
+.close-modal {
+    position: absolute;
+
+    right: 12px;
+    top: 12px;
+
+    width: 30px;
+    height: 30px;
+
+    padding: 0;
+
+    font-size: 20px;
+}
+
+.research-item {
+    padding: 13px;
+
+    background:
+        rgba(255,255,255,.03);
+
+    border:
+        1px solid rgba(255,255,255,.08);
+
+    border-radius: 7px;
+}
+
+.research-item h3 {
+    font-size: 12px;
+}
+
+.research-item p {
+    margin: 5px 0 10px;
+
+    font-size: 9px;
+
+    color: #80969c;
+}
+
+.research-item button {
+    font-size: 8px;
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 700px) {
+
+    .topbar {
+        min-height: 54px;
+
+        padding: 7px 8px;
+    }
+
+    .brand strong {
+        font-size: 15px;
+        letter-spacing: 3px;
+    }
+
+    .brand span {
+        font-size: 5px;
+        letter-spacing: 2px;
+    }
+
+    .resources {
+        gap: 3px;
+    }
+
+    .resource {
+        min-width: 42px;
+
+        padding: 6px 4px;
+
+        font-size: 8px;
+    }
+
+
+    .mission-panel {
+        top: 64px;
+        left: 7px;
+
+        width: 48vw;
+
+        padding: 8px;
+    }
+
+    .mission-title {
+        font-size: 7px;
+    }
+
+    #missionText {
+        font-size: 7px;
+    }
+
+
+    .camera-panel {
+        top: 64px;
+        right: 7px;
+    }
+
+
+    .battle-status {
+        top: 103px;
+        right: 7px;
+
+        font-size: 6px;
+
+        gap: 4px;
+    }
+
+
+    .unit-panel {
+        left: 6px;
+        right: 6px;
+        bottom: 128px;
+
+        width: auto;
+
+        padding: 6px;
+    }
+
+    .panel-title {
+        font-size: 6px;
+
+        margin-bottom: 5px;
+    }
+
+    .unit-list {
+        gap: 3px;
+    }
+
+    .unit-card {
+        padding: 4px 2px;
+    }
+
+    .unit-icon {
+        font-size: 15px;
+    }
+
+    .unit-card b {
+        font-size: 5px;
+    }
+
+    .unit-card small {
+        display: none;
+    }
+
+
+    .command-panel {
+        left: 6px;
+        right: 6px;
+        bottom: 48px;
+
+        width: auto;
+
+        grid-template-columns:
+            repeat(5, 1fr);
+
+        gap: 3px;
+
+        padding: 4px;
+    }
+
+    .command-panel button {
+        min-height: 39px;
+
+        font-size: 15px;
+    }
+
+    .command-panel button span {
+        font-size: 5px;
+    }
+
+
+    #notification {
+        bottom: 5px;
+
+        font-size: 7px;
+
+        padding: 6px 9px;
+    }
+
+
+    .base {
+        width: 75px;
+        height: 65px;
+    }
+
+    .base-building {
+        width: 36px;
+        height: 28px;
+
+        font-size: 14px;
+    }
+
+    .base-label {
+        margin-top: 4px;
+
+        font-size: 5px;
+    }
+
+
+    .unit {
+        width: 35px;
+        height: 35px;
+
+        font-size: 23px;
+    }
+
+    .tank {
+        font-size: 27px;
+    }
+
+    .infantry {
+        font-size: 21px;
+    }
+
+    .aircraft {
+        font-size: 24px;
+    }
+
+
+    .tree {
+        font-size: 23px;
+    }
+}
+
+
+/* =========================================================
+   VERY SMALL PHONES
+========================================================= */
+
+@media (max-width: 390px) {
+
+    .resource {
+        min-width: 35px;
+
+        font-size: 7px;
+    }
+
+    .brand span {
+        display: none;
+    }
+
+    .unit-panel {
+        bottom: 126px;
+    }
+
+    .command-panel button {
+        min-height: 36px;
+
+        font-size: 13px;
+    }
 }
