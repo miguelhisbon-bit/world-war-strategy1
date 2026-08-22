@@ -881,4 +881,892 @@ function enemyAI(dt) {
     }
 }
 
-function enemy
+function enemyAirAI(enemy) {
+    const targets = units.filter(u => u.friendly && u.state !== "DESTROYED");
+    if (!targets.length) return;
+    const target = targets.sort((a, b) =>
+        enemy.object.position.distanceTo(a.object.position) -
+        enemy.object.position.distanceTo(b.object.position)
+    )[0];
+    if (enemy.object.position.distanceTo(target.object.position) < 80) {
+        if (Math.random() < 0.03 * speed) {
+            enemyAirstrike(enemy, target);
+        }
+    } else {
+        enemy.destination = new THREE.Vector3(target.object.position.x, 8, target.object.position.z);
+        enemy.state = "MOVING";
+    }
+}
+
+function enemyAICombat(attacker, defender) {
+    if (Math.random() > 0.025 * speed) return;
+    // Fixed: Check attacker strength to avoid NaN
+    if (attacker.strength <= 0 || attacker.organization <= 0) return;
+
+    const attack = attacker.attack * (attacker.strength / 100) * (attacker.organization / 100);
+    const defense = defender.defense * (defender.organization / 100);
+    let damage = Math.max(2, attack - defense * 0.45 + Math.random() * 5);
+    if (weather === "RAIN") damage *= 0.9;
+    if (weather === "SNOW") damage *= 0.75;
+
+    defender.hp = Math.max(0, defender.hp - damage);
+    defender.organization = Math.max(0, defender.organization - damage * 0.45);
+    defender.morale = Math.max(0, defender.morale - damage * 0.18);
+    createExplosion(defender.object.position);
+
+    if (defender.hp <= 0 || defender.organization <= 0) {
+        destroyUnit(defender, attacker);
+    }
+}
+
+function enemyAirstrike(aircraft, target) {
+    let damage = 10 + Math.random() * 15;
+    if (weather === "RAIN") damage *= 0.7;
+    if (weather === "SNOW") damage *= 0.55;
+    target.hp = Math.max(0, target.hp - damage);
+    target.organization = Math.max(0, target.organization - damage * 0.6);
+    createExplosion(target.object.position);
+    if (target.hp <= 0 || target.organization <= 0) {
+        destroyUnit(target, aircraft);
+    }
+}
+
+/* =========================================================
+   ECONOMY (UPDATED)
+   ========================================================== */
+
+function updateEconomy(dt) {
+    if (paused) return;
+    const civilianIncome = factories.civilian * 0.22 * dt * speed;
+    const taxIncome = civilianIncome * (tax / 20);
+    money += taxIncome;
+    oil += factories.military * 0.012 * dt * speed;
+    steel += factories.military * 0.018 * dt * speed;
+    food += 0.15 * dt * speed;
+    manpower += 0.8 * dt * speed;
+
+    if (tax > 35) {
+        stability = Math.max(0, stability - dt * 0.025);
+    } else if (tax < 18) {
+        stability = Math.min(100, stability + dt * 0.01);
+    }
+    if (stability < 35) {
+        political = Math.max(0, political - dt * 0.08);
+    } else {
+        political = Math.min(999, political + dt * 0.035);
+    }
+    construction = Math.min(20, construction + factories.civilian * 0.001 * dt * speed);
+}
+
+/* =========================================================
+   PRODUCTION (UPDATED - Fixed ARTILLERY missing)
+   ========================================================== */
+
+function updateProduction(dt) {
+    if (paused) return;
+    for (const key of Object.keys(production)) {
+        const p = production[key];
+        if (p.factories <= 0) continue;
+        let progress = p.factories * p.efficiency * 0.004 * dt * speed;
+        if (tech.INDUSTRY.completed) progress *= 1.12;
+        p.progress += progress;
+        if (p.progress >= 100) {
+            p.progress -= 100;
+            p.output += Math.max(1, Math.floor(p.factories * p.efficiency / 55));
+            applyProductionOutput(key, p.output);
+            p.output = 0;
+            p.efficiency = Math.min(100, p.efficiency + 0.15);
+        }
+    }
+}
+
+function applyProductionOutput(type, amount) {
+    if (type === "INFANTRY") {
+        manpower += amount * 12;
+    } else if (type === "TANK") {
+        for (const unit of units) {
+            if (unit.friendly && unit.type === "TANK" && unit.state !== "DESTROYED") {
+                unit.strength = Math.min(unit.maxStrength || 100, unit.strength + amount * 0.7);
+                break;
+            }
+        }
+    } else if (type === "ARTILLERY") {
+        // Find a friendly artillery unit or just add to manpower
+        for (const unit of units) {
+            if (unit.friendly && unit.type === "ARTILLERY" && unit.state !== "DESTROYED") {
+                unit.strength = Math.min(unit.maxStrength || 100, unit.strength + amount * 0.7);
+                break;
+            }
+        }
+    } else if (type === "AIR") {
+        for (const unit of units) {
+            if (unit.friendly && unit.type === "AIR" && unit.state !== "DESTROYED") {
+                unit.readiness = Math.min(100, unit.readiness + amount * 1.2);
+                break;
+            }
+        }
+    }
+}
+
+function assignFactory(type) {
+    const used = Object.values(production).reduce((sum, item) => sum + item.factories, 0);
+    if (used >= factories.military) {
+        toast("No free military factories");
+        return;
+    }
+    production[type].factories++;
+    toast(`${type} factory assigned`);
+    openPanel("production");
+}
+
+/* =========================================================
+   RESEARCH
+   ========================================================== */
+
+function updateResearch(dt) {
+    if (paused) return;
+    for (const key of Object.keys(tech)) {
+        const t = tech[key];
+        if (!t.active || t.completed) continue;
+        t.progress += 0.18 * dt * speed;
+        if (t.progress >= 100) {
+            t.progress = 100;
+            t.completed = true;
+            t.active = false;
+            applyTechnology(key);
+            toast(`${t.name} completed`);
+        }
+    }
+}
+
+function startResearch(key) {
+    const t = tech[key];
+    if (t.completed) {
+        toast("Technology already completed");
+        return;
+    }
+    const active = Object.values(tech).filter(x => x.active).length;
+    if (!t.active && active >= 3) {
+        toast("All research slots are occupied");
+        return;
+    }
+    if (political < 10) {
+        toast("Need 10 political power");
+        return;
+    }
+    political -= 10;
+    t.active = true;
+    toast(`Research started: ${t.name}`);
+    openPanel("research");
+}
+
+function applyTechnology(key) {
+    if (key === "INDUSTRY") factories.civilian++;
+    if (key === "ELECTRONICS") intel = Math.min(100, intel + 10);
+    if (key === "LOGISTICS") {
+        for (const unit of units) {
+            unit.supply = Math.min(100, unit.supply + 10);
+        }
+    }
+}
+
+/* =========================================================
+   DIPLOMACY (UPDATED - Added missing countries)
+   ========================================================== */
+
+function improveDiplomacy(country) {
+    if (political < 15) {
+        toast("Need political power");
+        return;
+    }
+    political -= 15;
+    diplomacy[country] = Math.min(100, diplomacy[country] + 8);
+    addDiplomaticMessage(`Relations improved with ${nation[country][1]}`);
+    toast(`Relations improved with ${nation[country][1]}`);
+    openPanel("diplomacy");
+}
+
+function diplomaticAction(country) {
+    const value = diplomacy[country];
+    if (value <= -50) {
+        diplomacy[country] = -100;
+        stability = Math.max(0, stability - 2);
+        addDiplomaticMessage(`War declared on ${nation[country][1]}`);
+        toast(`War declared on ${nation[country][1]}`);
+    } else {
+        diplomacy[country] = Math.min(100, value + 12);
+        political = Math.max(0, political - 8);
+        addDiplomaticMessage(`Diplomatic pact proposed to ${nation[country][1]}`);
+        toast(`Diplomatic pact proposed to ${nation[country][1]}`);
+    }
+    openPanel("diplomacy");
+}
+
+/* =========================================================
+   INTELLIGENCE
+   ========================================================== */
+
+function runRecon() {
+    if (money < 250) {
+        toast("Not enough money");
+        return;
+    }
+    money -= 250;
+    intel = Math.min(100, intel + 10);
+    for (const unit of units) {
+        if (!unit.friendly) {
+            unit.readiness = Math.max(0, unit.readiness - 2);
+        }
+    }
+    toast("Recon completed");
+    updateAllUI();
+}
+
+function expandSpyNetwork() {
+    if (money < 400) {
+        toast("Not enough money");
+        return;
+    }
+    money -= 400;
+    spy = Math.min(100, spy + 12);
+    intel = Math.min(100, intel + 4);
+    toast("Spy network expanded");
+    updateAllUI();
+}
+
+function improveCounterIntel() {
+    if (money < 350) {
+        toast("Not enough money");
+        return;
+    }
+    money -= 350;
+    counterIntel = Math.min(100, counterIntel + 12);
+    toast("Counter-intelligence improved");
+    updateAllUI();
+}
+
+/* =========================================================
+   WEATHER / MAP
+   ========================================================== */
+
+function changeWeather() {
+    if (weather === "CLEAR") weather = "RAIN";
+    else if (weather === "RAIN") weather = "SNOW";
+    else weather = "CLEAR";
+    // Visual effect on ground
+    if (ground) {
+        ground.material.color.setHex(weather === "SNOW" ? 0x8a9a9a : mapColors[mapLayer]);
+    }
+    toast(`Weather: ${weather}`);
+}
+
+function setMapLayer(layer) {
+    mapLayer = layer;
+    if (ground) {
+        ground.material.color.setHex(mapColors[layer]);
+    }
+    toast(`Map layer: ${layer}`);
+}
+
+/* =========================================================
+   BATTLE LOG & DIPLOMATIC MESSAGES (NEW)
+   ========================================================== */
+
+function addBattleLog(message) {
+    battleLog.unshift({ time: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, message });
+    if (battleLog.length > 20) battleLog.pop();
+}
+
+function addDiplomaticMessage(message) {
+    diplomaticMessages.unshift({ time: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, message });
+    if (diplomaticMessages.length > 10) diplomaticMessages.pop();
+}
+
+/* =========================================================
+   AUTO-SAVE (NEW)
+   ========================================================== */
+
+function autosave() {
+    try {
+        const saveData = {
+            money, oil, steel, food, manpower,
+            political, stability, tax, construction,
+            intel, spy, counterIntel,
+            factories, diplomacy,
+            production, tech,
+            year, month, day,
+            units: units.map(u => ({
+                id: u.id, name: u.name, type: u.type, friendly: u.friendly,
+                hp: u.hp, organization: u.organization, morale: u.morale,
+                strength: u.strength, readiness: u.readiness, supply: u.supply,
+                attack: u.attack, defense: u.defense, speed: u.speed,
+                state: u.state, kills: u.kills, experience: u.experience,
+                entrenchment: u.entrenchment,
+                pos: u.object.position.toArray()
+            }))
+        };
+        localStorage.setItem('worldWarSave', JSON.stringify(saveData));
+    } catch (e) { /* silent fail */ }
+}
+
+function loadCampaign() {
+    try {
+        const raw = localStorage.getItem('worldWarSave');
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        money = data.money || money;
+        oil = data.oil || oil;
+        steel = data.steel || steel;
+        food = data.food || food;
+        manpower = data.manpower || manpower;
+        political = data.political || political;
+        stability = data.stability || stability;
+        tax = data.tax || tax;
+        construction = data.construction || construction;
+        intel = data.intel || intel;
+        spy = data.spy || spy;
+        counterIntel = data.counterIntel || counterIntel;
+        if (data.factories) Object.assign(factories, data.factories);
+        if (data.diplomacy) Object.assign(diplomacy, data.diplomacy);
+        if (data.production) Object.assign(production, data.production);
+        if (data.tech) Object.assign(tech, data.tech);
+        if (data.year) year = data.year;
+        if (data.month) month = data.month;
+        if (data.day) day = data.day;
+        // Load units positions
+        if (data.units) {
+            for (let i = 0; i < data.units.length && i < units.length; i++) {
+                const d = data.units[i];
+                const u = units[i];
+                if (u && d.pos) {
+                    u.object.position.fromArray(d.pos);
+                }
+            }
+        }
+    } catch (e) { /* silent fail */ }
+}
+
+/* =========================================================
+   PANELS (UPDATED - Added new features)
+   ========================================================== */
+
+function averageStat(key) {
+    const list = units.filter(u => u.friendly && u.state !== "DESTROYED");
+    if (!list.length) return 0;
+    return Math.round(list.reduce((sum, u) => sum + (u[key] || 0), 0) / list.length);
+}
+
+function threatLevel() {
+    const friendly = units.filter(u => u.friendly && u.state !== "DESTROYED").reduce((s, u) => s + u.strength, 0);
+    const enemy = units.filter(u => !u.friendly && u.state !== "DESTROYED").reduce((s, u) => s + u.strength, 0);
+    if (enemy > friendly) return "HIGH";
+    if (enemy > friendly * 0.75) return "MEDIUM";
+    return "LOW";
+}
+
+function infoCard(title, content) {
+    return `<div class="info-card"><h3>${title}</h3>${content}</div>`;
+}
+
+function actionButton(id, text, cls = "") {
+    return `<button class="action-btn ${cls}" id="${id}">${text}</button>`;
+}
+
+const panels = {
+    overview: {
+        title: "World Overview",
+        kicker: "STRATEGIC COMMAND",
+        html: () =>
+            infoCard("Global Situation",
+                statRow("Active Forces", units.filter(u => u.friendly && u.state !== "DESTROYED").length) +
+                statRow("Enemy Forces", units.filter(u => !u.friendly && u.state !== "DESTROYED").length) +
+                statRow("Threat Level", threatLevel()) +
+                statRow("Weather", weather) +
+                statRow("Map Layer", mapLayer)
+            ) +
+            infoCard("Map Layers",
+                ["MILITARY", "POLITICAL", "TERRAIN", "SUPPLY", "RESOURCES", "INTEL"]
+                    .map(layer => actionButton("", layer, `layer-btn`).replace("<button ", `<button data-layer="${layer}" `))
+                    .join("")
+            ) +
+            infoCard("Army Readiness",
+                progressRow("Strength", averageStat("strength")) +
+                progressRow("Organization", averageStat("organization")) +
+                progressRow("Morale", averageStat("morale")) +
+                progressRow("Readiness", averageStat("readiness"))
+            )
+    },
+    army: {
+        title: "Army Command",
+        kicker: "MILITARY COMMAND",
+        html: () => {
+            const friendly = units.filter(u => u.friendly && u.state !== "DESTROYED");
+            return infoCard("Available Forces",
+                friendly.map(u => `
+                    <button class="action-btn select-unit" data-id="${u.id}" style="text-align:left">
+                        ${u.type === "TANK" ? "🛡️" : u.type === "AIR" ? "✈️" : "🪖"}
+                        ${u.name} — ${u.state}
+                    </button>
+                `).join("")
+            ) +
+            infoCard("Army Statistics",
+                progressRow("Strength", averageStat("strength")) +
+                progressRow("Organization", averageStat("organization")) +
+                progressRow("Morale", averageStat("morale")) +
+                statRow("Manpower", Math.floor(manpower).toLocaleString())
+            );
+        }
+    },
+    economy: {
+        title: "Economy",
+        kicker: "NATIONAL ECONOMY",
+        html: () =>
+            infoCard("Resources",
+                statRow("Money", Math.floor(money).toLocaleString()) +
+                statRow("Oil", Math.floor(oil).toLocaleString()) +
+                statRow("Steel", Math.floor(steel).toLocaleString()) +
+                statRow("Food", Math.floor(food).toLocaleString()) +
+                statRow("Manpower", Math.floor(manpower).toLocaleString())
+            ) +
+            infoCard("National Stability",
+                progressRow("Stability", stability) +
+                statRow("Tax Rate", `${tax}%`) +
+                statRow("Political Power", Math.floor(political)) +
+                statRow("Construction", construction.toFixed(1))
+            ) +
+            actionButton("tax-down", "LOWER TAX — 2%") +
+            actionButton("tax-up", "RAISE TAX — 2%") +
+            actionButton("invest-industry", "INVEST IN INDUSTRY — $1000") +
+            actionButton("build-factory", "BUILD MILITARY FACTORY — 4 CONSTRUCTION")
+    },
+    production: {
+        title: "Military Production",
+        kicker: "INDUSTRIAL COMMAND",
+        html: () =>
+            infoCard("Factories",
+                statRow("Civilian", factories.civilian) +
+                statRow("Military", factories.military) +
+                statRow("Naval", factories.naval)
+            ) +
+            infoCard("Production Lines",
+                Object.entries(production).map(([key, p]) =>
+                    `<div>
+                        ${statRow(p.name, `${p.factories} factories`)}
+                        ${progressRow("Progress", p.progress)}
+                        ${actionButton(`factory-${key}`, `ASSIGN +1 ${key} FACTORY`)}
+                    </div>`
+                ).join("")
+            ) +
+            actionButton("buy-tank", "BUY TANK — $800 / 80 STEEL") +
+            actionButton("buy-infantry", "BUY INFANTRY EQUIPMENT — $350 / 35 STEEL") +
+            actionButton("buy-artillery", "BUY ARTILLERY — $600 / 65 STEEL") +
+            actionButton("buy-air", "BUY AIRCRAFT — $1100 / 90 STEEL")
+    },
+    research: {
+        title: "Technology",
+        kicker: "RESEARCH COMMAND",
+        html: () =>
+            infoCard("Research",
+                Object.entries(tech).map(([key, t]) =>
+                    `<div>
+                        ${statRow(t.name, t.completed ? "COMPLETED" : t.active ? `${Math.round(t.progress)}%` : "AVAILABLE")}
+                        ${progressRow("Research", t.progress)}
+                        ${actionButton(`research-${key}`,
+                            t.completed ? "COMPLETED" : t.active ? "RESEARCHING" : "START RESEARCH"
+                        )}
+                    </div>`
+                ).join("")
+            )
+    },
+    diplomacy: {
+        title: "Diplomacy",
+        kicker: "FOREIGN AFFAIRS",
+        html: () =>
+            infoCard("International Relations",
+                Object.entries(diplomacy).map(([key, value]) =>
+                    `<div>
+                        ${statRow(`${nation[key]?.[0] || '🏳️'} ${nation[key]?.[1] || key}`, value)}
+                        ${actionButton(`dip-${key}`, "IMPROVE RELATIONS")}
+                        ${actionButton(`diplomatic-${key}`, value < -50 ? "DECLARE WAR" : "PROPOSE PACT")}
+                    </div>`
+                ).join("")
+            ) +
+            infoCard("Diplomatic Log",
+                diplomaticMessages.map(m =>
+                    `<div style="font-size:10px;color:var(--muted);padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+                        [${m.time}] ${m.message}
+                    </div>`
+                ).join("") || "No diplomatic activity"
+            )
+    },
+    intel: {
+        title: "Intelligence",
+        kicker: "INTELLIGENCE COMMAND",
+        html: () =>
+            infoCard("Intelligence Network",
+                progressRow("Intel Level", intel) +
+                progressRow("Spy Network", spy) +
+                progressRow("Counter Intel", counterIntel) +
+                statRow("Enemy Units Detected", units.filter(u => !u.friendly && u.state !== "DESTROYED").length)
+            ) +
+            actionButton("run-recon", "RUN RECON — $250") +
+            actionButton("expand-spy", "EXPAND SPY NETWORK — $400") +
+            actionButton("improve-counter", "IMPROVE COUNTER INTEL — $350")
+    }
+};
+
+/* =========================================================
+   UI SETUP (UPDATED - Added event listeners)
+   ========================================================== */
+
+function setupUI() {
+    // Panel buttons
+    document.querySelectorAll('.panel-button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const panel = btn.dataset.panel;
+            if (panel === 'settings') {
+                toast("Settings panel coming soon");
+                return;
+            }
+            openPanel(panel);
+        });
+    });
+
+    // Close panel
+    $("closePanel")?.addEventListener('click', () => {
+        $("mainPanel")?.classList.remove('open');
+    });
+
+    // Close unit panel
+    $("closeUnit")?.addEventListener('click', () => {
+        $("unitPanel")?.classList.remove('open');
+        if (selectedUnit) {
+            selectedUnit.selected = false;
+            clearSelectionVisual(selectedUnit);
+            selectedUnit = null;
+        }
+    });
+
+    // Command buttons
+    $("moveCommand")?.addEventListener('click', commandMove);
+    $("attackCommand")?.addEventListener('click', commandAttack);
+    $("defendCommand")?.addEventListener('click', commandDefend);
+    $("holdCommand")?.addEventListener('click', commandHold);
+    $("retreatCommand")?.addEventListener('click', commandRetreat);
+    $("airstrikeCommand")?.addEventListener('click', commandAirstrike);
+
+    // Camera controls
+    $("zoomIn")?.addEventListener('click', () => {
+        controls.minDistance = 18;
+        controls.maxDistance = 260;
+        const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+        camera.position.addScaledVector(dir, -8);
+        controls.update();
+    });
+    $("zoomOut")?.addEventListener('click', () => {
+        const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+        camera.position.addScaledVector(dir, 8);
+        controls.update();
+    });
+    $("resetCamera")?.addEventListener('click', () => {
+        camera.position.set(0, 82, 86);
+        controls.target.set(0, 0, 0);
+        controls.update();
+    });
+
+    // Pause/Speed
+    $("pauseBtn")?.addEventListener('click', () => {
+        paused = !paused;
+        $("pauseBtn").textContent = paused ? "▶" : "Ⅱ";
+        toast(paused ? "Game paused" : "Game resumed");
+    });
+    $("speedBtn")?.addEventListener('click', () => {
+        speed = speed === 1 ? 2 : speed === 2 ? 4 : 1;
+        $("speedBtn").textContent = `${speed}×`;
+        toast(`Speed: ${speed}×`);
+    });
+
+    // Country select
+    document.querySelectorAll('.country-card').forEach(card => {
+        card.addEventListener('click', () => {
+            currentCountry = card.dataset.country;
+            const [flag, name] = nation[currentCountry] || ["🏳️", currentCountry];
+            $("countryFlag").textContent = flag;
+            $("countryName").textContent = name;
+            $("countryModal")?.classList.remove('open');
+            toast(`Switched to ${name}`);
+        });
+    });
+    $("closeCountryModal")?.addEventListener('click', () => {
+        $("countryModal")?.classList.remove('open');
+    });
+
+    // Tutorial
+    let tutorialStep = 0;
+    const tutorialData = [
+        { icon: "🎖️", title: "Welcome, Commander", text: "Select a military unit and command it across the battlefield." },
+        { icon: "📍", title: "Movement", text: "Click a friendly unit, then click 'MOVE' and tap terrain to set destination." },
+        { icon: "⚔️", title: "Combat", text: "Select a unit, click 'ATTACK', then tap an enemy unit to engage." },
+        { icon: "📊", title: "Strategy", text: "Use the left panel to manage economy, production, research, and diplomacy." }
+    ];
+
+    $("tutorialNext")?.addEventListener('click', () => {
+        tutorialStep++;
+        if (tutorialStep >= tutorialData.length) {
+            $("tutorial").style.display = 'none';
+            return;
+        }
+        const t = tutorialData[tutorialStep];
+        $("tutorialIcon").textContent = t.icon;
+        $("tutorialTitle").textContent = t.title;
+        $("tutorialText").textContent = t.text;
+        $("tutorialNext").textContent = tutorialStep === tutorialData.length - 1 ? "FINISH" : "NEXT";
+    });
+
+    // Panel content event delegation for dynamic buttons
+    $("panelContent")?.addEventListener('click', (e) => {
+        const target = e.target.closest('button');
+        if (!target) return;
+
+        // Layer buttons
+        if (target.dataset.layer) {
+            setMapLayer(target.dataset.layer);
+            openPanel("overview");
+            return;
+        }
+
+        // Select unit buttons
+        if (target.classList.contains('select-unit')) {
+            const id = target.dataset.id;
+            const unit = units.find(u => u.id === id);
+            if (unit) selectUnit(unit);
+            return;
+        }
+
+        // Economy actions
+        if (target.id === 'tax-down') {
+            tax = Math.max(5, tax - 2);
+            toast(`Tax lowered to ${tax}%`);
+            openPanel("economy");
+        }
+        if (target.id === 'tax-up') {
+            tax = Math.min(50, tax + 2);
+            toast(`Tax raised to ${tax}%`);
+            openPanel("economy");
+        }
+        if (target.id === 'invest-industry') {
+            if (money < 1000) { toast("Not enough money"); return; }
+            money -= 1000;
+            construction += 2;
+            toast("Industry investment successful");
+            openPanel("economy");
+        }
+        if (target.id === 'build-factory') {
+            if (construction < 4) { toast("Need 4 construction points"); return; }
+            construction -= 4;
+            factories.military++;
+            toast("Military factory built");
+            openPanel("economy");
+        }
+
+        // Production actions
+        if (target.id.startsWith('factory-')) {
+            const type = target.id.replace('factory-', '');
+            assignFactory(type);
+        }
+        ['buy-tank', 'buy-infantry', 'buy-artillery', 'buy-air'].forEach(id => {
+            if (target.id === id) {
+                const type = id.replace('buy-', '').toUpperCase();
+                const p = production[type];
+                if (!p) return;
+                if (money < p.cost) { toast("Not enough money"); return; }
+                if (steel < p.steel) { toast("Not enough steel"); return; }
+                money -= p.cost;
+                steel -= p.steel;
+                // Add a new unit
+                const pos = new THREE.Vector3((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40);
+                createUnit(`New ${p.name} Unit`, type, pos.x, pos.z);
+                toast(`${p.name} unit deployed`);
+                openPanel("production");
+                updateAllUI();
+            }
+        });
+
+        // Research actions
+        if (target.id.startsWith('research-')) {
+            const key = target.id.replace('research-', '');
+            startResearch(key);
+        }
+
+        // Diplomacy actions
+        if (target.id.startsWith('dip-')) {
+            const country = target.id.replace('dip-', '');
+            improveDiplomacy(country);
+        }
+        if (target.id.startsWith('diplomatic-')) {
+            const country = target.id.replace('diplomatic-', '');
+            diplomaticAction(country);
+        }
+
+        // Intel actions
+        if (target.id === 'run-recon') runRecon();
+        if (target.id === 'expand-spy') expandSpyNetwork();
+        if (target.id === 'improve-counter') improveCounterIntel();
+    });
+
+    // Initial panel
+    openPanel('overview');
+
+    // Update date display
+    updateDateDisplay();
+}
+
+function openPanel(name) {
+    const panel = panels[name];
+    if (!panel) return;
+    const kicker = $("panelKicker");
+    const title = $("panelTitle");
+    const content = $("panelContent");
+    const mainPanel = $("mainPanel");
+
+    if (kicker) kicker.textContent = panel.kicker || "STRATEGIC COMMAND";
+    if (title) title.textContent = panel.title || name.toUpperCase();
+    if (content) content.innerHTML = panel.html();
+    if (mainPanel) mainPanel.classList.add('open');
+
+    // Update active button
+    document.querySelectorAll('.panel-button').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.panel === name);
+    });
+}
+
+function updateAllUI() {
+    updateDateDisplay();
+    updateResources();
+    updateUnitPanel();
+    updateBattleStatus();
+}
+
+function updateDateDisplay() {
+    const date = $("gameDate");
+    if (!date) return;
+    const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    date.textContent = `${year} • ${months[month-1] || "JAN"} ${String(day).padStart(2,'0')}`;
+}
+
+function updateResources() {
+    const res = [
+        { id: 'money', val: Math.floor(money).toLocaleString() },
+        { id: 'oil', val: Math.floor(oil).toLocaleString() },
+        { id: 'steel', val: Math.floor(steel).toLocaleString() },
+        { id: 'food', val: Math.floor(food).toLocaleString() },
+        { id: 'manpower', val: Math.floor(manpower).toLocaleString() }
+    ];
+    res.forEach(r => {
+        const el = $(r.id);
+        if (el) el.textContent = r.val;
+    });
+}
+
+function updateBattleStatus() {
+    const el = $("battleStatus");
+    if (!el) return;
+    const enemies = units.filter(u => !u.friendly && u.state !== "DESTROYED");
+    if (enemies.length === 0) {
+        el.textContent = "🎉 VICTORY! ALL ENEMIES DESTROYED";
+        el.style.color = "var(--green)";
+        return;
+    }
+    const activeBattles = units.filter(u => u.state === "UNDER_ATTACK" || u.state === "ATTACKING");
+    if (activeBattles.length > 0) {
+        el.textContent = `⚔️ ACTIVE BATTLE — ${activeBattles.length} units engaged`;
+        el.style.color = "var(--red)";
+    } else {
+        el.textContent = `🛡️ STANDING BY — ${enemies.length} enemy units remain`;
+        el.style.color = "var(--accent)";
+    }
+}
+
+function toast(message) {
+    const el = $("toast");
+    if (!el) return;
+    el.textContent = message;
+    el.classList.add('show');
+    clearTimeout(el._timeout);
+    el._timeout = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+/* =========================================================
+   GAME LOOP (UPDATED - Added autosave)
+   ========================================================== */
+
+function loop() {
+    requestAnimationFrame(loop);
+
+    const dt = Math.min(clock.getDelta(), 0.05);
+
+    if (!paused) {
+        // Date tick
+        lastDateTick += dt * speed;
+        if (lastDateTick >= 1.2) {
+            lastDateTick = 0;
+            day++;
+            if (day > 30) {
+                day = 1;
+                month++;
+                if (month > 12) {
+                    month = 1;
+                    year++;
+                }
+                updateDateDisplay();
+            }
+        }
+
+        // Economy
+        updateEconomy(dt);
+
+        // Production
+        updateProduction(dt);
+
+        // Research
+        updateResearch(dt);
+
+        // Unit movements
+        updateUnitMovement(dt);
+
+        // Supply
+        updateSupply(dt);
+
+        // Recovery
+        updateRecovery(dt);
+
+        // Enemy AI
+        enemyAI(dt);
+
+        // Effects
+        updateEffects(dt);
+
+        // Autosave every 30 seconds
+        autosaveTimer += dt;
+        if (autosaveTimer >= 30) {
+            autosaveTimer = 0;
+            autosave();
+        }
+
+        // Update UI
+        updateResources();
+        updateBattleStatus();
+
+        // Selection ring animation
+        if (selectedUnit && selectedUnit.selectionRing) {
+            const ring = selectedUnit.selectionRing;
+            ring.material.opacity = 0.6 + Math.sin(Date.now() * 0.003) * 0.3;
+        }
+    }
+
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+// Start the game
+init().catch(console.error);
