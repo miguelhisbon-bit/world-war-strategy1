@@ -1,141 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
 
-  <title>WARFRONT 3D</title>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
 
-  <link rel="stylesheet" href="style.css">
+    <title>WARFRONT — 3D Tactical Command</title>
+
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-  <!-- ================= LOADING SCREEN ================= -->
+    <!-- LOADING SCREEN -->
 
-  <div id="loading">
+    <div id="loading">
 
-    <div class="loading-content">
+        <div class="loading-box">
 
-      <div class="game-logo">
-        WARFRONT
-      </div>
+            <div class="logo">
+                WARFRONT
+            </div>
 
-      <div class="game-subtitle">
-        3D TACTICAL COMMAND
-      </div>
+            <div class="subtitle">
+                3D TACTICAL COMMAND
+            </div>
 
-      <div class="loading-line"></div>
+            <div class="loading-line">
+                <div id="progress"></div>
+            </div>
 
-      <div class="loading-bar">
-        <div id="progress"></div>
-      </div>
+            <div id="loadText">
+                Initializing battlefield...
+            </div>
 
-      <div id="loadText">
-        Initializing battlefield...
-      </div>
-
-    </div>
-
-  </div>
-
-
-  <!-- ================= GAME HUD ================= -->
-
-  <div id="hud">
-
-    <!-- TOP BAR -->
-
-    <header>
-
-      <div class="brand">
-
-        <div class="brand-title">
-          WARFRONT
         </div>
 
-        <div class="brand-subtitle">
-          TACTICAL COMMAND
+    </div>
+
+
+    <!-- GAME UI -->
+
+    <div id="ui">
+
+        <div class="topbar">
+
+            <div>
+                <b>WARFRONT</b>
+                <span>TACTICAL COMMAND</span>
+            </div>
+
+            <div class="resources">
+
+                💰 <span id="money">10000</span>
+
+                ⛽ <span id="fuel">1000</span>
+
+                🏆 <span id="score">0</span>
+
+            </div>
+
         </div>
 
-      </div>
+
+        <div class="mission">
+
+            <b>MISSION</b>
+
+            <div id="mission">
+                Destroy the enemy forces
+            </div>
+
+        </div>
 
 
-      <div class="resources">
-
-        <span>
-          💰 <b id="money">5000</b>
-        </span>
-
-        <span>
-          ⛽ <b id="fuel">1000</b>
-        </span>
-
-        <span>
-          🔩 <b id="metal">2000</b>
-        </span>
-
-      </div>
-
-    </header>
+        <div id="info">
+            Select a unit
+        </div>
 
 
-    <!-- MISSION -->
+        <div class="controls">
 
-    <div id="mission">
-      🎯 CAPTURE THE ENEMY HEADQUARTERS
-    </div>
+            <button id="attack">
+                ⚔ ATTACK
+            </button>
 
+            <button id="air">
+                ✈ AIR STRIKE
+            </button>
 
-    <!-- INFORMATION -->
+            <button id="defend">
+                🛡 DEFEND
+            </button>
 
-    <div id="info">
-      Select a unit, then tap/click the battlefield to move it.
-    </div>
+            <button id="reset">
+                🎯 RESET CAMERA
+            </button>
 
-
-    <!-- MINIMAP -->
-
-    <div id="minimap">
-
-      <div class="map-grid"></div>
-
-      <div class="player-marker"></div>
-
-      <div class="enemy-marker"></div>
+        </div>
 
     </div>
 
 
-    <!-- BOTTOM CONTROLS -->
+    <!-- IMPORTANT -->
 
-    <div id="controls">
-
-      <button id="attack">
-        ⚔ ATTACK
-      </button>
-
-      <button id="air">
-        ✈ AIR STRIKE
-      </button>
-
-      <button id="defend">
-        🛡 DEFEND
-      </button>
-
-      <button id="reset">
-        ⌾ RESET CAMERA
-      </button>
-
-    </div>
-
-  </div>
-
-
-  <!-- ================= THREE.JS GAME ================= -->
-
-  <script type="module" src="js/main.js"></script>
+    <script
+        type="module"
+        src="js/main.js">
+    </script>
 
 </body>
 </html>
