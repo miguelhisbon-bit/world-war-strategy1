@@ -3,728 +3,257 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#050912">
-  <title>World War Strategy</title>
+  <title>WARFRONT — Tactical Command</title>
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<!-- LOADING SCREEN -->
-<div id="loadingScreen">
-
-  <div class="loader-earth">
-    <div class="earth-core"></div>
-    <div class="earth-ring ring-one"></div>
-    <div class="earth-ring ring-two"></div>
+  <!-- LOADING -->
+  <div id="loadingScreen">
+    <div class="loader-logo">WARFRONT</div>
+    <div class="loader-sub">TACTICAL COMMAND SYSTEM</div>
+    <div class="loader-bar">
+      <div id="loadingProgress"></div>
+    </div>
+    <div id="loadingText">Initializing battlefield...</div>
   </div>
 
-  <div class="loading-title">
-    WORLD WAR<br>
-    <span>STRATEGY</span>
-  </div>
-
-  <div class="loading-status" id="loadingStatus">
-    INITIALIZING WORLD...
-  </div>
-
-  <div class="loading-bar">
-    <div id="loadingProgress"></div>
-  </div>
-
-  <div class="loading-percent" id="loadingPercent">
-    0%
-  </div>
-
-</div>
-
-
-<!-- MAIN GAME -->
-
-<header class="topbar">
-
-  <div class="brand">
-    <div class="brand-icon">🌍</div>
+  <!-- TOP BAR -->
+  <header class="topbar">
     <div>
-      <strong>WORLD WAR</strong>
-      <small>STRATEGY</small>
-    </div>
-  </div>
-
-  <div class="resources">
-
-    <div class="resource">
-      <span>💰</span>
-      <b id="money">10,000</b>
+      <div class="game-title">WARFRONT</div>
+      <div class="game-subtitle">TACTICAL COMMAND</div>
     </div>
 
-    <div class="resource">
-      <span>🛢️</span>
-      <b id="oil">5,000</b>
+    <div class="resources">
+      <div>💰 <span id="money">5000</span></div>
+      <div>⛽ <span id="fuel">1000</span></div>
+      <div>🔩 <span id="metal">2000</span></div>
+      <div>⭐ Lv.<span id="level">1</span></div>
     </div>
+  </header>
 
-    <div class="resource">
-      <span>⛓️</span>
-      <b id="steel">5,000</b>
-    </div>
+  <!-- MAIN GAME -->
+  <main id="game">
 
-    <div class="resource">
-      <span>🌾</span>
-      <b id="food">5,000</b>
-    </div>
+    <!-- BATTLEFIELD -->
+    <section id="battlefield">
 
-  </div>
+      <div class="sky"></div>
 
-  <button class="icon-button" id="profileButton">👤</button>
+      <div class="terrain">
 
-</header>
+        <!-- mountains -->
+        <div class="mountain m1"></div>
+        <div class="mountain m2"></div>
+        <div class="mountain m3"></div>
 
+        <!-- river -->
+        <div class="river"></div>
 
-<div class="game-layout">
+        <!-- roads -->
+        <div class="road road1"></div>
+        <div class="road road2"></div>
 
+        <!-- forests -->
+        <div class="forest f1">🌲🌲🌲</div>
+        <div class="forest f2">🌲🌲🌲</div>
+        <div class="forest f3">🌲🌲🌲</div>
 
-  <!-- DESKTOP SIDE MENU -->
-
-  <aside class="side-menu">
-
-    <button class="menu-item active" data-page="world">
-      <span>🌍</span>
-      <label>World</label>
-    </button>
-
-    <button class="menu-item" data-page="nation">
-      <span>🏳️</span>
-      <label>Nation</label>
-    </button>
-
-    <button class="menu-item" data-page="military">
-      <span>🪖</span>
-      <label>Military</label>
-    </button>
-
-    <button class="menu-item" data-page="battle">
-      <span>⚔️</span>
-      <label>Battle</label>
-    </button>
-
-    <button class="menu-item" data-page="cities">
-      <span>🏙️</span>
-      <label>Cities</label>
-    </button>
-
-    <button class="menu-item" data-page="research">
-      <span>🔬</span>
-      <label>Research</label>
-    </button>
-
-    <button class="menu-item" data-page="diplomacy">
-      <span>🤝</span>
-      <label>Diplomacy</label>
-    </button>
-
-    <button class="menu-item" data-page="intel">
-      <span>🛰️</span>
-      <label>Intel</label>
-    </button>
-
-  </aside>
-
-
-  <main class="main-content">
-
-
-    <!-- WORLD PAGE -->
-
-    <section class="page active" id="world">
-
-      <div class="page-heading">
-
-        <div>
-          <div class="eyebrow">COMMAND CENTER</div>
-          <h1>World Map</h1>
-          <p>Control your nation. Shape the future.</p>
+        <!-- bases -->
+        <div class="base friendly-base" id="friendlyBase">
+          <div class="base-building">🏰</div>
+          <span>HQ</span>
         </div>
 
-        <div class="status-pill">
-          <i></i>
-          LIVE WORLD
+        <div class="base air-base">
+          <div class="base-building">✈️</div>
+          <span>AIR BASE</span>
+        </div>
+
+        <div class="base naval-base">
+          <div class="base-building">⚓</div>
+          <span>NAVAL BASE</span>
+        </div>
+
+        <div class="base enemy-base">
+          <div class="base-building">🏯</div>
+          <span>ENEMY HQ</span>
+        </div>
+
+        <!-- capture points -->
+        <div class="capture-point cp1">A</div>
+        <div class="capture-point cp2">B</div>
+        <div class="capture-point cp3">C</div>
+
+        <!-- units -->
+        <div class="unit tank friendly" id="tank1">🚜</div>
+        <div class="unit tank friendly" id="tank2">🚜</div>
+
+        <div class="unit infantry friendly" id="infantry1">🪖</div>
+        <div class="unit infantry friendly" id="infantry2">🪖</div>
+
+        <div class="unit aircraft friendly" id="aircraft1">✈️</div>
+
+        <div class="unit tank enemy" id="enemyTank1">🚜</div>
+        <div class="unit infantry enemy" id="enemyInfantry1">🪖</div>
+        <div class="unit aircraft enemy" id="enemyAircraft1">✈️</div>
+
+        <!-- effects -->
+        <div id="effects"></div>
+
+      </div>
+
+      <!-- BATTLE HUD -->
+      <div class="battle-hud">
+
+        <div class="objective">
+          <strong>MISSION</strong>
+          <span id="missionText">Capture all strategic points</span>
+        </div>
+
+        <div class="battle-status">
+          <span class="friendly-status">ALLY <b id="allyScore">50</b></span>
+          <div class="scorebar">
+            <div id="allyBar"></div>
+          </div>
+          <span class="enemy-status">ENEMY <b id="enemyScore">50</b></span>
         </div>
 
       </div>
 
-
-      <div class="globe-card">
-
-        <div class="globe-header">
-
-          <div>
-            <strong>GLOBAL STRATEGIC MAP</strong>
-            <span>Season 01 • Year 01</span>
-          </div>
-
-          <div class="globe-actions">
-
-            <button id="rotateButton">↻</button>
-            <button id="zoomIn">+</button>
-            <button id="zoomOut">−</button>
-
-          </div>
-
-        </div>
-
-
-        <div id="globeContainer">
-
-          <div class="map-label label-one">
-            AURORA
-          </div>
-
-          <div class="map-label label-two">
-            NORTHERN
-          </div>
-
-          <div class="map-label label-three">
-            WESTERN
-          </div>
-
-          <div class="map-crosshair">
-            <span></span>
-          </div>
-
-        </div>
-
-
-        <div class="map-legend">
-
-          <span>
-            <i class="dot player"></i>
-            Your Territory
-          </span>
-
-          <span>
-            <i class="dot ally"></i>
-            Ally
-          </span>
-
-          <span>
-            <i class="dot enemy"></i>
-            Hostile
-          </span>
-
-        </div>
-
+      <!-- CAMERA -->
+      <div class="camera-controls">
+        <button id="zoomIn">＋</button>
+        <button id="zoomOut">−</button>
+        <button id="resetCamera">⌾</button>
       </div>
 
-
-      <div class="dashboard-grid">
-
-        <div class="dashboard-card nation-card">
-
-          <div class="card-icon">🏳️</div>
-
-          <div>
-            <small>YOUR NATION</small>
-            <h2 id="nationName">Aurora Federation</h2>
-            <span>Capital • Aurora City</span>
-          </div>
-
-        </div>
-
-
-        <div class="dashboard-card">
-
-          <small>MILITARY POWER</small>
-
-          <div class="stat-large" id="armyPower">
-            18,420
-          </div>
-
-          <div class="mini-progress">
-            <i style="width:72%"></i>
-          </div>
-
-        </div>
-
-
-        <div class="dashboard-card">
-
-          <small>STABILITY</small>
-
-          <div class="stat-large">
-            <span id="stability">78</span>%
-          </div>
-
-          <div class="mini-progress">
-            <i id="stabilityProgress" style="width:78%"></i>
-          </div>
-
-        </div>
-
-
-      </div>
-
-
-      <div class="section-title">
-        <h2>Strategic Events</h2>
-        <button id="randomEvent">🎲 Random Event</button>
-      </div>
-
-      <div id="newsFeed" class="news-feed"></div>
-
-    </section>
-
-
-    <!-- NATION -->
-
-    <section class="page" id="nation">
-
-      <div class="page-heading">
-        <div>
-          <div class="eyebrow">NATIONAL COMMAND</div>
-          <h1>Nation</h1>
-          <p>Manage your country and policies.</p>
-        </div>
-      </div>
-
-
-      <div class="hero-nation">
-
-        <div class="flag-large">
-          🌌
-        </div>
-
-        <div>
-          <small>COMMANDER OF</small>
-          <h1>Aurora Federation</h1>
-          <p>Level <b id="nationLevel">1</b> • Reputation <b id="reputation">50</b></p>
-        </div>
-
-      </div>
-
-
-      <div class="cards-grid">
-
-        <div class="game-card">
-
-          <div class="card-heading">
-            <span>🏛️</span>
-            <h3>Government</h3>
-          </div>
-
-          <p>Stability</p>
-
-          <div class="progress">
-            <i id="nationStability" style="width:78%"></i>
-          </div>
-
-          <button class="primary-button" id="industrialPolicy">
-            Industrial Policy
-          </button>
-
-          <button class="secondary-button" id="socialPolicy">
-            Social Program
-          </button>
-
-        </div>
-
-
-        <div class="game-card">
-
-          <div class="card-heading">
-            <span>💰</span>
-            <h3>Economy</h3>
-          </div>
-
-          <p>Treasury</p>
-          <h2 id="nationMoney">10,000</h2>
-
-          <button class="primary-button" id="tradeButton">
-            Expand Trade
-          </button>
-
-        </div>
-
-
-        <div class="game-card">
-
-          <div class="card-heading">
-            <span>🛡️</span>
-            <h3>Defense</h3>
-          </div>
-
-          <p>Defense Rating</p>
-          <h2 id="defense">500</h2>
-
-          <button class="primary-button" id="defensePolicy">
-            Strengthen Defense
-          </button>
-
-        </div>
-
+      <!-- MINIMAP -->
+      <div class="minimap">
+        <div class="mini-friendly">●</div>
+        <div class="mini-enemy">●</div>
+        <div class="mini-objective">◆</div>
       </div>
 
     </section>
 
+    <!-- SIDE COMMAND PANEL -->
+    <aside class="command-panel">
 
-    <!-- MILITARY -->
+      <div class="panel-title">COMMAND CENTER</div>
 
-    <section class="page" id="military">
-
-      <div class="page-heading">
+      <div class="commander-card">
+        <div class="commander-avatar">🧑‍✈️</div>
         <div>
-          <div class="eyebrow">ARMED FORCES</div>
-          <h1>Military</h1>
-          <p>Build and command your armed forces.</p>
+          <strong>Commander</strong>
+          <small>Field Marshal</small>
         </div>
       </div>
 
-
-      <div class="unit-grid">
-
-        <div class="unit-card">
-
-          <div class="unit-image">🪖</div>
-
-          <div>
-            <small>GROUND FORCES</small>
-            <h2>Infantry</h2>
-            <strong id="infantry">1,000</strong>
-          </div>
-
-          <button class="primary-button" data-unit="infantry">
-            Train
-          </button>
-
+      <div class="stats-grid">
+        <div>
+          <span>UNITS</span>
+          <b id="unitCount">5</b>
         </div>
-
-
-        <div class="unit-card">
-
-          <div class="unit-image">🛡️</div>
-
-          <div>
-            <small>ARMORED FORCES</small>
-            <h2>Armor</h2>
-            <strong id="armor">150</strong>
-          </div>
-
-          <button class="primary-button" data-unit="armor">
-            Produce
-          </button>
-
+        <div>
+          <span>ENEMIES</span>
+          <b id="enemyCount">3</b>
         </div>
-
-
-        <div class="unit-card">
-
-          <div class="unit-image">✈️</div>
-
-          <div>
-            <small>AIR FORCE</small>
-            <h2>Aircraft</h2>
-            <strong id="aircraft">60</strong>
-          </div>
-
-          <button class="primary-button" data-unit="aircraft">
-            Produce
-          </button>
-
+        <div>
+          <span>BASES</span>
+          <b>4</b>
         </div>
-
-
-        <div class="unit-card">
-
-          <div class="unit-image">🚢</div>
-
-          <div>
-            <small>NAVY</small>
-            <h2>Ships</h2>
-            <strong id="ships">25</strong>
-          </div>
-
-          <button class="primary-button" data-unit="ships">
-            Build
-          </button>
-
+        <div>
+          <span>VICTORIES</span>
+          <b id="victories">0</b>
         </div>
+      </div>
+
+      <div class="command-buttons">
+
+        <button class="command-btn" id="attackBtn">
+          ⚔️ ATTACK
+        </button>
+
+        <button class="command-btn" id="defendBtn">
+          🛡️ DEFEND
+        </button>
+
+        <button class="command-btn" id="airStrikeBtn">
+          ✈️ AIR STRIKE
+        </button>
+
+        <button class="command-btn" id="scoutBtn">
+          🔭 SCOUT
+        </button>
+
+        <button class="command-btn" id="reinforceBtn">
+          🪖 REINFORCE
+        </button>
+
+        <button class="command-btn" id="repairBtn">
+          🔧 REPAIR
+        </button>
 
       </div>
 
+      <div class="section-title">UNIT CONTROL</div>
 
-      <div class="game-card airbase-card">
+      <div class="unit-list">
 
-        <div class="card-heading">
+        <button class="unit-card selected" data-unit="tank1">
+          <span>🚜</span>
+          <div>
+            <b>Heavy Tank</b>
+            <small>HP 100 • ATK 35</small>
+          </div>
+        </button>
+
+        <button class="unit-card" data-unit="infantry1">
+          <span>🪖</span>
+          <div>
+            <b>Infantry</b>
+            <small>HP 80 • ATK 20</small>
+          </div>
+        </button>
+
+        <button class="unit-card" data-unit="aircraft1">
           <span>✈️</span>
-          <h3>Air Base Network</h3>
-        </div>
-
-        <div class="big-stat">
-          <b id="airBases">2</b>
-          <span>Operational Bases</span>
-        </div>
-
-        <button class="primary-button" id="buildAirBase">
-          Build Air Base • 💰 1,500
+          <div>
+            <b>Fighter</b>
+            <small>HP 90 • ATK 45</small>
+          </div>
         </button>
 
       </div>
 
-    </section>
+      <div class="section-title">SYSTEM</div>
 
-
-    <!-- BATTLE -->
-
-    <section class="page" id="battle">
-
-      <div class="page-heading">
-        <div>
-          <div class="eyebrow">WAR ROOM</div>
-          <h1>Battle Command</h1>
-          <p>Plan your next strategic operation.</p>
-        </div>
+      <div class="system-buttons">
+        <button id="researchBtn">🔬 Research</button>
+        <button id="missionBtn">🎯 Missions</button>
+        <button id="saveBtn">💾 Save Game</button>
       </div>
 
-
-      <div class="battle-arena">
-
-        <div class="army-side your-army">
-
-          <div class="army-emblem">
-            🛡️
-          </div>
-
-          <small>YOUR FORCES</small>
-
-          <h2 id="battlePower">
-            18,420
-          </h2>
-
-          <span>Combat Power</span>
-
-        </div>
-
-
-        <div class="battle-vs">
-          VS
-        </div>
-
-
-        <div class="army-side enemy-army">
-
-          <div class="army-emblem">
-            ⚔️
-          </div>
-
-          <small>ENEMY</small>
-
-          <h2 id="enemyPower">
-            12,800
-          </h2>
-
-          <span>Estimated Power</span>
-
-        </div>
-
+      <div id="notification">
+        Battlefield ready.
       </div>
 
-
-      <div class="game-card">
-
-        <div class="card-heading">
-          <span>🎯</span>
-          <h3>Operation Planning</h3>
-        </div>
-
-
-        <label>Target</label>
-
-        <select id="target">
-
-          <option>Northern Dominion</option>
-          <option>Western Empire</option>
-          <option>Southern Territory</option>
-
-        </select>
-
-
-        <label>Terrain</label>
-
-        <select id="terrain">
-
-          <option>🏙️ Urban</option>
-          <option>🌲 Forest</option>
-          <option>🏔️ Mountain</option>
-          <option>🏜️ Desert</option>
-          <option>🌾 Plains</option>
-
-        </select>
-
-
-        <label>Weather</label>
-
-        <select id="weather">
-
-          <option>☀️ Clear</option>
-          <option>🌧️ Rain</option>
-          <option>🌫️ Fog</option>
-          <option>❄️ Snow</option>
-
-        </select>
-
-
-        <button class="battle-button" id="startBattle">
-          ⚔️ LAUNCH OPERATION
-        </button>
-
-
-        <div id="battleResult" class="battle-result">
-          Awaiting orders...
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <!-- CITIES -->
-
-    <section class="page" id="cities">
-
-      <div class="page-heading">
-        <div>
-          <div class="eyebrow">INFRASTRUCTURE</div>
-          <h1>Cities</h1>
-          <p>Develop your nation's key locations.</p>
-        </div>
-      </div>
-
-      <div id="citiesList" class="city-list"></div>
-
-    </section>
-
-
-    <!-- RESEARCH -->
-
-    <section class="page" id="research">
-
-      <div class="page-heading">
-        <div>
-          <div class="eyebrow">TECHNOLOGY</div>
-          <h1>Research</h1>
-          <p>Unlock advanced strategic capabilities.</p>
-        </div>
-      </div>
-
-      <div id="researchList" class="research-list"></div>
-
-    </section>
-
-
-    <!-- DIPLOMACY -->
-
-    <section class="page" id="diplomacy">
-
-      <div class="page-heading">
-        <div>
-          <div class="eyebrow">FOREIGN AFFAIRS</div>
-          <h1>Diplomacy</h1>
-          <p>Shape relations with other fictional nations.</p>
-        </div>
-      </div>
-
-      <div id="diplomacyList" class="diplomacy-list"></div>
-
-    </section>
-
-
-    <!-- INTELLIGENCE -->
-
-    <section class="page" id="intel">
-
-      <div class="page-heading">
-        <div>
-          <div class="eyebrow">RECONNAISSANCE</div>
-          <h1>Intelligence</h1>
-          <p>Monitor the fictional world.</p>
-        </div>
-      </div>
-
-      <div class="intel-grid">
-
-        <div class="game-card">
-          <div class="intel-icon">🛰️</div>
-          <h2>Satellite</h2>
-          <strong id="satelliteLevel">Level 1</strong>
-          <button class="primary-button" id="upgradeSatellite">
-            Upgrade
-          </button>
-        </div>
-
-        <div class="game-card">
-          <div class="intel-icon">📡</div>
-          <h2>Radar</h2>
-          <strong>Operational</strong>
-          <button class="primary-button" id="scanButton">
-            Scan World
-          </button>
-        </div>
-
-        <div class="game-card">
-          <div class="intel-icon">🔭</div>
-          <h2>Recon</h2>
-          <strong>Ready</strong>
-          <button class="primary-button" id="reconButton">
-            Recon Mission
-          </button>
-        </div>
-
-      </div>
-
-    </section>
-
+    </aside>
 
   </main>
 
-</div>
+  <!-- MODAL -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-box">
+      <button id="closeModal">×</button>
+      <h2 id="modalTitle">Research</h2>
+      <div id="modalContent"></div>
+    </div>
+  </div>
 
-
-<!-- MOBILE NAV -->
-
-<nav class="mobile-nav">
-
-  <button class="active" data-page="world">
-    <span>🌍</span>
-    <small>World</small>
-  </button>
-
-  <button data-page="nation">
-    <span>🏳️</span>
-    <small>Nation</small>
-  </button>
-
-  <button data-page="military">
-    <span>🪖</span>
-    <small>Army</small>
-  </button>
-
-  <button data-page="battle">
-    <span>⚔️</span>
-    <small>Battle</small>
-  </button>
-
-  <button data-page="cities">
-    <span>🏙️</span>
-    <small>Cities</small>
-  </button>
-
-</nav>
-
-
-<div id="toast"></div>
-
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="game.js"></script>
-
+  <script src="game.js"></script>
 </body>
 </html>
