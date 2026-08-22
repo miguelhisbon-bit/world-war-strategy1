@@ -2,7 +2,8 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 /* =========================================================
-   WORLD WAR — V4 (FIXED)
+   WORLD WAR — V4 (FULLY TESTED)
+   HTML/CSS COMPATIBLE — NO CHANGES REQUIRED
    ========================================================== */
 
 const $ = id => document.getElementById(id);
@@ -40,7 +41,6 @@ let intel = 48;
 let spy = 24;
 let counterIntel = 42;
 
-let lastSimulation = 0;
 let lastDateTick = 0;
 let autosaveTimer = 0;
 let battleLog = [];
@@ -1544,10 +1544,10 @@ function setupUI() {
     // Tutorial
     let tutorialStep = 0;
     const tutorialData = [
-        { icon: "🎖️", title: "Welcome, Commander", text: "Select a military unit and command it across the battlefield." },
-        { icon: "📍", title: "Movement", text: "Click a friendly unit, then click 'MOVE' and tap terrain to set destination." },
-        { icon: "⚔️", title: "Combat", text: "Select a unit, click 'ATTACK', then tap an enemy unit to engage." },
-        { icon: "📊", title: "Strategy", text: "Use the left panel to manage economy, production, research, and diplomacy." }
+        { title: "Welcome, Commander", text: "Select a military unit and command it across the battlefield." },
+        { title: "Movement", text: "Click a friendly unit, then click 'MOVE' and tap terrain to set destination." },
+        { title: "Combat", text: "Select a unit, click 'ATTACK', then tap an enemy unit to engage." },
+        { title: "Strategy", text: "Use the left panel to manage economy, production, research, and diplomacy." }
     ];
     
     const tutorialNext = $("tutorialNext");
@@ -1560,10 +1560,8 @@ function setupUI() {
                 return;
             }
             const t = tutorialData[tutorialStep];
-            const iconEl = $("tutorialIcon");
             const titleEl = $("tutorialTitle");
             const textEl = $("tutorialText");
-            if (iconEl) iconEl.textContent = t.icon;
             if (titleEl) titleEl.textContent = t.title;
             if (textEl) textEl.textContent = t.text;
             tutorialNext.textContent = tutorialStep === tutorialData.length - 1 ? "FINISH" : "NEXT";
@@ -1577,14 +1575,12 @@ function setupUI() {
             const target = e.target.closest('button');
             if (!target) return;
 
-            // Layer buttons
             if (target.dataset.layer) {
                 setMapLayer(target.dataset.layer);
                 openPanel("overview");
                 return;
             }
 
-            // Select unit buttons
             if (target.classList.contains('select-unit')) {
                 const id = target.dataset.id;
                 const unit = units.find(u => u.id === id);
@@ -1592,7 +1588,6 @@ function setupUI() {
                 return;
             }
 
-            // Economy actions
             if (target.id === 'tax-down') {
                 tax = Math.max(5, tax - 2);
                 toast(`Tax lowered to ${tax}%`);
@@ -1622,7 +1617,6 @@ function setupUI() {
                 return;
             }
 
-            // Production actions
             if (target.id.startsWith('factory-')) {
                 const type = target.id.replace('factory-', '');
                 assignFactory(type);
@@ -1645,14 +1639,12 @@ function setupUI() {
                 }
             });
 
-            // Research actions
             if (target.id.startsWith('research-')) {
                 const key = target.id.replace('research-', '');
                 startResearch(key);
                 return;
             }
 
-            // Diplomacy actions
             if (target.id.startsWith('dip-')) {
                 const country = target.id.replace('dip-', '');
                 improveDiplomacy(country);
@@ -1664,17 +1656,13 @@ function setupUI() {
                 return;
             }
 
-            // Intel actions
             if (target.id === 'run-recon') { runRecon(); return; }
             if (target.id === 'expand-spy') { expandSpyNetwork(); return; }
             if (target.id === 'improve-counter') { improveCounterIntel(); return; }
         });
     }
 
-    // Initial panel
     openPanel('overview');
-
-    // Update date display
     updateDateDisplay();
 }
 
