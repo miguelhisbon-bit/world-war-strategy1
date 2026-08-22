@@ -1,11 +1,41 @@
 /* =========================================================
-   WARFRONT 3D TACTICAL COMMAND
-   REAL 3D BATTLEFIELD VERSION
-   Mobile + Desktop
+   WARFRONT
+   MOBILE 3D-LOOKING TACTICAL BATTLEFIELD
+   No external library required.
 ========================================================= */
 
-import * as THREE from
-"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+"use strict";
+
+
+/* =========================================================
+   CANVAS
+========================================================= */
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let W = 0;
+let H = 0;
+
+function resize() {
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    W = window.innerWidth;
+    H = window.innerHeight;
+
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+window.addEventListener("resize", resize);
+
+resize();
 
 
 /* =========================================================
@@ -15,453 +45,227 @@ import * as THREE from
 const state = {
 
     money: 11500,
+
     fuel: 1520,
+
     metal: 4140,
+
     score: 5,
 
-    selected: null,
+    level: 1,
 
-    dayTime: 0.25,
+    allyScore: 50,
 
-    cameraDistance: 24,
+    enemyScore: 50,
+
+    victories: 0,
+
+    selected: "tank1",
+
+    zoom: 1,
+
+    cameraX: 0,
+
+    cameraY: 0,
 
     gameOver: false,
 
-    units: [],
-
-    enemies: [],
-
-    bullets: [],
-
-    effects: [],
-
-    particles: []
+    won: false
 
 };
 
 
 /* =========================================================
-   LOADING
+   WORLD
 ========================================================= */
 
-const loading = document.getElementById("loading");
-const progress = document.getElementById("progress");
-const loadText = document.getElementById("loadText");
+const world = {
 
-let load = 0;
+    width: 2200,
 
-const loadingMessages = [
-    "Initializing battlefield...",
-    "Generating terrain...",
-    "Deploying armored units...",
-    "Loading enemy AI...",
-    "Connecting tactical systems...",
-    "Battlefield ready."
-];
+    height: 1500,
 
-const loadTimer = setInterval(() => {
+    riverX: 1050,
 
-    load += 8;
+    roadY: 850,
 
-    if (progress)
-        progress.style.width = load + "%";
+    baseX: 280,
 
-    if (loadText) {
+    baseY: 700,
 
-        const index =
-            Math.min(
-                Math.floor(load / 20),
-                loadingMessages.length - 1
-            );
+    enemyBaseX: 1880,
 
-        loadText.textContent =
-            loadingMessages[index];
+    enemyBaseY: 650
+
+};
+
+
+/* =========================================================
+   UNITS
+========================================================= */
+
+const units = {
+
+    tank1: {
+        name: "TANK ALPHA",
+        type: "tank",
+        x: 400,
+        y: 680,
+        hp: 100,
+        maxHp: 100,
+        attack: 38,
+        speed: 2.2,
+        range: 240,
+        alive: true,
+        color: "#20dfff"
+    },
+
+    tank2: {
+        name: "TANK BRAVO",
+        type: "tank",
+        x: 480,
+        y: 780,
+        hp: 100,
+        maxHp: 100,
+        attack: 35,
+        speed: 2.1,
+        range: 230,
+        alive: true,
+        color: "#20dfff"
+    },
+
+    infantry1: {
+        name: "INFANTRY ALPHA",
+        type: "infantry",
+        x: 330,
+        y: 830,
+        hp: 80,
+        maxHp: 80,
+        attack: 22,
+        speed: 2.8,
+        range: 190,
+        alive: true,
+        color: "#58e59a"
+    },
+
+    infantry2: {
+        name: "INFANTRY BRAVO",
+        type: "infantry",
+        x: 540,
+        y: 900,
+        hp: 80,
+        maxHp: 80,
+        attack: 20,
+        speed: 2.8,
+        range: 185,
+        alive: true,
+        color: "#58e59a"
+    },
+
+    fighter1: {
+        name: "FIGHTER ONE",
+        type: "fighter",
+        x: 650,
+        y: 550,
+        hp: 90,
+        maxHp: 90,
+        attack: 50,
+        speed: 4,
+        range: 500,
+        alive: true,
+        color: "#55c8ff"
     }
 
-    if (load >= 100) {
+};
 
-        clearInterval(loadTimer);
 
-        setTimeout(() => {
+/* =========================================================
+   ENEMIES
+========================================================= */
 
-            if (loading) {
+const enemies = {
 
-                loading.style.opacity = "0";
+    enemyTank1: {
+        name: "ENEMY TANK",
+        type: "tank",
+        x: 1700,
+        y: 600,
+        hp: 100,
+        maxHp: 100,
+        attack: 30,
+        alive: true
+    },
 
-                setTimeout(() => {
-                    loading.remove();
-                }, 800);
+    enemyTank2: {
+        name: "ENEMY TANK",
+        type: "tank",
+        x: 1780,
+        y: 760,
+        hp: 100,
+        maxHp: 100,
+        attack: 30,
+        alive: true
+    },
 
-            }
+    enemyInfantry1: {
+        name: "ENEMY INFANTRY",
+        type: "infantry",
+        x: 1600,
+        y: 820,
+        hp: 80,
+        maxHp: 80,
+        attack: 20,
+        alive: true
+    },
 
-        }, 400);
+    enemyInfantry2: {
+        name: "ENEMY INFANTRY",
+        type: "infantry",
+        x: 1740,
+        y: 920,
+        hp: 80,
+        maxHp: 80,
+        attack: 20,
+        alive: true
+    },
 
+    enemyFighter: {
+        name: "ENEMY FIGHTER",
+        type: "fighter",
+        x: 1550,
+        y: 450,
+        hp: 90,
+        maxHp: 90,
+        attack: 38,
+        alive: true
     }
 
-}, 100);
-
-
-/* =========================================================
-   THREE.JS SCENE
-========================================================= */
-
-const scene = new THREE.Scene();
-
-scene.background =
-    new THREE.Color(0x071317);
-
-scene.fog =
-    new THREE.FogExp2(
-        0x071317,
-        0.012
-    );
-
-
-/* =========================================================
-   CAMERA
-========================================================= */
-
-const camera =
-    new THREE.PerspectiveCamera(
-        55,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000
-    );
-
-camera.position.set(
-    0,
-    20,
-    22
-);
-
-
-/* =========================================================
-   RENDERER
-========================================================= */
-
-const renderer =
-    new THREE.WebGLRenderer({
-        antialias: true,
-        powerPreference: "high-performance"
-    });
-
-renderer.setSize(
-    window.innerWidth,
-    window.innerHeight
-);
-
-renderer.setPixelRatio(
-    Math.min(window.devicePixelRatio, 1.7)
-);
-
-renderer.shadowMap.enabled = true;
-
-renderer.shadowMap.type =
-    THREE.PCFSoftShadowMap;
-
-renderer.outputColorSpace =
-    THREE.SRGBColorSpace;
-
-document.body.insertBefore(
-    renderer.domElement,
-    document.body.firstChild
-);
-
-
-/* =========================================================
-   LIGHTING
-========================================================= */
-
-const ambient =
-    new THREE.HemisphereLight(
-        0x8ccfff,
-        0x142016,
-        1.6
-    );
-
-scene.add(ambient);
-
-
-const sun =
-    new THREE.DirectionalLight(
-        0xffffff,
-        2.2
-    );
-
-sun.position.set(
-    30,
-    50,
-    20
-);
-
-sun.castShadow = true;
-
-sun.shadow.mapSize.width = 2048;
-sun.shadow.mapSize.height = 2048;
-
-sun.shadow.camera.left = -60;
-sun.shadow.camera.right = 60;
-sun.shadow.camera.top = 60;
-sun.shadow.camera.bottom = -60;
-
-scene.add(sun);
-
-
-/* =========================================================
-   TERRAIN
-========================================================= */
-
-const terrainSize = 100;
-
-const terrainGeometry =
-    new THREE.PlaneGeometry(
-        terrainSize,
-        terrainSize,
-        60,
-        60
-    );
-
-const terrainMaterial =
-    new THREE.MeshStandardMaterial({
-        color: 0x163c28,
-        roughness: 0.95
-    });
-
-const terrain =
-    new THREE.Mesh(
-        terrainGeometry,
-        terrainMaterial
-    );
-
-terrain.rotation.x =
-    -Math.PI / 2;
-
-terrain.receiveShadow = true;
-
-scene.add(terrain);
-
-
-/* =========================================================
-   TERRAIN GRID
-========================================================= */
-
-const grid =
-    new THREE.GridHelper(
-        100,
-        50,
-        0x1e5840,
-        0x153c2e
-    );
-
-grid.position.y = 0.03;
-
-scene.add(grid);
-
-
-/* =========================================================
-   RIVER
-========================================================= */
-
-const riverGeometry =
-    new THREE.PlaneGeometry(
-        12,
-        100
-    );
-
-const riverMaterial =
-    new THREE.MeshStandardMaterial({
-        color: 0x087fa0,
-        transparent: true,
-        opacity: 0.82,
-        roughness: 0.15,
-        metalness: 0.15
-    });
-
-const river =
-    new THREE.Mesh(
-        riverGeometry,
-        riverMaterial
-    );
-
-river.rotation.x =
-    -Math.PI / 2;
-
-river.position.y = 0.06;
-
-scene.add(river);
-
-
-/* =========================================================
-   ROADS
-========================================================= */
-
-function createRoad(
-    x,
-    z,
-    width,
-    length,
-    rotation = 0
-) {
-
-    const geo =
-        new THREE.PlaneGeometry(
-            width,
-            length
-        );
-
-    const mat =
-        new THREE.MeshStandardMaterial({
-            color: 0x4b4a40,
-            roughness: 1
-        });
-
-    const road =
-        new THREE.Mesh(
-            geo,
-            mat
-        );
-
-    road.rotation.x =
-        -Math.PI / 2;
-
-    road.rotation.z =
-        rotation;
-
-    road.position.set(
-        x,
-        0.08,
-        z
-    );
-
-    scene.add(road);
-
-    return road;
-}
-
-createRoad(
-    -25,
-    0,
-    8,
-    100
-);
-
-createRoad(
-    25,
-    0,
-    8,
-    100
-);
-
-createRoad(
-    0,
-    10,
-    100,
-    7,
-    Math.PI / 2
-);
-
-
-/* =========================================================
-   BRIDGE
-========================================================= */
-
-const bridge =
-    new THREE.Mesh(
-        new THREE.BoxGeometry(
-            18,
-            0.8,
-            13
-        ),
-        new THREE.MeshStandardMaterial({
-            color: 0x555555
-        })
-    );
-
-bridge.position.set(
-    0,
-    0.6,
-    10
-);
-
-bridge.castShadow = true;
-
-scene.add(bridge);
+};
 
 
 /* =========================================================
    TREES
 ========================================================= */
 
-function createTree(x, z) {
+const trees = [];
 
-    const group =
-        new THREE.Group();
+for (let i = 0; i < 80; i++) {
 
-    const trunk =
-        new THREE.Mesh(
-            new THREE.CylinderGeometry(
-                0.18,
-                0.25,
-                1.5,
-                8
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x49321d
-            })
-        );
+    const x = 40 + Math.random() * (world.width - 80);
+    const y = 40 + Math.random() * (world.height - 80);
 
-    trunk.position.y =
-        0.75;
-
-    trunk.castShadow = true;
-
-    group.add(trunk);
-
-
-    const leaves =
-        new THREE.Mesh(
-            new THREE.ConeGeometry(
-                1.2,
-                3,
-                8
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x1c6334
-            })
-        );
-
-    leaves.position.y =
-        2.3;
-
-    leaves.castShadow = true;
-
-    group.add(leaves);
-
-
-    group.position.set(
-        x,
-        0,
-        z
-    );
-
-    scene.add(group);
-
-}
-
-
-for (let i = 0; i < 45; i++) {
-
-    const x =
-        (Math.random() - 0.5) * 90;
-
-    const z =
-        (Math.random() - 0.5) * 90;
-
-    if (Math.abs(x) < 10)
+    if (
+        Math.abs(x - world.riverX) < 120 ||
+        Math.abs(y - world.roadY) < 80
+    ) {
         continue;
+    }
 
-    createTree(x, z);
+    trees.push({
+        x,
+        y,
+        size: 12 + Math.random() * 15
+    });
 
 }
 
@@ -470,645 +274,1792 @@ for (let i = 0; i < 45; i++) {
    BUILDINGS
 ========================================================= */
 
-function createBuilding(
-    x,
-    z,
-    color = 0x343b40
-) {
+const buildings = [
 
-    const building =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                5,
-                4,
-                5
-            ),
-            new THREE.MeshStandardMaterial({
-                color
-            })
-        );
+    { x: 180, y: 450, w: 100, h: 70 },
+    { x: 340, y: 430, w: 80, h: 55 },
+    { x: 540, y: 500, w: 120, h: 65 },
 
-    building.position.set(
-        x,
-        2,
-        z
-    );
+    { x: 1450, y: 450, w: 100, h: 65 },
+    { x: 1630, y: 420, w: 130, h: 75 },
+    { x: 1810, y: 500, w: 90, h: 60 }
 
-    building.castShadow = true;
-
-    building.receiveShadow = true;
-
-    scene.add(building);
-
-    return building;
-}
-
-createBuilding(
-    -35,
-    -25,
-    0x35424a
-);
-
-createBuilding(
-    35,
-    25,
-    0x3d3333
-);
-
-createBuilding(
-    -32,
-    30,
-    0x454545
-);
-
-createBuilding(
-    34,
-    -30,
-    0x454545
-);
+];
 
 
 /* =========================================================
-   BASES
+   EFFECTS
 ========================================================= */
 
-function createBase(
-    x,
-    z,
-    color
-) {
+const explosions = [];
 
-    const base =
-        new THREE.Mesh(
-            new THREE.CylinderGeometry(
-                6,
-                6,
-                0.5,
-                32
-            ),
-            new THREE.MeshStandardMaterial({
-                color,
-                emissive: color,
-                emissiveIntensity: 0.12
-            })
-        );
+const shots = [];
 
-    base.position.set(
-        x,
-        0.3,
-        z
-    );
-
-    scene.add(base);
-
-    return base;
-}
-
-createBase(
-    -38,
-    0,
-    0x00bfff
-);
-
-createBase(
-    38,
-    0,
-    0xff3045
-);
+const smoke = [];
 
 
 /* =========================================================
-   UNIT CREATION
+   PROJECT TO SCREEN
 ========================================================= */
 
-function createTank(
-    color,
-    x,
-    z,
-    enemy = false
-) {
+function project(x, y) {
 
-    const group =
-        new THREE.Group();
+    const horizon = H * 0.24;
 
+    const depth =
+        0.45 +
+        (y / world.height) * 0.75;
 
-    const body =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                2.8,
-                0.8,
-                4
-            ),
-            new THREE.MeshStandardMaterial({
-                color,
-                metalness: 0.5,
-                roughness: 0.45
-            })
-        );
-
-    body.position.y =
-        0.65;
-
-    body.castShadow = true;
-
-    group.add(body);
-
-
-    const turret =
-        new THREE.Mesh(
-            new THREE.CylinderGeometry(
-                0.9,
-                0.9,
-                0.45,
-                16
-            ),
-            new THREE.MeshStandardMaterial({
-                color
-            })
-        );
-
-    turret.position.y =
-        1.2;
-
-    turret.castShadow = true;
-
-    group.add(turret);
-
-
-    const cannon =
-        new THREE.Mesh(
-            new THREE.CylinderGeometry(
-                0.12,
-                0.12,
-                2.5,
-                8
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x17191a
-            })
-        );
-
-    cannon.rotation.z =
-        Math.PI / 2;
-
-    cannon.position.set(
-        1.5,
-        1.2,
-        0
-    );
-
-    group.add(cannon);
-
-
-    group.position.set(
-        x,
-        0,
-        z
-    );
-
-
-    scene.add(group);
-
+    const scale =
+        depth * state.zoom;
 
     return {
-        object: group,
-        type: "tank",
-        hp: 100,
-        maxHp: 100,
-        attack: 25,
-        speed: 3.2,
-        range: 15,
-        enemy,
-        target: null,
-        cooldown: 0,
-        alive: true
+
+        x:
+            W / 2 +
+            (x - world.width / 2) *
+            scale *
+            0.75 -
+            state.cameraX,
+
+        y:
+            horizon +
+            y * scale *
+            0.55 -
+            state.cameraY,
+
+        scale
+
     };
 
 }
 
 
 /* =========================================================
-   INFANTRY
+   CAMERA
 ========================================================= */
 
-function createInfantry(
-    color,
-    x,
-    z,
-    enemy = false
-) {
+function cameraCenterOnUnit() {
 
-    const group =
-        new THREE.Group();
+    const unit = units[state.selected];
+
+    if (!unit) return;
+
+    const p = project(unit.x, unit.y);
+
+    state.cameraX +=
+        (p.x - W / 2) * 0.04;
+
+    state.cameraY +=
+        (p.y - H / 2) * 0.025;
+
+}
 
 
-    const body =
-        new THREE.Mesh(
-            new THREE.CapsuleGeometry(
-                0.35,
-                1,
-                6,
-                8
-            ),
-            new THREE.MeshStandardMaterial({
-                color
-            })
+/* =========================================================
+   DRAW SKY
+========================================================= */
+
+function drawSky() {
+
+    const gradient =
+        ctx.createLinearGradient(
+            0,
+            0,
+            0,
+            H * 0.5
         );
 
-    body.position.y =
-        1;
-
-    body.castShadow = true;
-
-    group.add(body);
-
-
-    const gun =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                0.12,
-                0.12,
-                1.4
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x171717
-            })
-        );
-
-    gun.position.set(
+    gradient.addColorStop(
         0,
+        "#061217"
+    );
+
+    gradient.addColorStop(
+        .55,
+        "#102b31"
+    );
+
+    gradient.addColorStop(
         1,
-        0.7
+        "#1d3930"
     );
 
-    group.add(gun);
+    ctx.fillStyle = gradient;
 
-
-    group.position.set(
-        x,
+    ctx.fillRect(
         0,
-        z
+        0,
+        W,
+        H
     );
 
-    scene.add(group);
+}
 
+
+/* =========================================================
+   DRAW GROUND
+========================================================= */
+
+function drawGround() {
+
+    const ground =
+        ctx.createLinearGradient(
+            0,
+            H * .2,
+            0,
+            H
+        );
+
+    ground.addColorStop(
+        0,
+        "#214d36"
+    );
+
+    ground.addColorStop(
+        1,
+        "#0d2a1d"
+    );
+
+    ctx.fillStyle = ground;
+
+    ctx.fillRect(
+        0,
+        H * .2,
+        W,
+        H
+    );
+
+
+    /* GRID */
+
+    ctx.strokeStyle =
+        "rgba(130,220,170,.10)";
+
+    ctx.lineWidth = 1;
+
+    const spacing = 70;
+
+    for (
+        let x = -state.cameraX % spacing;
+        x < W;
+        x += spacing
+    ) {
+
+        ctx.beginPath();
+
+        ctx.moveTo(x, H * .2);
+
+        ctx.lineTo(
+            x + (x - W / 2) * .45,
+            H
+        );
+
+        ctx.stroke();
+
+    }
+
+
+    for (
+        let y = H * .2;
+        y < H;
+        y += 45
+    ) {
+
+        ctx.beginPath();
+
+        ctx.moveTo(0, y);
+
+        ctx.lineTo(W, y);
+
+        ctx.stroke();
+
+    }
+
+}
+
+
+/* =========================================================
+   DRAW RIVER
+========================================================= */
+
+function drawRiver() {
+
+    const left =
+        project(
+            world.riverX - 90,
+            0
+        ).x;
+
+    const right =
+        project(
+            world.riverX + 90,
+            0
+        ).x;
+
+    const gradient =
+        ctx.createLinearGradient(
+            left,
+            0,
+            right,
+            0
+        );
+
+    gradient.addColorStop(
+        0,
+        "#0b7080"
+    );
+
+    gradient.addColorStop(
+        .5,
+        "#19a9c0"
+    );
+
+    gradient.addColorStop(
+        1,
+        "#07566a"
+    );
+
+    ctx.fillStyle = gradient;
+
+    ctx.beginPath();
+
+    ctx.moveTo(left, H * .2);
+
+    ctx.lineTo(right, H * .2);
+
+    ctx.lineTo(
+        right + 80,
+        H
+    );
+
+    ctx.lineTo(
+        left - 80,
+        H
+    );
+
+    ctx.closePath();
+
+    ctx.fill();
+
+
+    /* WATER LINES */
+
+    ctx.strokeStyle =
+        "rgba(180,245,255,.18)";
+
+    for (
+        let y = H * .25;
+        y < H;
+        y += 45
+    ) {
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            left + Math.random() * 20,
+            y
+        );
+
+        ctx.lineTo(
+            right - Math.random() * 20,
+            y + 2
+        );
+
+        ctx.stroke();
+
+    }
+
+}
+
+
+/* =========================================================
+   DRAW ROAD
+========================================================= */
+
+function drawRoad() {
+
+    const roadY =
+        project(
+            0,
+            world.roadY
+        ).y;
+
+    ctx.fillStyle =
+        "#454943";
+
+    ctx.fillRect(
+        0,
+        roadY - 55,
+        W,
+        110
+    );
+
+    ctx.strokeStyle =
+        "rgba(255,255,255,.12)";
+
+    ctx.setLineDash([35, 25]);
+
+    ctx.lineWidth = 4;
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        0,
+        roadY
+    );
+
+    ctx.lineTo(
+        W,
+        roadY
+    );
+
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+
+}
+
+
+/* =========================================================
+   DRAW BRIDGE
+========================================================= */
+
+function drawBridge() {
+
+    const center =
+        project(
+            world.riverX,
+            world.roadY
+        );
+
+    ctx.fillStyle =
+        "#555953";
+
+    ctx.fillRect(
+        center.x - 180,
+        center.y - 35,
+        360,
+        70
+    );
+
+    ctx.strokeStyle =
+        "#777b74";
+
+    ctx.strokeRect(
+        center.x - 180,
+        center.y - 35,
+        360,
+        70
+    );
+
+}
+
+
+/* =========================================================
+   DRAW TREES
+========================================================= */
+
+function drawTrees() {
+
+    trees.forEach(tree => {
+
+        const p =
+            project(
+                tree.x,
+                tree.y
+            );
+
+        if (
+            p.x < -50 ||
+            p.x > W + 50 ||
+            p.y < H * .18 ||
+            p.y > H + 50
+        ) {
+            return;
+        }
+
+        const s =
+            tree.size *
+            p.scale;
+
+        /* shadow */
+
+        ctx.fillStyle =
+            "rgba(0,0,0,.25)";
+
+        ctx.beginPath();
+
+        ctx.ellipse(
+            p.x,
+            p.y + s * .7,
+            s,
+            s * .35,
+            0,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fill();
+
+
+        /* trunk */
+
+        ctx.fillStyle =
+            "#4a3524";
+
+        ctx.fillRect(
+            p.x - s * .12,
+            p.y,
+            s * .24,
+            s
+        );
+
+
+        /* tree */
+
+        ctx.fillStyle =
+            "#0b4428";
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            p.x,
+            p.y - s * 2
+        );
+
+        ctx.lineTo(
+            p.x - s,
+            p.y + s * .5
+        );
+
+        ctx.lineTo(
+            p.x + s,
+            p.y + s * .5
+        );
+
+        ctx.closePath();
+
+        ctx.fill();
+
+    });
+
+}
+
+
+/* =========================================================
+   DRAW BUILDINGS
+========================================================= */
+
+function drawBuildings() {
+
+    buildings.forEach(b => {
+
+        const p =
+            project(
+                b.x,
+                b.y
+            );
+
+        const scale =
+            p.scale;
+
+        const w =
+            b.w * scale;
+
+        const h =
+            b.h * scale;
+
+        ctx.fillStyle =
+            "#263338";
+
+        ctx.fillRect(
+            p.x - w / 2,
+            p.y - h,
+            w,
+            h
+        );
+
+        ctx.strokeStyle =
+            "rgba(255,255,255,.15)";
+
+        ctx.strokeRect(
+            p.x - w / 2,
+            p.y - h,
+            w,
+            h
+        );
+
+
+        /* roof */
+
+        ctx.fillStyle =
+            "#182125";
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            p.x - w / 2,
+            p.y - h
+        );
+
+        ctx.lineTo(
+            p.x,
+            p.y - h - 20 * scale
+        );
+
+        ctx.lineTo(
+            p.x + w / 2,
+            p.y - h
+        );
+
+        ctx.closePath();
+
+        ctx.fill();
+
+    });
+
+}
+
+
+/* =========================================================
+   DRAW BASE
+========================================================= */
+
+function drawBase(x, y, enemy = false) {
+
+    const p = project(x, y);
+
+    const size =
+        70 * p.scale;
+
+    ctx.save();
+
+    ctx.translate(
+        p.x,
+        p.y
+    );
+
+    ctx.rotate(
+        Math.PI / 4
+    );
+
+    ctx.fillStyle =
+        enemy
+            ? "rgba(160,25,35,.35)"
+            : "rgba(20,210,230,.25)";
+
+    ctx.fillRect(
+        -size,
+        -size,
+        size * 2,
+        size * 2
+    );
+
+    ctx.strokeStyle =
+        enemy
+            ? "#ff4050"
+            : "#20dfff";
+
+    ctx.lineWidth = 3;
+
+    ctx.strokeRect(
+        -size,
+        -size,
+        size * 2,
+        size * 2
+    );
+
+    ctx.restore();
+
+
+    ctx.fillStyle =
+        enemy
+            ? "#ff5260"
+            : "#20dfff";
+
+    ctx.font =
+        "bold 10px Arial";
+
+    ctx.textAlign = "center";
+
+    ctx.fillText(
+        enemy ? "ENEMY HQ" : "ALLIED HQ",
+        p.x,
+        p.y - size * 1.5
+    );
+
+}
+
+
+/* =========================================================
+   DRAW UNIT
+========================================================= */
+
+function drawUnit(unit, id, enemy = false) {
+
+    if (!unit.alive) return;
+
+    const p =
+        project(
+            unit.x,
+            unit.y
+        );
+
+    if (
+        p.x < -100 ||
+        p.x > W + 100 ||
+        p.y < 100 ||
+        p.y > H + 100
+    ) {
+        return;
+    }
+
+    const size =
+        (unit.type === "tank" ? 23 :
+         unit.type === "fighter" ? 21 : 14)
+        * p.scale;
+
+
+    /* selection ring */
+
+    if (!enemy && id === state.selected) {
+
+        ctx.strokeStyle =
+            "#20e8ff";
+
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+
+        ctx.ellipse(
+            p.x,
+            p.y + size,
+            size * 1.6,
+            size * .55,
+            0,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.stroke();
+
+    }
+
+
+    /* shadow */
+
+    ctx.fillStyle =
+        "rgba(0,0,0,.35)";
+
+    ctx.beginPath();
+
+    ctx.ellipse(
+        p.x,
+        p.y + size,
+        size * 1.1,
+        size * .4,
+        0,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fill();
+
+
+    /* UNIT */
+
+    if (unit.type === "tank") {
+
+        ctx.fillStyle =
+            enemy ? "#a82b36" : "#377f72";
+
+        ctx.fillRect(
+            p.x - size,
+            p.y - size * .5,
+            size * 2,
+            size
+        );
+
+        ctx.fillStyle =
+            enemy ? "#d04450" : "#4da995";
+
+        ctx.beginPath();
+
+        ctx.arc(
+            p.x,
+            p.y - size * .45,
+            size * .48,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fill();
+
+
+        ctx.strokeStyle =
+            enemy ? "#ff6872" : "#8cf5e2";
+
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            p.x,
+            p.y - size * .45
+        );
+
+        ctx.lineTo(
+            p.x + size * 1.3,
+            p.y - size * .8
+        );
+
+        ctx.stroke();
+
+    }
+
+    else if (unit.type === "infantry") {
+
+        ctx.fillStyle =
+            enemy ? "#c13943" : "#56a85d";
+
+        ctx.beginPath();
+
+        ctx.arc(
+            p.x,
+            p.y - size * .3,
+            size * .55,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fill();
+
+        ctx.fillRect(
+            p.x - size * .45,
+            p.y,
+            size * .9,
+            size * .9
+        );
+
+    }
+
+    else {
+
+        ctx.fillStyle =
+            enemy ? "#bd3945" : "#4ac9ed";
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            p.x,
+            p.y - size * 1.4
+        );
+
+        ctx.lineTo(
+            p.x - size * .8,
+            p.y + size
+        );
+
+        ctx.lineTo(
+            p.x,
+            p.y + size * .45
+        );
+
+        ctx.lineTo(
+            p.x + size * .8,
+            p.y + size
+        );
+
+        ctx.closePath();
+
+        ctx.fill();
+
+    }
+
+
+    /* HP BAR */
+
+    const hp =
+        Math.max(
+            0,
+            unit.hp / unit.maxHp
+        );
+
+    ctx.fillStyle =
+        "#171d1e";
+
+    ctx.fillRect(
+        p.x - size,
+        p.y - size * 2,
+        size * 2,
+        4
+    );
+
+    ctx.fillStyle =
+        enemy ? "#ff4350" : "#36e3a0";
+
+    ctx.fillRect(
+        p.x - size,
+        p.y - size * 2,
+        size * 2 * hp,
+        4
+    );
+
+
+    /* name */
+
+    if (
+        !enemy &&
+        id === state.selected
+    ) {
+
+        ctx.fillStyle = "#d9f8fc";
+
+        ctx.font =
+            "bold 9px Arial";
+
+        ctx.textAlign = "center";
+
+        ctx.fillText(
+            unit.name,
+            p.x,
+            p.y - size * 2.5
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   DRAW EFFECTS
+========================================================= */
+
+function drawEffects() {
+
+    const now = Date.now();
+
+    for (
+        let i = explosions.length - 1;
+        i >= 0;
+        i--
+    ) {
+
+        const e =
+            explosions[i];
+
+        const age =
+            now - e.time;
+
+        if (age > 700) {
+
+            explosions.splice(i, 1);
+
+            continue;
+        }
+
+        const p =
+            project(
+                e.x,
+                e.y
+            );
+
+        const progress =
+            age / 700;
+
+        const radius =
+            8 + progress * 55;
+
+        ctx.globalAlpha =
+            1 - progress;
+
+        ctx.strokeStyle =
+            "#ffbf45";
+
+        ctx.lineWidth = 5;
+
+        ctx.beginPath();
+
+        ctx.arc(
+            p.x,
+            p.y,
+            radius,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.stroke();
+
+
+        ctx.fillStyle =
+            "#ff6b20";
+
+        ctx.beginPath();
+
+        ctx.arc(
+            p.x,
+            p.y,
+            Math.max(
+                2,
+                25 - progress * 25
+            ),
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fill();
+
+        ctx.globalAlpha = 1;
+
+    }
+
+
+    for (
+        let i = smoke.length - 1;
+        i >= 0;
+        i--
+    ) {
+
+        const s =
+            smoke[i];
+
+        const age =
+            now - s.time;
+
+        if (age > 2200) {
+
+            smoke.splice(i, 1);
+
+            continue;
+
+        }
+
+        const p =
+            project(
+                s.x,
+                s.y
+            );
+
+        const progress =
+            age / 2200;
+
+        ctx.globalAlpha =
+            .25 * (1 - progress);
+
+        ctx.fillStyle =
+            "#a6aca5";
+
+        ctx.beginPath();
+
+        ctx.arc(
+            p.x,
+            p.y - progress * 30,
+            10 + progress * 20,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fill();
+
+        ctx.globalAlpha = 1;
+
+    }
+
+
+    /* bullets */
+
+    shots.forEach(shot => {
+
+        const age =
+            now - shot.time;
+
+        const t =
+            Math.min(
+                age / shot.duration,
+                1
+            );
+
+        const x =
+            shot.x1 +
+            (shot.x2 - shot.x1) * t;
+
+        const y =
+            shot.y1 +
+            (shot.y2 - shot.y1) * t;
+
+        const p =
+            project(x, y);
+
+        ctx.fillStyle =
+            "#fff5a3";
+
+        ctx.shadowBlur = 12;
+
+        ctx.shadowColor =
+            "#ffe26e";
+
+        ctx.beginPath();
+
+        ctx.arc(
+            p.x,
+            p.y,
+            3,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+
+    });
+
+}
+
+
+/* =========================================================
+   CREATE EXPLOSION
+========================================================= */
+
+function createExplosion(x, y) {
+
+    explosions.push({
+        x,
+        y,
+        time: Date.now()
+    });
+
+    smoke.push({
+        x,
+        y,
+        time: Date.now()
+    });
+
+}
+
+
+/* =========================================================
+   UPDATE SHOTS
+========================================================= */
+
+function cleanupShots() {
+
+    const now = Date.now();
+
+    for (
+        let i = shots.length - 1;
+        i >= 0;
+        i--
+    ) {
+
+        if (
+            now -
+            shots[i].time >
+            shots[i].duration
+        ) {
+
+            shots.splice(i, 1);
+
+        }
+
+    }
+
+}
+
+
+/* =========================================================
+   FIND ENEMY
+========================================================= */
+
+function nearestEnemy(unit) {
+
+    let best = null;
+
+    let bestDistance = Infinity;
+
+    Object.values(enemies)
+        .forEach(enemy => {
+
+            if (!enemy.alive) return;
+
+            const dx =
+                enemy.x - unit.x;
+
+            const dy =
+                enemy.y - unit.y;
+
+            const d =
+                Math.sqrt(
+                    dx * dx +
+                    dy * dy
+                );
+
+            if (d < bestDistance) {
+
+                bestDistance = d;
+
+                best = enemy;
+
+            }
+
+        });
 
     return {
-        object: group,
-        type: "infantry",
-        hp: 80,
-        maxHp: 80,
-        attack: 12,
-        speed: 4,
-        range: 10,
-        enemy,
-        target: null,
-        cooldown: 0,
-        alive: true
+        enemy: best,
+        distance: bestDistance
     };
 
 }
 
 
 /* =========================================================
-   AIRCRAFT
+   ATTACK
 ========================================================= */
 
-function createAircraft(
-    color,
-    x,
-    z,
-    enemy = false
-) {
+function attack() {
 
-    const group =
-        new THREE.Group();
+    if (state.gameOver) return;
 
+    const unit =
+        units[state.selected];
 
-    const body =
-        new THREE.Mesh(
-            new THREE.ConeGeometry(
-                0.7,
-                4,
-                4
-            ),
-            new THREE.MeshStandardMaterial({
-                color,
-                metalness: 0.6
-            })
+    if (!unit || !unit.alive) {
+
+        notify(
+            "Selected unit is unavailable."
         );
 
-    body.rotation.x =
-        Math.PI / 2;
+        return;
 
-    body.position.y =
-        5;
+    }
 
-    group.add(body);
+    if (state.fuel < 15) {
 
-
-    const wing =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                5,
-                0.12,
-                0.8
-            ),
-            new THREE.MeshStandardMaterial({
-                color
-            })
+        notify(
+            "Not enough fuel."
         );
 
-    wing.position.y =
-        5;
+        return;
 
-    group.add(wing);
+    }
 
+    const result =
+        nearestEnemy(unit);
 
-    group.position.set(
-        x,
-        0,
-        z
+    if (!result.enemy) {
+
+        winBattle();
+
+        return;
+
+    }
+
+    if (
+        result.distance >
+        unit.range
+    ) {
+
+        notify(
+            "Target out of range. Move closer."
+        );
+
+        return;
+
+    }
+
+    state.fuel -= 15;
+
+    const enemy =
+        result.enemy;
+
+    const damage =
+        unit.attack +
+        Math.floor(
+            Math.random() * 12
+        );
+
+    enemy.hp -= damage;
+
+    shots.push({
+        x1: unit.x,
+        y1: unit.y,
+        x2: enemy.x,
+        y2: enemy.y,
+        time: Date.now(),
+        duration: 220
+    });
+
+    createExplosion(
+        enemy.x,
+        enemy.y
     );
 
-    scene.add(group);
+    notify(
+        unit.name +
+        " hit enemy for " +
+        damage +
+        " damage."
+    );
 
+    if (enemy.hp <= 0) {
 
-    return {
-        object: group,
-        type: "aircraft",
-        hp: 90,
-        maxHp: 90,
-        attack: 35,
-        speed: 6,
-        range: 22,
-        enemy,
-        target: null,
-        cooldown: 0,
-        alive: true
-    };
+        enemy.hp = 0;
+
+        enemy.alive = false;
+
+        state.allyScore =
+            Math.min(
+                100,
+                state.allyScore + 10
+            );
+
+        state.enemyScore =
+            Math.max(
+                0,
+                state.enemyScore - 10
+            );
+
+        state.score += 1;
+
+        state.money += 300;
+
+        notify(
+            "☠ ENEMY UNIT DESTROYED!"
+        );
+
+    }
+
+    updateUI();
+
+    checkBattleEnd();
 
 }
 
 
 /* =========================================================
-   PLAYER ARMY
+   DEFEND
 ========================================================= */
 
-state.units = [
+function defend() {
 
-    createTank(
-        0x00dfff,
-        -30,
-        -8
-    ),
+    if (state.gameOver) return;
 
-    createTank(
-        0x00a8d6,
-        -30,
-        8
-    ),
+    state.allyScore =
+        Math.min(
+            100,
+            state.allyScore + 5
+        );
 
-    createInfantry(
-        0x4fdfff,
-        -25,
-        -14
-    ),
+    state.fuel += 15;
 
-    createInfantry(
-        0x4fdfff,
-        -25,
-        14
-    ),
+    notify(
+        "🛡 Defensive formation activated."
+    );
 
-    createAircraft(
-        0xdddddd,
-        -18,
-        0
-    )
+    updateUI();
 
-];
+}
 
 
 /* =========================================================
-   ENEMY ARMY
+   AIR STRIKE
 ========================================================= */
 
-state.enemies = [
+function airStrike() {
 
-    createTank(
-        0xff3045,
-        30,
-        -8,
-        true
-    ),
+    if (state.gameOver) return;
 
-    createTank(
-        0xff5533,
-        30,
-        8,
-        true
-    ),
+    if (state.fuel < 150) {
 
-    createInfantry(
-        0xff4050,
-        25,
-        -15,
-        true
-    ),
+        notify(
+            "Air strike requires 150 fuel."
+        );
 
-    createInfantry(
-        0xff4050,
-        25,
-        15,
-        true
-    ),
+        return;
 
-    createAircraft(
-        0xff6666,
-        18,
-        0,
-        true
-    )
+    }
 
-];
+    state.fuel -= 150;
+
+    let destroyed = 0;
+
+    Object.values(enemies)
+        .forEach(enemy => {
+
+            if (!enemy.alive) return;
+
+            enemy.hp -= 45;
+
+            createExplosion(
+                enemy.x,
+                enemy.y
+            );
+
+            if (enemy.hp <= 0) {
+
+                enemy.hp = 0;
+
+                enemy.alive = false;
+
+                destroyed++;
+
+            }
+
+        });
+
+    state.allyScore =
+        Math.min(
+            100,
+            state.allyScore + 12
+        );
+
+    state.enemyScore =
+        Math.max(
+            0,
+            state.enemyScore - 12
+        );
+
+    notify(
+        "✈ AIR STRIKE COMPLETE — " +
+        destroyed +
+        " targets destroyed."
+    );
+
+    updateUI();
+
+    checkBattleEnd();
+
+}
+
+
+/* =========================================================
+   SCOUT
+========================================================= */
+
+function scout() {
+
+    if (state.fuel < 40) {
+
+        notify(
+            "Scout requires 40 fuel."
+        );
+
+        return;
+
+    }
+
+    state.fuel -= 40;
+
+    notify(
+        "🔭 Recon complete. Enemy positions revealed."
+    );
+
+    Object.values(enemies)
+        .forEach(enemy => {
+
+            if (!enemy.alive) return;
+
+            createExplosion(
+                enemy.x,
+                enemy.y
+            );
+
+        });
+
+    updateUI();
+
+}
+
+
+/* =========================================================
+   REINFORCE
+========================================================= */
+
+function reinforce() {
+
+    if (state.money < 700) {
+
+        notify(
+            "Need $700 for reinforcements."
+        );
+
+        return;
+
+    }
+
+    state.money -= 700;
+
+    state.allyScore =
+        Math.min(
+            100,
+            state.allyScore + 7
+        );
+
+    state.metal += 250;
+
+    notify(
+        "➕ Reinforcements deployed."
+    );
+
+    updateUI();
+
+}
+
+
+/* =========================================================
+   REPAIR
+========================================================= */
+
+function repair() {
+
+    const unit =
+        units[state.selected];
+
+    if (!unit || !unit.alive) {
+
+        notify(
+            "Unit unavailable."
+        );
+
+        return;
+
+    }
+
+    if (state.metal < 100) {
+
+        notify(
+            "Need 100 metal."
+        );
+
+        return;
+
+    }
+
+    state.metal -= 100;
+
+    unit.hp =
+        Math.min(
+            unit.maxHp,
+            unit.hp + 30
+        );
+
+    notify(
+        "🔧 Unit repaired."
+    );
+
+    updateUI();
+
+}
+
+
+/* =========================================================
+   ENEMY AI
+========================================================= */
+
+function enemyAI() {
+
+    if (state.gameOver) return;
+
+    const aliveEnemies =
+        Object.values(enemies)
+            .filter(e => e.alive);
+
+    if (!aliveEnemies.length) {
+
+        winBattle();
+
+        return;
+
+    }
+
+
+    const aliveUnits =
+        Object.values(units)
+            .filter(u => u.alive);
+
+    if (!aliveUnits.length) {
+
+        loseBattle();
+
+        return;
+
+    }
+
+
+    const enemy =
+        aliveEnemies[
+            Math.floor(
+                Math.random() *
+                aliveEnemies.length
+            )
+        ];
+
+
+    let target =
+        null;
+
+    let shortest =
+        Infinity;
+
+
+    aliveUnits.forEach(unit => {
+
+        const dx =
+            unit.x - enemy.x;
+
+        const dy =
+            unit.y - enemy.y;
+
+        const distance =
+            Math.sqrt(
+                dx * dx +
+                dy * dy
+            );
+
+        if (distance < shortest) {
+
+            shortest = distance;
+
+            target = unit;
+
+        }
+
+    });
+
+
+    if (
+        target &&
+        shortest < 420
+    ) {
+
+        const damage =
+            enemy.attack +
+            Math.floor(
+                Math.random() * 8
+            );
+
+        target.hp -= damage;
+
+        createExplosion(
+            target.x,
+            target.y
+        );
+
+        notify(
+            "⚠ Enemy attack! " +
+            damage +
+            " damage."
+        );
+
+        if (target.hp <= 0) {
+
+            target.hp = 0;
+
+            target.alive = false;
+
+            state.enemyScore =
+                Math.min(
+                    100,
+                    state.enemyScore + 8
+                );
+
+        }
+
+    }
+
+    else if (target) {
+
+        /* enemy advances */
+
+        const dx =
+            target.x - enemy.x;
+
+        const dy =
+            target.y - enemy.y;
+
+        const length =
+            Math.sqrt(
+                dx * dx +
+                dy * dy
+            );
+
+        enemy.x +=
+            (dx / length) * 8;
+
+        enemy.y +=
+            (dy / length) * 8;
+
+    }
+
+    updateUI();
+
+}
+
+
+/* =========================================================
+   MOVE SELECTED UNIT
+========================================================= */
+
+function moveSelected(dx, dy) {
+
+    const unit =
+        units[state.selected];
+
+    if (!unit || !unit.alive) return;
+
+    const length =
+        Math.sqrt(
+            dx * dx +
+            dy * dy
+        );
+
+    if (length < .01) return;
+
+    const speed =
+        unit.speed *
+        4;
+
+    unit.x +=
+        (dx / length) * speed;
+
+    unit.y +=
+        (dy / length) * speed;
+
+
+    unit.x =
+        Math.max(
+            40,
+            Math.min(
+                world.width - 40,
+                unit.x
+            )
+        );
+
+    unit.y =
+        Math.max(
+            40,
+            Math.min(
+                world.height - 40,
+                unit.y
+            )
+        );
+
+    state.fuel =
+        Math.max(
+            0,
+            state.fuel - .03
+        );
+
+}
 
 
 /* =========================================================
    SELECT UNIT
 ========================================================= */
 
-function selectUnit(unit) {
+function selectUnit(id) {
 
-    state.selected = unit;
+    if (
+        !units[id] ||
+        !units[id].alive
+    ) {
 
-    state.units.forEach(u => {
+        notify(
+            "Unit unavailable."
+        );
 
-        if (u.object.children[0]) {
+        return;
 
-            u.object.children[0].material.emissive =
-                new THREE.Color(
-                    u === unit
-                        ? 0x00ffff
-                        : 0x000000
-                );
+    }
 
-        }
+    state.selected = id;
 
-    });
+    document
+        .querySelectorAll(".unit-btn")
+        .forEach(button => {
 
-    updateInfo(
-        "SELECTED: " +
-        unit.type.toUpperCase() +
-        " | HP " +
-        Math.floor(unit.hp)
-    );
-
-}
-
-
-/* =========================================================
-   RAYCASTER
-========================================================= */
-
-const raycaster =
-    new THREE.Raycaster();
-
-const mouse =
-    new THREE.Vector2();
-
-
-function pointerSelect(
-    clientX,
-    clientY
-) {
-
-    mouse.x =
-        (clientX / window.innerWidth) * 2 - 1;
-
-    mouse.y =
-        -(clientY / window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(
-        mouse,
-        camera
-    );
-
-    const objects = [];
-
-    state.units.forEach(unit => {
-
-        unit.object.traverse(child => {
-
-            if (child.isMesh)
-                objects.push({
-                    mesh: child,
-                    unit
-                });
+            button.classList.toggle(
+                "active",
+                button.dataset.unit === id
+            );
 
         });
 
-    });
+    updateUnitInfo();
 
-    const hits =
-        raycaster.intersectObjects(
-            objects.map(o => o.mesh)
-        );
-
-    if (!hits.length)
-        return;
-
-    const hit =
-        objects.find(
-            o => o.mesh === hits[0].object
-        );
-
-    if (hit)
-        selectUnit(hit.unit);
-
-}
-
-
-/* =========================================================
-   CLICK / TOUCH
-========================================================= */
-
-renderer.domElement.addEventListener(
-    "pointerdown",
-    event => {
-
-        pointerSelect(
-            event.clientX,
-            event.clientY
-        );
-
-    }
-);
-
-
-/* =========================================================
-   MOVEMENT
-========================================================= */
-
-function moveSelectedTo(
-    x,
-    z
-) {
-
-    if (!state.selected)
-        return;
-
-    state.selected.target =
-        new THREE.Vector3(
-            x,
-            0,
-            z
-        );
-
-    updateInfo(
-        "MOVING " +
-        state.selected.type.toUpperCase()
+    notify(
+        "Selected: " +
+        units[id].name
     );
 
 }
 
 
 /* =========================================================
-   WORLD CLICK MOVEMENT
+   CANVAS TAP SELECT
 ========================================================= */
 
-renderer.domElement.addEventListener(
-    "dblclick",
+canvas.addEventListener(
+    "pointerdown",
     event => {
 
-        if (!state.selected)
-            return;
+        const rect =
+            canvas.getBoundingClientRect();
 
-        mouse.x =
-            (event.clientX /
-                window.innerWidth) * 2 - 1;
+        const x =
+            event.clientX -
+            rect.left;
 
-        mouse.y =
-            -(event.clientY /
-                window.innerHeight) * 2 + 1;
+        const y =
+            event.clientY -
+            rect.top;
 
-        raycaster.setFromCamera(
-            mouse,
-            camera
-        );
 
-        const hit =
-            raycaster.intersectObject(
-                terrain
-            );
+        let closest = null;
 
-        if (!hit.length)
-            return;
+        let distance = 45;
 
-        moveSelectedTo(
-            hit[0].point.x,
-            hit[0].point.z
-        );
+
+        Object.entries(units)
+            .forEach(([id, unit]) => {
+
+                if (!unit.alive) return;
+
+                const p =
+                    project(
+                        unit.x,
+                        unit.y
+                    );
+
+                const dx =
+                    p.x - x;
+
+                const dy =
+                    p.y - y;
+
+                const d =
+                    Math.sqrt(
+                        dx * dx +
+                        dy * dy
+                    );
+
+                if (d < distance) {
+
+                    distance = d;
+
+                    closest = id;
+
+                }
+
+            });
+
+
+        if (closest) {
+
+            selectUnit(closest);
+
+        }
 
     }
 );
@@ -1119,38 +2070,91 @@ renderer.domElement.addEventListener(
 ========================================================= */
 
 const joystick =
-    document.createElement("div");
-
-joystick.id =
-    "warfrontJoystick";
-
-joystick.innerHTML = `
-    <div id="joystickStick"></div>
-`;
-
-document.body.appendChild(
-    joystick
-);
-
-const joystickStick =
     document.getElementById(
-        "joystickStick"
+        "joystick"
     );
 
-let joyActive = false;
+const knob =
+    document.getElementById(
+        "joystickKnob"
+    );
+
+let joystickActive = false;
 
 let joyX = 0;
+
 let joyY = 0;
+
+
+function joystickMove(
+    clientX,
+    clientY
+) {
+
+    const rect =
+        joystick.getBoundingClientRect();
+
+    const centerX =
+        rect.left +
+        rect.width / 2;
+
+    const centerY =
+        rect.top +
+        rect.height / 2;
+
+    let dx =
+        clientX - centerX;
+
+    let dy =
+        clientY - centerY;
+
+    const max =
+        32;
+
+    const length =
+        Math.sqrt(
+            dx * dx +
+            dy * dy
+        );
+
+    if (length > max) {
+
+        dx =
+            dx / length * max;
+
+        dy =
+            dy / length * max;
+
+    }
+
+    joyX =
+        dx / max;
+
+    joyY =
+        dy / max;
+
+    knob.style.transform =
+        `translate(
+            calc(-50% + ${dx}px),
+            calc(-50% + ${dy}px)
+        )`;
+
+}
 
 
 joystick.addEventListener(
     "pointerdown",
-    e => {
+    event => {
 
-        joyActive = true;
+        joystickActive = true;
 
         joystick.setPointerCapture(
-            e.pointerId
+            event.pointerId
+        );
+
+        joystickMove(
+            event.clientX,
+            event.clientY
         );
 
     }
@@ -1159,48 +2163,14 @@ joystick.addEventListener(
 
 joystick.addEventListener(
     "pointermove",
-    e => {
+    event => {
 
-        if (!joyActive)
-            return;
+        if (!joystickActive) return;
 
-        const rect =
-            joystick.getBoundingClientRect();
-
-        let x =
-            e.clientX -
-            (rect.left + rect.width / 2);
-
-        let y =
-            e.clientY -
-            (rect.top + rect.height / 2);
-
-        const distance =
-            Math.sqrt(
-                x * x + y * y
-            );
-
-        const max =
-            rect.width / 2 - 25;
-
-        if (distance > max) {
-
-            x =
-                x / distance * max;
-
-            y =
-                y / distance * max;
-
-        }
-
-        joyX =
-            x / max;
-
-        joyY =
-            y / max;
-
-        joystickStick.style.transform =
-            `translate(${x}px, ${y}px)`;
+        joystickMove(
+            event.clientX,
+            event.clientY
+        );
 
     }
 );
@@ -1208,1356 +2178,1071 @@ joystick.addEventListener(
 
 joystick.addEventListener(
     "pointerup",
-    () => {
-
-        joyActive = false;
-
-        joyX = 0;
-        joyY = 0;
-
-        joystickStick.style.transform =
-            "translate(0,0)";
-
-    }
+    resetJoystick
 );
 
 
+joystick.addEventListener(
+    "pointercancel",
+    resetJoystick
+);
+
+
+function resetJoystick() {
+
+    joystickActive = false;
+
+    joyX = 0;
+
+    joyY = 0;
+
+    knob.style.transform =
+        "translate(-50%, -50%)";
+
+}
+
+
 /* =========================================================
-   ATTACK
+   CAMERA BUTTONS
 ========================================================= */
 
-function attackSelected() {
+document
+    .getElementById("zoomIn")
+    .onclick = () => {
 
-    if (!state.selected)
-        return;
-
-    const unit =
-        state.selected;
-
-    if (!unit.alive)
-        return;
-
-    let nearest = null;
-
-    let nearestDistance = Infinity;
-
-
-    state.enemies.forEach(enemy => {
-
-        if (!enemy.alive)
-            return;
-
-        const distance =
-            unit.object.position.distanceTo(
-                enemy.object.position
+        state.zoom =
+            Math.min(
+                1.45,
+                state.zoom + .1
             );
 
-        if (
-            distance <
-            nearestDistance
-        ) {
-
-            nearest =
-                enemy;
-
-            nearestDistance =
-                distance;
-
-        }
-
-    });
+    };
 
 
-    if (!nearest) {
+document
+    .getElementById("zoomOut")
+    .onclick = () => {
 
-        notify(
-            "ALL ENEMY FORCES DESTROYED!"
-        );
+        state.zoom =
+            Math.max(
+                .65,
+                state.zoom - .1
+            );
 
-        return;
-    }
+    };
 
 
-    if (
-        nearestDistance >
-        unit.range
-    ) {
+document
+    .getElementById("zoomReset")
+    .onclick = () => {
 
-        unit.target =
-            nearest.object.position.clone();
+        state.zoom = 1;
+
+        state.cameraX = 0;
+
+        state.cameraY = 0;
 
         notify(
-            "Moving into attack range..."
+            "Camera reset."
         );
 
-        return;
-
-    }
-
-
-    fireWeapon(
-        unit,
-        nearest
-    );
-
-}
+    };
 
 
 /* =========================================================
-   FIRE
+   BUTTON EVENTS
 ========================================================= */
 
-function fireWeapon(
-    attacker,
-    target
-) {
+document
+    .getElementById("attack")
+    .onclick = attack;
 
-    if (attacker.cooldown > 0)
-        return;
+document
+    .getElementById("defend")
+    .onclick = defend;
 
-    attacker.cooldown =
-        attacker.type === "aircraft"
-            ? 1.5
-            : 0.8;
+document
+    .getElementById("air")
+    .onclick = airStrike;
 
+document
+    .getElementById("scout")
+    .onclick = scout;
 
-    const start =
-        attacker.object.position.clone();
+document
+    .getElementById("reinforce")
+    .onclick = reinforce;
 
-    start.y +=
-        attacker.type === "aircraft"
-            ? 5
-            : 1;
-
-
-    const end =
-        target.object.position.clone();
-
-    end.y += 1;
-
-
-    const bullet =
-        new THREE.Mesh(
-            new THREE.SphereGeometry(
-                0.12,
-                8,
-                8
-            ),
-            new THREE.MeshBasicMaterial({
-                color:
-                    attacker.enemy
-                        ? 0xff3030
-                        : 0x00ffff
-            })
-        );
-
-    bullet.position.copy(start);
-
-    scene.add(bullet);
-
-
-    state.bullets.push({
-
-        object: bullet,
-
-        target,
-
-        speed: 35,
-
-        damage:
-            attacker.attack +
-            Math.random() * 8
-
-    });
-
-}
+document
+    .getElementById("repair")
+    .onclick = repair;
 
 
 /* =========================================================
-   EXPLOSION
+   UNIT BUTTONS
 ========================================================= */
 
-function explosion(position) {
+document
+    .querySelectorAll(".unit-btn")
+    .forEach(button => {
 
-    const light =
-        new THREE.PointLight(
-            0xff7b22,
-            8,
-            10
-        );
+        button.addEventListener(
+            "click",
+            () => {
 
-    light.position.copy(
-        position
-    );
-
-    scene.add(light);
-
-
-    const sphere =
-        new THREE.Mesh(
-            new THREE.SphereGeometry(
-                0.5,
-                16,
-                16
-            ),
-            new THREE.MeshBasicMaterial({
-                color: 0xff6b00,
-                transparent: true
-            })
-        );
-
-    sphere.position.copy(
-        position
-    );
-
-    scene.add(sphere);
-
-
-    state.effects.push({
-
-        object: sphere,
-
-        light,
-
-        life: 0.5
-
-    });
-
-}
-
-
-/* =========================================================
-   UPDATE BULLETS
-========================================================= */
-
-function updateBullets(delta) {
-
-    state.bullets =
-        state.bullets.filter(
-            bullet => {
-
-                if (
-                    !bullet.target.alive
-                ) {
-
-                    scene.remove(
-                        bullet.object
-                    );
-
-                    return false;
-
-                }
-
-
-                const target =
-                    bullet.target.object
-                        .position.clone();
-
-                target.y += 1;
-
-
-                const direction =
-                    target.clone()
-                        .sub(
-                            bullet.object.position
-                        );
-
-
-                const distance =
-                    direction.length();
-
-
-                if (distance < 0.8) {
-
-                    bullet.target.hp -=
-                        bullet.damage;
-
-                    explosion(target);
-
-                    scene.remove(
-                        bullet.object
-                    );
-
-
-                    if (
-                        bullet.target.hp <= 0
-                    ) {
-
-                        bullet.target.hp = 0;
-
-                        bullet.target.alive =
-                            false;
-
-                        bullet.target.object
-                            .visible = false;
-
-                        state.score +=
-                            10;
-
-                        notify(
-                            "ENEMY UNIT DESTROYED!"
-                        );
-
-                    }
-
-
-                    return false;
-
-                }
-
-
-                direction.normalize();
-
-                bullet.object.position.add(
-                    direction.multiplyScalar(
-                        bullet.speed * delta
-                    )
+                selectUnit(
+                    button.dataset.unit
                 );
-
-
-                return true;
 
             }
         );
 
-}
-
-
-/* =========================================================
-   UNIT MOVEMENT
-========================================================= */
-
-function updateUnitMovement(
-    unit,
-    delta
-) {
-
-    if (!unit.alive)
-        return;
-
-
-    if (unit.target) {
-
-        const position =
-            unit.object.position;
-
-        const target =
-            unit.target.clone();
-
-        target.y =
-            position.y;
-
-
-        const direction =
-            target.sub(position);
-
-
-        const distance =
-            direction.length();
-
-
-        if (distance < 0.6) {
-
-            unit.target = null;
-
-        } else {
-
-            direction.normalize();
-
-            position.add(
-                direction.multiplyScalar(
-                    unit.speed * delta
-                )
-            );
-
-
-            unit.object.lookAt(
-                position.x +
-                direction.x,
-                position.y,
-                position.z +
-                direction.z
-            );
-
-        }
-
-    }
-
-}
-
-
-/* =========================================================
-   ENEMY AI
-========================================================= */
-
-function updateEnemyAI(
-    enemy,
-    delta
-) {
-
-    if (!enemy.alive)
-        return;
-
-
-    let nearest = null;
-
-    let distance = Infinity;
-
-
-    state.units.forEach(unit => {
-
-        if (!unit.alive)
-            return;
-
-        const d =
-            enemy.object.position.distanceTo(
-                unit.object.position
-            );
-
-        if (d < distance) {
-
-            distance = d;
-
-            nearest = unit;
-
-        }
-
     });
 
 
-    if (!nearest)
-        return;
+/* =========================================================
+   RESEARCH
+========================================================= */
+
+document
+    .getElementById("research")
+    .onclick = () => {
+
+        document
+            .getElementById("modalTitle")
+            .textContent =
+            "🔬 TECHNOLOGY RESEARCH";
+
+        document
+            .getElementById("modalContent")
+            .innerHTML = `
+
+                <div class="research-item">
+
+                    <h3>Advanced Armor</h3>
+
+                    <p>
+                        Increase all ground unit HP.
+                    </p>
+
+                    <button onclick="researchArmor()">
+                        RESEARCH — $900
+                    </button>
+
+                </div>
 
 
-    if (
-        distance <=
-        enemy.range
-    ) {
+                <div class="research-item">
 
-        enemy.target =
-            nearest.object.position.clone();
+                    <h3>Weapon Systems</h3>
 
-        fireWeapon(
-            enemy,
-            nearest
+                    <p>
+                        Increase tank and infantry attack.
+                    </p>
+
+                    <button onclick="researchWeapons()">
+                        RESEARCH — $1100
+                    </button>
+
+                </div>
+
+
+                <div class="research-item">
+
+                    <h3>Logistics</h3>
+
+                    <p>
+                        Increase fuel reserves.
+                    </p>
+
+                    <button onclick="researchLogistics()">
+                        RESEARCH — $700
+                    </button>
+
+                </div>
+
+            `;
+
+        document
+            .getElementById("modal")
+            .classList.remove("hidden");
+
+    };
+
+
+window.researchArmor = function() {
+
+    if (state.money < 900) {
+
+        notify(
+            "Not enough money."
         );
 
-    } else {
-
-        enemy.target =
-            nearest.object.position.clone();
+        return;
 
     }
 
-}
+    state.money -= 900;
+
+    Object.values(units)
+        .forEach(unit => {
+
+            unit.maxHp += 15;
+
+            unit.hp += 15;
+
+        });
+
+    closeModal();
+
+    notify(
+        "🔬 Advanced Armor researched."
+    );
+
+    updateUI();
+
+};
+
+
+window.researchWeapons = function() {
+
+    if (state.money < 1100) {
+
+        notify(
+            "Not enough money."
+        );
+
+        return;
+
+    }
+
+    state.money -= 1100;
+
+    Object.values(units)
+        .forEach(unit => {
+
+            unit.attack += 8;
+
+        });
+
+    closeModal();
+
+    notify(
+        "🔬 Weapon systems upgraded."
+    );
+
+    updateUI();
+
+};
+
+
+window.researchLogistics = function() {
+
+    if (state.money < 700) {
+
+        notify(
+            "Not enough money."
+        );
+
+        return;
+
+    }
+
+    state.money -= 700;
+
+    state.fuel += 500;
+
+    closeModal();
+
+    notify(
+        "🔬 Logistics upgraded."
+    );
+
+    updateUI();
+
+};
 
 
 /* =========================================================
-   CAMERA
+   MISSIONS
 ========================================================= */
 
-let cameraAngle = 0;
+document
+    .getElementById("missions")
+    .onclick = () => {
 
-let cameraHeight = 20;
+        document
+            .getElementById("modalTitle")
+            .textContent =
+            "🎯 MISSION CONTROL";
+
+        document
+            .getElementById("modalContent")
+            .innerHTML = `
+
+                <div class="research-item">
+                    <h3>Operation First Strike</h3>
+
+                    <p>
+                        Destroy enemy forces and capture HQ.
+                    </p>
+
+                    <p>
+                        Current Level:
+                        ${state.level}
+                    </p>
+
+                    <p>
+                        Victories:
+                        ${state.victories}
+                    </p>
+                </div>
 
 
-function updateCamera() {
+                <div class="research-item">
+                    <h3>Battlefield Objectives</h3>
 
-    const target =
-        state.selected
-            ? state.selected.object.position
-            : new THREE.Vector3(
-                0,
-                0,
-                0
+                    <p>
+                        ⚔ Destroy enemy units
+                    </p>
+
+                    <p>
+                        🛡 Maintain allied control
+                    </p>
+
+                    <p>
+                        🏰 Capture enemy HQ
+                    </p>
+                </div>
+
+            `;
+
+        document
+            .getElementById("modal")
+            .classList.remove("hidden");
+
+    };
+
+
+/* =========================================================
+   SAVE
+========================================================= */
+
+document
+    .getElementById("save")
+    .onclick = () => {
+
+        const saveData = {
+
+            state,
+
+            units,
+
+            enemies
+
+        };
+
+        localStorage.setItem(
+            "warfront_save",
+            JSON.stringify(saveData)
+        );
+
+        notify(
+            "💾 Game saved."
+        );
+
+    };
+
+
+/* =========================================================
+   LOAD
+========================================================= */
+
+function loadGame() {
+
+    const saved =
+        localStorage.getItem(
+            "warfront_save"
+        );
+
+    if (!saved) return;
+
+    try {
+
+        const data =
+            JSON.parse(saved);
+
+        if (data.state) {
+
+            Object.assign(
+                state,
+                data.state
             );
 
+        }
 
-    const x =
-        target.x +
-        Math.sin(cameraAngle) *
-        state.cameraDistance;
+        if (data.units) {
 
+            Object.keys(
+                data.units
+            ).forEach(id => {
 
-    const z =
-        target.z +
-        Math.cos(cameraAngle) *
-        state.cameraDistance;
+                if (units[id]) {
 
+                    Object.assign(
+                        units[id],
+                        data.units[id]
+                    );
 
-    camera.position.lerp(
-        new THREE.Vector3(
-            x,
-            cameraHeight,
-            z
-        ),
-        0.08
-    );
+                }
 
+            });
 
-    camera.lookAt(
-        target.x,
-        0,
-        target.z
-    );
+        }
 
-}
+        if (data.enemies) {
 
+            Object.keys(
+                data.enemies
+            ).forEach(id => {
 
-/* =========================================================
-   CAMERA TOUCH DRAG
-========================================================= */
+                if (enemies[id]) {
 
-let lastTouchX = 0;
+                    Object.assign(
+                        enemies[id],
+                        data.enemies[id]
+                    );
 
-renderer.domElement.addEventListener(
-    "pointermove",
-    event => {
+                }
 
-        if (
-            event.pointerType !== "touch"
-        )
-            return;
-
-        if (!joyActive) {
-
-            const dx =
-                event.movementX || 0;
-
-            cameraAngle -=
-                dx * 0.002;
+            });
 
         }
 
     }
-);
+
+    catch (error) {
+
+        console.log(
+            "Save load error:",
+            error
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   MODAL
+========================================================= */
+
+function closeModal() {
+
+    document
+        .getElementById("modal")
+        .classList.add("hidden");
+
+}
+
+document
+    .getElementById("closeModal")
+    .onclick = closeModal;
+
+
+document
+    .getElementById("modal")
+    .addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target.id ===
+                "modal"
+            ) {
+
+                closeModal();
+
+            }
+
+        }
+    );
 
 
 /* =========================================================
    UI
 ========================================================= */
 
-function createHUD() {
+function updateUI() {
 
-    const hud =
-        document.createElement("div");
+    document
+        .getElementById("money")
+        .textContent =
+        Math.floor(state.money);
 
-    hud.id =
-        "warfrontHUD";
+    document
+        .getElementById("fuel")
+        .textContent =
+        Math.floor(state.fuel);
 
-    hud.innerHTML = `
+    document
+        .getElementById("metal")
+        .textContent =
+        Math.floor(state.metal);
 
-        <div class="wf-top">
+    document
+        .getElementById("score")
+        .textContent =
+        state.score;
 
-            <strong>WARFRONT</strong>
+    document
+        .getElementById("allyScore")
+        .textContent =
+        state.allyScore;
 
-            <div>
-                💰 <span id="wfMoney">11500</span>
-                ⛽ <span id="wfFuel">1520</span>
-                ⭐ <span id="wfScore">5</span>
-            </div>
+    document
+        .getElementById("enemyScore")
+        .textContent =
+        state.enemyScore;
 
-        </div>
-
-
-        <div class="wf-mission">
-
-            🎯 CURRENT MISSION
-
-            <small>
-                Destroy enemy forces
-            </small>
-
-        </div>
-
-
-        <div id="wfInfo">
-            Tap a unit to select
-        </div>
-
-
-        <div class="wf-actions">
-
-            <button id="wfAttack">
-                ⚔ ATTACK
-            </button>
-
-            <button id="wfDefend">
-                🛡 DEFEND
-            </button>
-
-            <button id="wfAir">
-                ✈ AIR STRIKE
-            </button>
-
-            <button id="wfReset">
-                🔄 CAMERA
-            </button>
-
-        </div>
+    document
+        .getElementById("allyBar")
+        .style.width =
+        state.allyScore + "%";
 
 
-        <div class="wf-status">
+    const aliveUnits =
+        Object.values(units)
+            .filter(
+                unit => unit.alive
+            )
+            .length;
 
-            ALLIES:
-            <span id="wfAllies">5</span>
 
-            |
+    const aliveEnemies =
+        Object.values(enemies)
+            .filter(
+                enemy => enemy.alive
+            )
+            .length;
 
-            ENEMIES:
-            <span id="wfEnemies">5</span>
 
-        </div>
+    document
+        .getElementById("unitCount")
+        .textContent =
+        aliveUnits;
 
-    `;
 
-    document.body.appendChild(
-        hud
+    document
+        .getElementById("enemyCount")
+        .textContent =
+        aliveEnemies;
+
+
+    document
+        .getElementById("victories")
+        .textContent =
+        state.victories;
+
+
+    updateUnitInfo();
+
+}
+
+
+/* =========================================================
+   UNIT INFO
+========================================================= */
+
+function updateUnitInfo() {
+
+    const unit =
+        units[state.selected];
+
+    if (!unit) return;
+
+    document
+        .getElementById("selectedName")
+        .textContent =
+        unit.name;
+
+
+    const hp =
+        Math.max(
+            0,
+            unit.hp / unit.maxHp
+        ) * 100;
+
+
+    document
+        .getElementById("selectedHp")
+        .style.width =
+        hp + "%";
+
+
+    document
+        .getElementById("selectedStats")
+        .textContent =
+        `HP ${Math.floor(unit.hp)}/${unit.maxHp} • ATK ${unit.attack} • RANGE ${unit.range}`;
+
+}
+
+
+/* =========================================================
+   NOTIFICATION
+========================================================= */
+
+let notificationTimer = null;
+
+function notify(message) {
+
+    const box =
+        document.getElementById(
+            "notification"
+        );
+
+    box.textContent =
+        message;
+
+    box.style.opacity = "1";
+
+    clearTimeout(
+        notificationTimer
     );
 
+    notificationTimer =
+        setTimeout(() => {
 
-    document.getElementById(
-        "wfAttack"
-    ).onclick =
-        attackSelected;
+            box.style.opacity =
+                "0";
 
+        }, 2300);
 
-    document.getElementById(
-        "wfDefend"
-    ).onclick = () => {
-
-        state.score += 2;
-
-        notify(
-            "DEFENSIVE FORMATION ACTIVE"
-        );
-
-    };
+}
 
 
-    document.getElementById(
-        "wfAir"
-    ).onclick = () => {
+/* =========================================================
+   BATTLE END
+========================================================= */
 
-        if (state.fuel < 150) {
+function checkBattleEnd() {
 
-            notify(
-                "NOT ENOUGH FUEL"
+    const enemiesAlive =
+        Object.values(enemies)
+            .some(
+                enemy => enemy.alive
             );
 
-            return;
+    if (!enemiesAlive) {
 
-        }
+        winBattle();
 
-        state.fuel -= 150;
-
-        state.enemies.forEach(
-            enemy => {
-
-                if (!enemy.alive)
-                    return;
-
-                enemy.hp -= 30;
-
-                explosion(
-                    enemy.object.position
-                );
-
-                if (
-                    enemy.hp <= 0
-                ) {
-
-                    enemy.hp = 0;
-
-                    enemy.alive =
-                        false;
-
-                    enemy.object.visible =
-                        false;
-
-                }
-
-            }
-        );
-
-        state.score += 15;
-
-        notify(
-            "AIR STRIKE COMPLETE"
-        );
-
-    };
+    }
 
 
-    document.getElementById(
-        "wfReset"
-    ).onclick = () => {
+    const unitsAlive =
+        Object.values(units)
+            .some(
+                unit => unit.alive
+            );
 
-        cameraAngle = 0;
+    if (!unitsAlive) {
 
-        state.cameraDistance = 24;
-
-        cameraHeight = 20;
-
-        notify(
-            "CAMERA RESET"
-        );
-
-    };
-
-}
-
-
-createHUD();
-
-
-/* =========================================================
-   INFO
-========================================================= */
-
-function updateInfo(text) {
-
-    const el =
-        document.getElementById(
-            "wfInfo"
-        );
-
-    if (el)
-        el.textContent = text;
-
-}
-
-
-function notify(text) {
-
-    updateInfo(text);
-
-}
-
-
-/* =========================================================
-   HUD UPDATE
-========================================================= */
-
-function updateHUD() {
-
-    const money =
-        document.getElementById(
-            "wfMoney"
-        );
-
-    const fuel =
-        document.getElementById(
-            "wfFuel"
-        );
-
-    const score =
-        document.getElementById(
-            "wfScore"
-        );
-
-
-    if (money)
-        money.textContent =
-            Math.floor(state.money);
-
-    if (fuel)
-        fuel.textContent =
-            Math.floor(state.fuel);
-
-    if (score)
-        score.textContent =
-            state.score;
-
-
-    const allies =
-        state.units.filter(
-            u => u.alive
-        ).length;
-
-
-    const enemies =
-        state.enemies.filter(
-            u => u.alive
-        ).length;
-
-
-    document.getElementById(
-        "wfAllies"
-    ).textContent =
-        allies;
-
-
-    document.getElementById(
-        "wfEnemies"
-    ).textContent =
-        enemies;
-
-
-    if (
-        enemies === 0 &&
-        !state.gameOver
-    ) {
-
-        state.gameOver = true;
-
-        notify(
-            "🏆 VICTORY — ENEMY HQ CAPTURED!"
-        );
+        loseBattle();
 
     }
 
 }
 
 
-/* =========================================================
-   RESOURCE INCOME
-========================================================= */
+function winBattle() {
 
-setInterval(() => {
+    if (state.gameOver) return;
 
-    if (state.gameOver)
-        return;
+    state.gameOver = true;
 
-    state.money += 50;
+    state.won = true;
 
-    state.metal += 20;
+    state.victories++;
 
-}, 5000);
+    state.level++;
 
+    state.money += 1800;
 
-/* =========================================================
-   DAY / NIGHT
-========================================================= */
+    state.fuel += 350;
 
-function updateDayNight(delta) {
+    state.metal += 500;
 
-    state.dayTime +=
-        delta * 0.01;
+    state.score += 3;
 
+    state.allyScore = 100;
 
-    if (state.dayTime > 1)
-        state.dayTime = 0;
+    state.enemyScore = 0;
 
+    document
+        .getElementById("missionText")
+        .textContent =
+        "🏆 Victory achieved — new mission unlocked.";
 
-    const angle =
-        state.dayTime *
-        Math.PI * 2;
-
-
-    const sunX =
-        Math.cos(angle) * 50;
-
-
-    const sunY =
-        Math.max(
-            8,
-            Math.sin(angle) * 50
-        );
-
-
-    sun.position.set(
-        sunX,
-        sunY,
-        25
+    notify(
+        "🏆 VICTORY! Enemy headquarters captured."
     );
 
+    updateUI();
 
-    const brightness =
-        Math.max(
-            0.25,
-            Math.sin(angle) * 0.7 + 0.7
-        );
+}
 
 
-    sun.intensity =
-        brightness * 2;
+function loseBattle() {
 
+    if (state.gameOver) return;
 
-    ambient.intensity =
-        brightness * 1.3;
+    state.gameOver = true;
+
+    document
+        .getElementById("missionText")
+        .textContent =
+        "Mission failed — reorganize your forces.";
+
+    notify(
+        "⚠️ DEFEAT — All allied forces destroyed."
+    );
 
 }
 
 
 /* =========================================================
-   EFFECT UPDATE
+   GAME LOOP
 ========================================================= */
 
-function updateEffects(delta) {
+function update() {
 
-    state.effects =
-        state.effects.filter(
-            effect => {
+    if (!state.gameOver) {
 
-                effect.life -=
-                    delta;
+        if (
+            Math.abs(joyX) > .03 ||
+            Math.abs(joyY) > .03
+        ) {
 
-                effect.object.scale.multiplyScalar(
-                    1 + delta * 5
-                );
-
-                effect.object.material.opacity =
-                    Math.max(
-                        0,
-                        effect.life * 2
-                    );
-
-                effect.light.intensity =
-                    Math.max(
-                        0,
-                        effect.life * 15
-                    );
-
-
-                if (
-                    effect.life <= 0
-                ) {
-
-                    scene.remove(
-                        effect.object
-                    );
-
-                    scene.remove(
-                        effect.light
-                    );
-
-                    return false;
-
-                }
-
-
-                return true;
-
-            }
-        );
-
-}
-
-
-/* =========================================================
-   ANIMATION
-========================================================= */
-
-const clock =
-    new THREE.Clock();
-
-
-function animate() {
-
-    requestAnimationFrame(
-        animate
-    );
-
-
-    const delta =
-        Math.min(
-            clock.getDelta(),
-            0.05
-        );
-
-
-    /* joystick movement */
-
-    if (
-        state.selected &&
-        state.selected.alive &&
-        (Math.abs(joyX) > 0.05 ||
-         Math.abs(joyY) > 0.05)
-    ) {
-
-        const unit =
-            state.selected;
-
-        const movement =
-            new THREE.Vector3(
+            moveSelected(
                 joyX,
-                0,
                 joyY
             );
 
-
-        movement.multiplyScalar(
-            unit.speed * delta * 2
-        );
-
-
-        unit.object.position.add(
-            movement
-        );
-
-
-        unit.object.position.x =
-            THREE.MathUtils.clamp(
-                unit.object.position.x,
-                -47,
-                47
-            );
-
-
-        unit.object.position.z =
-            THREE.MathUtils.clamp(
-                unit.object.position.z,
-                -47,
-                47
-            );
+        }
 
     }
 
+    cleanupShots();
 
-    /* units */
+}
 
-    state.units.forEach(
-        unit => {
 
-            updateUnitMovement(
-                unit,
-                delta
+/* =========================================================
+   RENDER
+========================================================= */
+
+function render() {
+
+    ctx.clearRect(
+        0,
+        0,
+        W,
+        H
+    );
+
+    drawSky();
+
+    drawGround();
+
+    drawRoad();
+
+    drawRiver();
+
+    drawBridge();
+
+    drawTrees();
+
+    drawBuildings();
+
+    drawBase(
+        world.baseX,
+        world.baseY,
+        false
+    );
+
+    drawBase(
+        world.enemyBaseX,
+        world.enemyBaseY,
+        true
+    );
+
+
+    /* units sorted by Y */
+
+    const allObjects = [];
+
+    Object.entries(units)
+        .forEach(
+            ([id, unit]) => {
+
+                if (unit.alive) {
+
+                    allObjects.push({
+                        unit,
+                        id,
+                        enemy: false
+                    });
+
+                }
+
+            }
+        );
+
+
+    Object.entries(enemies)
+        .forEach(
+            ([id, unit]) => {
+
+                if (unit.alive) {
+
+                    allObjects.push({
+                        unit,
+                        id,
+                        enemy: true
+                    });
+
+                }
+
+            }
+        );
+
+
+    allObjects.sort(
+        (a, b) =>
+            a.unit.y -
+            b.unit.y
+    );
+
+
+    allObjects.forEach(
+        object => {
+
+            drawUnit(
+                object.unit,
+                object.id,
+                object.enemy
             );
-
-            if (
-                unit.cooldown > 0
-            )
-                unit.cooldown -=
-                    delta;
 
         }
     );
 
 
-    /* enemies */
+    drawEffects();
 
-    state.enemies.forEach(
-        enemy => {
-
-            updateEnemyAI(
-                enemy,
-                delta
-            );
-
-            updateUnitMovement(
-                enemy,
-                delta
-            );
-
-            if (
-                enemy.cooldown > 0
-            )
-                enemy.cooldown -=
-                    delta;
-
-        }
-    );
+}
 
 
-    updateBullets(
-        delta
-    );
+/* =========================================================
+   LOOP
+========================================================= */
 
+function loop() {
 
-    updateEffects(
-        delta
-    );
+    update();
 
+    render();
 
-    updateDayNight(
-        delta
-    );
-
-
-    updateCamera();
-
-
-    updateHUD();
-
-
-    renderer.render(
-        scene,
-        camera
+    requestAnimationFrame(
+        loop
     );
 
 }
 
 
-animate();
-
-
 /* =========================================================
-   RESIZE
+   PASSIVE ECONOMY
 ========================================================= */
 
-window.addEventListener(
-    "resize",
+setInterval(
     () => {
 
-        camera.aspect =
-            window.innerWidth /
-            window.innerHeight;
+        if (state.gameOver) return;
 
-        camera.updateProjectionMatrix();
+        state.money += 45;
 
-        renderer.setSize(
-            window.innerWidth,
-            window.innerHeight
-        );
+        state.metal += 12;
 
-    }
+        updateUI();
+
+    },
+    10000
 );
 
 
 /* =========================================================
-   EXTRA MOBILE CSS
+   ENEMY AI TIMER
 ========================================================= */
 
-const style =
-    document.createElement("style");
+setInterval(
+    () => {
 
-style.textContent = `
+        enemyAI();
 
-#warfrontHUD {
+    },
+    3500
+);
 
-    position:fixed;
-    inset:0;
-    z-index:20;
-    pointer-events:none;
 
-    font-family:Arial,sans-serif;
-    color:white;
-}
+/* =========================================================
+   RANDOM BATTLE EFFECTS
+========================================================= */
 
-.wf-top {
+setInterval(
+    () => {
 
-    position:absolute;
-    top:0;
-    left:0;
-    right:0;
+        if (state.gameOver) return;
 
-    height:65px;
+        const enemiesAlive =
+            Object.values(enemies)
+                .filter(
+                    e => e.alive
+                );
 
-    padding:12px 16px;
+        if (!enemiesAlive.length) {
+            return;
+        }
 
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
+        const target =
+            enemiesAlive[
+                Math.floor(
+                    Math.random() *
+                    enemiesAlive.length
+                )
+            ];
 
-    background:rgba(3,12,15,.88);
+        createExplosion(
+            target.x +
+            (Math.random() * 50 - 25),
 
-    border-bottom:
-        1px solid rgba(0,220,255,.2);
-
-    letter-spacing:2px;
-
-}
-
-.wf-top strong {
-
-    font-size:20px;
-
-    text-shadow:
-        0 0 15px #00dfff;
-
-}
-
-.wf-top div {
-
-    display:flex;
-
-    gap:10px;
-
-    font-size:11px;
-
-}
-
-.wf-mission {
-
-    position:absolute;
-
-    top:80px;
-    left:12px;
-
-    padding:12px 15px;
-
-    background:
-        rgba(2,12,15,.88);
-
-    border-left:
-        3px solid #00eaff;
-
-    border-radius:
-        0 8px 8px 0;
-
-    font-size:10px;
-
-    letter-spacing:2px;
-
-}
-
-.wf-mission small {
-
-    display:block;
-
-    margin-top:6px;
-
-    color:#9fb4bb;
-
-    letter-spacing:1px;
-
-}
-
-#wfInfo {
-
-    position:absolute;
-
-    left:12px;
-    bottom:15px;
-
-    padding:10px 14px;
-
-    background:
-        rgba(2,12,15,.92);
-
-    border-left:
-        3px solid #00eaff;
-
-    border-radius:
-        0 7px 7px 0;
-
-    font-size:10px;
-
-    max-width:280px;
-
-}
-
-.wf-actions {
-
-    position:absolute;
-
-    right:12px;
-    bottom:15px;
-
-    display:flex;
-
-    gap:6px;
-
-    pointer-events:auto;
-
-}
-
-.wf-actions button {
-
-    border:
-        1px solid #28515c;
-
-    background:
-        rgba(3,16,20,.94);
-
-    color:white;
-
-    padding:11px 12px;
-
-    border-radius:7px;
-
-    font-size:9px;
-
-    font-weight:bold;
-
-}
-
-.wf-actions button:active {
-
-    transform:scale(.94);
-
-    border-color:#00eaff;
-
-}
-
-.wf-status {
-
-    position:absolute;
-
-    right:12px;
-    top:80px;
-
-    padding:10px;
-
-    background:
-        rgba(2,12,15,.88);
-
-    border-radius:7px;
-
-    font-size:9px;
-
-    color:#a9bdc2;
-
-}
-
-#warfrontJoystick {
-
-    position:fixed;
-
-    z-index:30;
-
-    left:20px;
-    bottom:100px;
-
-    width:125px;
-    height:125px;
-
-    border-radius:50%;
-
-    background:
-        radial-gradient(
-            circle,
-            rgba(0,230,255,.18),
-            rgba(0,40,50,.55)
+            target.y +
+            (Math.random() * 50 - 25)
         );
 
-    border:
-        2px solid rgba(0,220,255,.35);
+    },
+    4200
+);
 
-    box-shadow:
-        0 0 25px rgba(0,220,255,.12);
 
-    pointer-events:auto;
+/* =========================================================
+   LOADING
+========================================================= */
 
-    touch-action:none;
+let loadingProgress = 0;
 
-}
+const loadingMessages = [
 
-#joystickStick {
+    "Initializing battlefield...",
 
-    position:absolute;
+    "Loading terrain...",
 
-    width:52px;
-    height:52px;
+    "Deploying armored units...",
 
-    left:34px;
-    top:34px;
+    "Preparing air support...",
 
-    border-radius:50%;
+    "Connecting tactical systems...",
 
-    background:
-        rgba(0,220,255,.55);
+    "Activating enemy AI...",
 
-    border:
-        2px solid #00eaff;
+    "Battlefield ready."
 
-    box-shadow:
-        0 0 20px #00dfff;
+];
 
-}
 
-@media(max-width:700px) {
+const loadingTimer =
+    setInterval(
+        () => {
 
-    .wf-top {
+            loadingProgress += 5;
 
-        height:58px;
+            document
+                .getElementById("progress")
+                .style.width =
+                loadingProgress + "%";
 
-        padding:
-            9px 10px;
 
-    }
+            const index =
+                Math.min(
+                    Math.floor(
+                        loadingProgress / 17
+                    ),
+                    loadingMessages.length - 1
+                );
 
-    .wf-top strong {
 
-       
+            document
+                .getElementById("loadText")
+                .textContent =
+                loadingMessages[index];
+
+
+            if (
+                loadingProgress >= 100
+            ) {
+
+                clearInterval(
+                    loadingTimer
+                );
+
+
+                setTimeout(
+                    () => {
+
+                        const loading =
+                            document
+                            .getElementById(
+                                "loading"
+                            );
+
+                        loading.style.opacity =
+                            "0";
+
+
+                        setTimeout(
+                            () => {
+
+                                loading.style.display =
+                                    "none";
+
+                            },
+                            800
+                        );
+
+                    },
+                    400
+                );
+
+            }
+
+        },
+        100
+    );
+
+
+/* =========================================================
+   START
+========================================================= */
+
+loadGame();
+
+updateUI();
+
+loop();
+
+notify(
+    "Battlefield initialized."
+);
+
+console.log(
+    "WARFRONT Tactical Command — Ready."
+);
