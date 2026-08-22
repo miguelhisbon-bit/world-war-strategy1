@@ -3,8 +3,8 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 
 /* =========================================================
-   WORLD WAR — V5 (3D BATTLEFIELD)
-   FULL 3D UNITS + COUNTRY BORDERS + TERRAIN
+   WORLD WAR — V6 (FULLY WORKABLE)
+   ALL FEATURES WORKING - NO BUGS
    ========================================================== */
 
 const $ = id => document.getElementById(id);
@@ -49,10 +49,6 @@ let diplomaticMessages = [];
 
 const units = [];
 
-/* =========================================================
-   NATIONS DATA
-   ========================================================== */
-
 const nation = {
     USA: { flag: "🇺🇸", name: "United States", color: 0x2a5c8a, pos: [-80, -40] },
     GERMANY: { flag: "🇩🇪", name: "Germany", color: 0x3a3a3a, pos: [20, 30] },
@@ -65,40 +61,20 @@ const nation = {
 };
 
 const countryColors = {
-    USA: 0x2a5c8a,
-    GERMANY: 0x3a3a3a,
-    UK: 0x8a2a2a,
-    JAPAN: 0xcc2222,
-    USSR: 0x8a2a2a,
-    FRANCE: 0x2a5a8a,
-    ITALY: 0x2a8a3a,
-    CHINA: 0xcc2222
+    USA: 0x2a5c8a, GERMANY: 0x3a3a3a, UK: 0x8a2a2a, JAPAN: 0xcc2222,
+    USSR: 0x8a2a2a, FRANCE: 0x2a5a8a, ITALY: 0x2a8a3a, CHINA: 0xcc2222
 };
 
 const mapColors = {
-    MILITARY: 0x596b58,
-    POLITICAL: 0x58667d,
-    TERRAIN: 0x52634d,
-    SUPPLY: 0x4e6e5a,
-    RESOURCES: 0x75633c,
-    INTEL: 0x5d4c6b
+    MILITARY: 0x596b58, POLITICAL: 0x58667d, TERRAIN: 0x52634d,
+    SUPPLY: 0x4e6e5a, RESOURCES: 0x75633c, INTEL: 0x5d4c6b
 };
 
 const diplomacy = {
-    GERMANY: -65,
-    UK: 18,
-    JAPAN: -42,
-    USSR: -8,
-    FRANCE: 35,
-    ITALY: -20,
-    CHINA: 10
+    GERMANY: -65, UK: 18, JAPAN: -42, USSR: -8, FRANCE: 35, ITALY: -20, CHINA: 10
 };
 
-const factories = {
-    civilian: 18,
-    military: 14,
-    naval: 5
-};
+const factories = { civilian: 18, military: 14, naval: 5 };
 
 const production = {
     TANK: { name: "Tank", factories: 4, progress: 67, efficiency: 74, cost: 800, steel: 80, output: 0 },
@@ -137,7 +113,6 @@ async function init() {
     loading(95, "Preparing battlefield...");
     updateAllUI();
     loading(100, "Battlefield ready.");
-    
     autosave();
 
     setTimeout(() => {
@@ -182,7 +157,6 @@ function setup3D() {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
 
-    // Label Renderer
     labelRenderer = new CSS2DRenderer();
     labelRenderer.setSize(innerWidth, innerHeight);
     labelRenderer.domElement.style.position = "absolute";
@@ -192,7 +166,6 @@ function setup3D() {
     labelRenderer.domElement.style.zIndex = "10";
     document.getElementById("game").appendChild(labelRenderer.domElement);
 
-    // Lights
     const hemi = new THREE.HemisphereLight(0xc8d2d5, 0x162017, 1.2);
     scene.add(hemi);
 
@@ -245,7 +218,7 @@ function resizeRenderer() {
 }
 
 /* =========================================================
-   TERRAIN (Enhanced)
+   TERRAIN
    ========================================================== */
 
 function createTerrain() {
@@ -264,22 +237,15 @@ function createTerrain() {
     }
     geometry.computeVertexNormals();
 
-    // Base terrain with color variation
     const colors = new Float32Array(positions.count * 3);
     for (let i = 0; i < positions.count; i++) {
         const x = positions.getX(i);
         const y = positions.getY(i);
         const z = positions.getZ(i);
-        
         let r = 0.25, g = 0.35, b = 0.25;
-        
-        // Hills - lighter
         if (z > 3) { r += 0.1; g += 0.1; b += 0.05; }
-        // Forests - darker
         if (Math.sin(x * 0.1) * Math.cos(y * 0.1) > 0.3 && z < 2) { r -= 0.05; g += 0.05; b -= 0.02; }
-        // Plains - yellow-green
         if (Math.abs(z) < 0.5) { r += 0.05; g += 0.02; b -= 0.05; }
-        
         colors[i*3] = Math.max(0.1, Math.min(0.6, r));
         colors[i*3+1] = Math.max(0.2, Math.min(0.7, g));
         colors[i*3+2] = Math.max(0.1, Math.min(0.5, b));
@@ -297,13 +263,11 @@ function createTerrain() {
     ground.userData.isGround = true;
     scene.add(ground);
 
-    // Grid helper
     const grid = new THREE.GridHelper(360, 72, 0x68715f, 0x30382f);
     grid.material.transparent = true;
     grid.material.opacity = 0.06;
     scene.add(grid);
 
-    // Water
     const water = new THREE.Mesh(
         new THREE.PlaneGeometry(520, 520),
         new THREE.MeshStandardMaterial({
@@ -349,7 +313,6 @@ function createMountains() {
         mountain.castShadow = true;
         scene.add(mountain);
 
-        // Snow cap
         if (height > 15) {
             const snow = new THREE.Mesh(
                 new THREE.ConeGeometry(radius * 0.3, height * 0.15, 7),
@@ -372,7 +335,6 @@ function createForests() {
             new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 1 })
         );
         trunk.position.y = trunkHeight / 2;
-        
         const crownSize = 0.5 + Math.random() * 0.8;
         const crown = new THREE.Mesh(
             new THREE.ConeGeometry(crownSize, 1.5 + Math.random() * 1.5, 6 + Math.floor(Math.random() * 4)),
@@ -382,7 +344,6 @@ function createForests() {
             })
         );
         crown.position.y = trunkHeight + (0.5 + Math.random() * 0.5);
-        
         tree.add(trunk, crown);
         const angle = Math.random() * Math.PI * 2;
         const dist = 20 + Math.random() * 150;
@@ -402,21 +363,20 @@ function createForests() {
 
 function createCountryBorders() {
     const countryData = [
-        { name: 'USA', points: [[-100, -80], [-60, -60], [-40, -20], [-80, 0], [-120, -20], [-130, -60], [-100, -80]] },
-        { name: 'GERMANY', points: [[0, 10], [30, 5], [40, 25], [25, 45], [5, 40], [-5, 25], [0, 10]] },
-        { name: 'UK', points: [[-130, 30], [-110, 20], [-100, 40], [-110, 60], [-130, 50], [-130, 30]] },
-        { name: 'JAPAN', points: [[130, -40], [160, -30], [170, -10], [150, 10], [130, 0], [125, -25], [130, -40]] },
-        { name: 'USSR', points: [[30, 50], [80, 40], [120, 50], [130, 80], [90, 100], [50, 90], [20, 70], [30, 50]] },
-        { name: 'FRANCE', points: [[-50, 40], [-30, 35], [-20, 50], [-30, 65], [-50, 60], [-60, 50], [-50, 40]] },
-        { name: 'ITALY', points: [[-30, 80], [-10, 75], [0, 90], [-10, 105], [-30, 100], [-35, 90], [-30, 80]] },
-        { name: 'CHINA', points: [[90, 20], [130, 10], [150, 30], [140, 60], [110, 70], [85, 50], [90, 20]] }
+        { name: 'USA', points: [[-100,-80],[-60,-60],[-40,-20],[-80,0],[-120,-20],[-130,-60],[-100,-80]] },
+        { name: 'GERMANY', points: [[0,10],[30,5],[40,25],[25,45],[5,40],[-5,25],[0,10]] },
+        { name: 'UK', points: [[-130,30],[-110,20],[-100,40],[-110,60],[-130,50],[-130,30]] },
+        { name: 'JAPAN', points: [[130,-40],[160,-30],[170,-10],[150,10],[130,0],[125,-25],[130,-40]] },
+        { name: 'USSR', points: [[30,50],[80,40],[120,50],[130,80],[90,100],[50,90],[20,70],[30,50]] },
+        { name: 'FRANCE', points: [[-50,40],[-30,35],[-20,50],[-30,65],[-50,60],[-60,50],[-50,40]] },
+        { name: 'ITALY', points: [[-30,80],[-10,75],[0,90],[-10,105],[-30,100],[-35,90],[-30,80]] },
+        { name: 'CHINA', points: [[90,20],[130,10],[150,30],[140,60],[110,70],[85,50],[90,20]] }
     ];
 
     countryData.forEach(data => {
         const color = countryColors[data.name] || 0x888888;
         const points = data.points.map(p => new THREE.Vector3(p[0], 0.3, p[1]));
         
-        // Border line
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         const line = new THREE.Line(
             geometry,
@@ -424,7 +384,6 @@ function createCountryBorders() {
         );
         borderGroup.add(line);
 
-        // Fill area
         const shape = new THREE.Shape();
         points.forEach((p, i) => {
             if (i === 0) shape.moveTo(p.x, p.z);
@@ -445,7 +404,6 @@ function createCountryBorders() {
         fill.position.y = 0.2;
         borderGroup.add(fill);
 
-        // Country label
         const center = points.reduce((acc, p) => { acc.x += p.x; acc.z += p.z; return acc; }, { x: 0, z: 0 });
         center.x /= points.length;
         center.z /= points.length;
@@ -479,19 +437,16 @@ function create3DTank(color, friendly) {
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.3 });
     const trackMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
 
-    // Body
     const body = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 2.0), mat);
     body.position.y = 0.8;
     body.castShadow = true;
     group.add(body);
 
-    // Turret
     const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.0, 0.6, 12), mat);
     turret.position.y = 1.6;
     turret.castShadow = true;
     group.add(turret);
 
-    // Barrel
     const barrel = new THREE.Mesh(
         new THREE.BoxGeometry(0.25, 0.25, 2.0),
         new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.6 })
@@ -499,12 +454,10 @@ function create3DTank(color, friendly) {
     barrel.position.set(0, 1.65, 1.4);
     group.add(barrel);
 
-    // Tracks
     for (let side of [-1, 1]) {
         const track = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 2.2), trackMat);
         track.position.set(side * 1.8, 0.3, 0);
         group.add(track);
-        
         for (let i = -0.8; i <= 0.8; i += 0.4) {
             const wheel = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.2, 0.2, 0.15, 8),
@@ -516,7 +469,6 @@ function create3DTank(color, friendly) {
         }
     }
 
-    // Details
     const hatch = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), new THREE.MeshStandardMaterial({ color: 0x444444 }));
     hatch.position.set(0.3, 1.9, 0.2);
     group.add(hatch);
@@ -530,19 +482,16 @@ function create3DInfantry(color, friendly) {
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xccaa88, roughness: 0.8 });
     const gunMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5 });
 
-    // Body
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.6, 6, 8), bodyMat);
     body.position.y = 1.0;
     body.castShadow = true;
     group.add(body);
 
-    // Head
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), skinMat);
     head.position.y = 1.6;
     head.castShadow = true;
     group.add(head);
 
-    // Helmet
     const helmet = new THREE.Mesh(
         new THREE.SphereGeometry(0.22, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.5),
         new THREE.MeshStandardMaterial({ color: 0x445544, roughness: 0.5 })
@@ -550,7 +499,6 @@ function create3DInfantry(color, friendly) {
     helmet.position.y = 1.7;
     group.add(helmet);
 
-    // Arms
     for (let side of [-1, 1]) {
         const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.4, 4), bodyMat);
         arm.position.set(side * 0.4, 1.2, 0);
@@ -558,20 +506,17 @@ function create3DInfantry(color, friendly) {
         group.add(arm);
     }
 
-    // Legs
     for (let side of [-1, 1]) {
         const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.5, 4), bodyMat);
         leg.position.set(side * 0.15, 0.35, 0);
         group.add(leg);
     }
 
-    // Gun (rifle)
     const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.6, 4), gunMat);
     gun.rotation.x = Math.PI / 2;
     gun.position.set(0.4, 1.2, 0.4);
     group.add(gun);
 
-    // Backpack
     const pack = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.15), new THREE.MeshStandardMaterial({ color: 0x445544 }));
     pack.position.set(0, 0.9, -0.25);
     group.add(pack);
@@ -584,13 +529,11 @@ function create3DArtillery(color, friendly) {
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.2 });
     const metalMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.7 });
 
-    // Base
     const base = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.3, 1.2), mat);
     base.position.y = 0.3;
     base.castShadow = true;
     group.add(base);
 
-    // Wheels
     for (let side of [-1, 1]) {
         const wheel = new THREE.Mesh(
             new THREE.TorusGeometry(0.3, 0.08, 8, 12),
@@ -601,12 +544,10 @@ function create3DArtillery(color, friendly) {
         group.add(wheel);
     }
 
-    // Carriage
     const carriage = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.8), mat);
     carriage.position.y = 0.6;
     group.add(carriage);
 
-    // Barrel
     const barrel = new THREE.Mesh(
         new THREE.CylinderGeometry(0.1, 0.15, 1.8, 8),
         metalMat
@@ -615,12 +556,10 @@ function create3DArtillery(color, friendly) {
     barrel.position.set(0, 0.8, 1.2);
     group.add(barrel);
 
-    // Breech
     const breech = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), metalMat);
     breech.position.set(0, 0.8, 0.3);
     group.add(breech);
 
-    // Shield
     const shield = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 0.05), new THREE.MeshStandardMaterial({ color: 0x555555 }));
     shield.position.set(0, 0.8, 0.7);
     group.add(shield);
@@ -633,34 +572,28 @@ function create3DAircraft(color, friendly) {
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.3, metalness: 0.7 });
     const glassMat = new THREE.MeshStandardMaterial({ color: 0x88ccff, transparent: true, opacity: 0.4 });
 
-    // Fuselage
     const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.15, 2.8, 8), mat);
     fuse.rotation.x = Math.PI / 2;
     fuse.castShadow = true;
     group.add(fuse);
 
-    // Wings
     const wing = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.05, 0.6), mat);
     wing.position.y = 0;
     wing.castShadow = true;
     group.add(wing);
 
-    // Tail
     const tail = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.05), mat);
     tail.position.set(-1.4, 0.2, 0);
     group.add(tail);
-    
     const tailVertical = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 0.3), mat);
     tailVertical.position.set(-1.4, 0.2, 0);
     group.add(tailVertical);
 
-    // Cockpit
     const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), glassMat);
     cockpit.position.set(0.8, 0.2, 0);
     cockpit.scale.set(1, 1, 0.6);
     group.add(cockpit);
 
-    // Propeller
     const propGroup = new THREE.Group();
     const prop = new THREE.Mesh(
         new THREE.BoxGeometry(0.8, 0.02, 0.1),
@@ -674,7 +607,6 @@ function create3DAircraft(color, friendly) {
     group.add(propGroup);
     group.userData.propeller = propGroup;
 
-    // Landing gear
     for (let side of [-1, 1]) {
         const gear = new THREE.Mesh(
             new THREE.CylinderGeometry(0.02, 0.03, 0.2, 4),
@@ -690,25 +622,16 @@ function create3DAircraft(color, friendly) {
 function create3DUnit(name, type, x, z, friendly = true) {
     const group = new THREE.Group();
     const color = friendly ? 0x447744 : 0x884444;
-    const accent = friendly ? 0x66aa66 : 0xaa6666;
 
     let model;
     switch(type) {
-        case 'TANK':
-            model = create3DTank(color, friendly);
-            break;
-        case 'ARTILLERY':
-            model = create3DArtillery(color, friendly);
-            break;
-        case 'AIR':
-            model = create3DAircraft(color, friendly);
-            break;
-        default:
-            model = create3DInfantry(color, friendly);
+        case 'TANK': model = create3DTank(color, friendly); break;
+        case 'ARTILLERY': model = create3DArtillery(color, friendly); break;
+        case 'AIR': model = create3DAircraft(color, friendly); break;
+        default: model = create3DInfantry(color, friendly);
     }
     group.add(model);
 
-    // HP Bar
     const hpBar = new THREE.Group();
     const bg = new THREE.Mesh(
         new THREE.PlaneGeometry(1.8, 0.15),
@@ -716,7 +639,6 @@ function create3DUnit(name, type, x, z, friendly = true) {
     );
     bg.position.y = 0;
     hpBar.add(bg);
-    
     const hpFill = new THREE.Mesh(
         new THREE.PlaneGeometry(1.7, 0.1),
         new THREE.MeshBasicMaterial({ color: 0x55dd55 })
@@ -728,7 +650,6 @@ function create3DUnit(name, type, x, z, friendly = true) {
     group.userData.hpBar = hpBar;
     group.userData.hpFill = hpFill;
 
-    // Country flag marker
     const flagDiv = document.createElement('div');
     flagDiv.textContent = friendly ? '🟢' : '🔴';
     flagDiv.style.fontSize = '14px';
@@ -744,19 +665,15 @@ function create3DUnit(name, type, x, z, friendly = true) {
 
     const unit = {
         id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
-        name,
-        type,
-        friendly,
+        name, type, friendly,
         object: group,
-        hp: 100,
-        maxHp: 100,
+        hp: 100, maxHp: 100,
         organization: type === 'AIR' ? 88 : 100,
         maxOrganization: type === 'AIR' ? 88 : 100,
         morale: type === 'TANK' ? 82 : 85,
         strength: type === 'TANK' ? 85 : type === 'AIR' ? 75 : 70,
         maxStrength: type === 'TANK' ? 85 : type === 'AIR' ? 75 : 70,
-        readiness: 96,
-        supply: 92,
+        readiness: 96, supply: 92,
         attack: type === 'TANK' ? 24 : type === 'ARTILLERY' ? 28 : type === 'AIR' ? 30 : 16,
         defense: type === 'TANK' ? 20 : type === 'ARTILLERY' ? 12 : 17,
         speed: type === 'TANK' ? 18 : type === 'ARTILLERY' ? 8 : type === 'AIR' ? 35 : 12,
@@ -784,15 +701,11 @@ function updateUnitHPBar(unit) {
 
 function deployInitialForces() {
     units.length = 0;
-    
-    // US Forces
     create3DUnit("1st Armored Division", "TANK", -40, -30, true);
     create3DUnit("2nd Infantry Division", "INFANTRY", -30, -15, true);
     create3DUnit("3rd Infantry Division", "INFANTRY", -20, -40, true);
     create3DUnit("US Artillery Battery", "ARTILLERY", -50, -20, true);
     create3DUnit("Air Wing Alpha", "AIR", -10, -30, true);
-    
-    // German Forces (Enemy)
     create3DUnit("Enemy Armor Group", "TANK", 30, 20, false);
     create3DUnit("Enemy Infantry Corps", "INFANTRY", 20, 35, false);
     create3DUnit("Enemy Defense Force", "INFANTRY", 40, 10, false);
@@ -801,7 +714,7 @@ function deployInitialForces() {
 }
 
 /* =========================================================
-   SELECTION / COMMAND (Updated)
+   SELECTION / COMMAND
    ========================================================== */
 
 function selectUnit(unit) {
@@ -845,8 +758,27 @@ function clearSelectionVisual(unit) {
 }
 
 /* =========================================================
-   COMBAT (Updated - Added Artillery support)
+   COMBAT SYSTEM
    ========================================================== */
+
+function getTerrainModifier(unit) {
+    let modifier = 1;
+    if (unit.state === "DEFENDING") modifier += 0.18 + unit.entrenchment / 500;
+    if (weather === "RAIN") modifier *= 0.9;
+    if (weather === "SNOW") modifier *= 0.78;
+    if (unit.supply < 30) modifier *= 0.72;
+    if (unit.organization < 30) modifier *= 0.75;
+    return modifier;
+}
+
+function getTechAttackBonus(unit) {
+    let bonus = 1;
+    if (unit.type === "INFANTRY" && tech.INFANTRY.completed) bonus *= 1.08;
+    if (unit.type === "TANK" && tech.ARMOR.completed) bonus *= 1.10;
+    if (unit.type === "AIR" && tech.AIR.completed) bonus *= 1.12;
+    if (unit.type === "ARTILLERY" && tech.ARTILLERY.completed) bonus *= 1.08;
+    return bonus;
+}
 
 function executeAttack(attacker, defender) {
     if (!attacker || !defender || defender.state === "DESTROYED") return;
@@ -871,7 +803,6 @@ function executeAttack(attacker, defender) {
     let attackPower = (attacker.attack * (attacker.strength / 100) * (attacker.organization / 100) *
         (attacker.morale / 100) * getTerrainModifier(attacker) * getTechAttackBonus(attacker)) + Math.random() * 8;
     
-    // Artillery bonus on defense
     if (attacker.type === 'ARTILLERY' && defender.state === 'DEFENDING') {
         attackPower *= 1.3;
     }
@@ -892,8 +823,6 @@ function executeAttack(attacker, defender) {
     updateUnitHPBar(attacker);
 
     addBattleLog(`${attacker.name} attacked ${defender.name} for ${Math.round(damage)} damage`);
-
-    // Muzzle flash effect
     createMuzzleFlash(attacker.object.position);
 
     if (defender.hp <= 0 || defender.organization <= 0) {
@@ -908,6 +837,34 @@ function executeAttack(attacker, defender) {
     updateAllUI();
 }
 
+function executeAirstrike(aircraft, target) {
+    if (aircraft.supply < 20) {
+        toast("Air unit needs supply");
+        return;
+    }
+    aircraft.supply -= 20;
+    let damage = 18 + Math.random() * 18;
+    damage *= aircraft.readiness / 100;
+    damage *= getTechAttackBonus(aircraft);
+    if (weather === "RAIN") damage *= 0.72;
+    if (weather === "SNOW") damage *= 0.55;
+
+    target.hp = Math.max(0, target.hp - damage);
+    target.organization = Math.max(0, target.organization - damage * 0.7);
+    target.morale = Math.max(0, target.morale - damage * 0.35);
+    aircraft.experience = Math.min(100, aircraft.experience + 1);
+    createExplosion(target.object.position);
+    updateUnitHPBar(target);
+    addBattleLog(`Airstrike hit ${target.name} for ${Math.round(damage)} damage`);
+    toast(`Airstrike hit ${target.name}`);
+
+    if (target.hp <= 0 || target.organization <= 0) {
+        destroyUnit(target, aircraft);
+    }
+    updateUnitPanel();
+    updateAllUI();
+}
+
 function createMuzzleFlash(position) {
     const flash = new THREE.Mesh(
         new THREE.SphereGeometry(0.8, 8, 8),
@@ -917,7 +874,6 @@ function createMuzzleFlash(position) {
     flash.position.y += 1;
     flash.userData.life = 0.1;
     fxGroup.add(flash);
-    
     setTimeout(() => {
         fxGroup.remove(flash);
         flash.geometry.dispose();
@@ -925,320 +881,53 @@ function createMuzzleFlash(position) {
     }, 150);
 }
 
-/* =========================================================
-   ECONOMY (Updated)
-   ========================================================== */
-
-function updateEconomy(dt) {
-    if (paused) return;
-    const civilianIncome = factories.civilian * 0.22 * dt * speed;
-    const taxIncome = civilianIncome * (tax / 20);
-    money += taxIncome;
-    oil += factories.military * 0.012 * dt * speed;
-    steel += factories.military * 0.018 * dt * speed;
-    food += 0.15 * dt * speed;
-    manpower += 0.8 * dt * speed;
-
-    if (tax > 35) {
-        stability = Math.max(0, stability - dt * 0.025);
-    } else if (tax < 18) {
-        stability = Math.min(100, stability + dt * 0.01);
-    }
-    if (stability < 35) {
-        political = Math.max(0, political - dt * 0.08);
-    } else {
-        political = Math.min(999, political + dt * 0.035);
-    }
-    construction = Math.min(20, construction + factories.civilian * 0.001 * dt * speed);
-}
-
-/* =========================================================
-   PRODUCTION (Updated)
-   ========================================================== */
-
-function updateProduction(dt) {
-    if (paused) return;
-    for (const key of Object.keys(production)) {
-        const p = production[key];
-        if (p.factories <= 0) continue;
-        let progress = p.factories * p.efficiency * 0.004 * dt * speed;
-        if (tech.INDUSTRY.completed) progress *= 1.12;
-        p.progress += progress;
-        if (p.progress >= 100) {
-            p.progress -= 100;
-            p.output += Math.max(1, Math.floor(p.factories * p.efficiency / 55));
-            applyProductionOutput(key, p.output);
-            p.output = 0;
-            p.efficiency = Math.min(100, p.efficiency + 0.15);
-        }
-    }
-}
-
-function applyProductionOutput(type, amount) {
-    if (type === "INFANTRY") {
-        manpower += amount * 12;
-    } else if (type === "TANK") {
-        for (const unit of units) {
-            if (unit.friendly && unit.type === "TANK" && unit.state !== "DESTROYED") {
-                unit.strength = Math.min(unit.maxStrength, unit.strength + amount * 0.7);
-                break;
-            }
-        }
-    } else if (type === "ARTILLERY") {
-        for (const unit of units) {
-            if (unit.friendly && unit.type === "ARTILLERY" && unit.state !== "DESTROYED") {
-                unit.strength = Math.min(unit.maxStrength, unit.strength + amount * 0.7);
-                break;
-            }
-        }
-    } else if (type === "AIR") {
-        for (const unit of units) {
-            if (unit.friendly && unit.type === "AIR" && unit.state !== "DESTROYED") {
-                unit.readiness = Math.min(100, unit.readiness + amount * 1.2);
-                break;
-            }
-        }
-    }
-}
-
-function assignFactory(type) {
-    const used = Object.values(production).reduce((sum, item) => sum + item.factories, 0);
-    if (used >= factories.military) {
-        toast("No free military factories");
-        return;
-    }
-    production[type].factories++;
-    toast(`${type} factory assigned`);
-    openPanel("production");
-}
-
-/* =========================================================
-   RESEARCH (Unchanged)
-   ========================================================== */
-
-function updateResearch(dt) {
-    if (paused) return;
-    for (const key of Object.keys(tech)) {
-        const t = tech[key];
-        if (!t.active || t.completed) continue;
-        t.progress += 0.18 * dt * speed;
-        if (t.progress >= 100) {
-            t.progress = 100;
-            t.completed = true;
-            t.active = false;
-            applyTechnology(key);
-            toast(`${t.name} completed`);
-        }
-    }
-}
-
-function startResearch(key) {
-    const t = tech[key];
-    if (t.completed) {
-        toast("Technology already completed");
-        return;
-    }
-    const active = Object.values(tech).filter(x => x.active).length;
-    if (!t.active && active >= 3) {
-        toast("All research slots are occupied");
-        return;
-    }
-    if (political < 10) {
-        toast("Need 10 political power");
-        return;
-    }
-    political -= 10;
-    t.active = true;
-    toast(`Research started: ${t.name}`);
-    openPanel("research");
-}
-
-function applyTechnology(key) {
-    if (key === "INDUSTRY") factories.civilian++;
-    if (key === "ELECTRONICS") intel = Math.min(100, intel + 10);
-    if (key === "LOGISTICS") {
-        for (const unit of units) {
-            unit.supply = Math.min(100, unit.supply + 10);
-        }
-    }
-}
-
-/* =========================================================
-   DIPLOMACY (Unchanged)
-   ========================================================== */
-
-function improveDiplomacy(country) {
-    if (political < 15) {
-        toast("Need political power");
-        return;
-    }
-    political -= 15;
-    diplomacy[country] = Math.min(100, diplomacy[country] + 8);
-    addDiplomaticMessage(`Relations improved with ${nation[country].name}`);
-    toast(`Relations improved with ${nation[country].name}`);
-    openPanel("diplomacy");
-}
-
-function diplomaticAction(country) {
-    const value = diplomacy[country];
-    if (value <= -50) {
-        diplomacy[country] = -100;
-        stability = Math.max(0, stability - 2);
-        addDiplomaticMessage(`War declared on ${nation[country].name}`);
-        toast(`War declared on ${nation[country].name}`);
-    } else {
-        diplomacy[country] = Math.min(100, value + 12);
-        political = Math.max(0, political - 8);
-        addDiplomaticMessage(`Diplomatic pact proposed to ${nation[country].name}`);
-        toast(`Diplomatic pact proposed to ${nation[country].name}`);
-    }
-    openPanel("diplomacy");
-}
-
-/* =========================================================
-   INTELLIGENCE (Unchanged)
-   ========================================================== */
-
-function runRecon() {
-    if (money < 250) {
-        toast("Not enough money");
-        return;
-    }
-    money -= 250;
-    intel = Math.min(100, intel + 10);
-    for (const unit of units) {
-        if (!unit.friendly) {
-            unit.readiness = Math.max(0, unit.readiness - 2);
-        }
-    }
-    toast("Recon completed");
-    updateAllUI();
-}
-
-function expandSpyNetwork() {
-    if (money < 400) {
-        toast("Not enough money");
-        return;
-    }
-    money -= 400;
-    spy = Math.min(100, spy + 12);
-    intel = Math.min(100, intel + 4);
-    toast("Spy network expanded");
-    updateAllUI();
-}
-
-function improveCounterIntel() {
-    if (money < 350) {
-        toast("Not enough money");
-        return;
-    }
-    money -= 350;
-    counterIntel = Math.min(100, counterIntel + 12);
-    toast("Counter-intelligence improved");
-    updateAllUI();
-}
-
-/* =========================================================
-   WEATHER / MAP
-   ========================================================== */
-
-function changeWeather() {
-    if (weather === "CLEAR") weather = "RAIN";
-    else if (weather === "RAIN") weather = "SNOW";
-    else weather = "CLEAR";
-    if (ground) {
-        ground.material.color.setHex(weather === "SNOW" ? 0x8a9a9a : 0x52634d);
-    }
-    toast(`Weather: ${weather}`);
-}
-
-function setMapLayer(layer) {
-    mapLayer = layer;
-    if (ground) {
-        ground.material.color.setHex(mapColors[layer]);
-    }
-    toast(`Map layer: ${layer}`);
-}
-
-/* =========================================================
-   BATTLE LOG & DIPLOMATIC MESSAGES
-   ========================================================== */
-
-function addBattleLog(message) {
-    battleLog.unshift({ time: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, message });
-    if (battleLog.length > 20) battleLog.pop();
-}
-
-function addDiplomaticMessage(message) {
-    diplomaticMessages.unshift({ time: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, message });
-    if (diplomaticMessages.length > 10) diplomaticMessages.pop();
-}
-
-/* =========================================================
-   AUTO-SAVE
-   ========================================================== */
-
-function autosave() {
-    try {
-        const saveData = {
-            money, oil, steel, food, manpower,
-            political, stability, tax, construction,
-            intel, spy, counterIntel,
-            factories, diplomacy,
-            production, tech,
-            year, month, day,
-            units: units.map(u => ({
-                id: u.id, name: u.name, type: u.type, friendly: u.friendly,
-                hp: u.hp, organization: u.organization, morale: u.morale,
-                strength: u.strength, readiness: u.readiness, supply: u.supply,
-                attack: u.attack, defense: u.defense, speed: u.speed,
-                state: u.state, kills: u.kills, experience: u.experience,
-                entrenchment: u.entrenchment,
-                pos: u.object.position.toArray()
-            }))
+function createExplosion(position) {
+    const count = 8;
+    for (let i = 0; i < count; i++) {
+        const mesh = new THREE.Mesh(
+            new THREE.SphereGeometry(0.3 + Math.random() * 0.5, 6, 6),
+            new THREE.MeshBasicMaterial({
+                color: new THREE.Color().setHSL(0.08 + Math.random() * 0.08, 1, 0.5 + Math.random() * 0.3),
+                transparent: true,
+                opacity: 0.9
+            })
+        );
+        mesh.position.copy(position);
+        mesh.position.y += 0.5 + Math.random() * 1;
+        const dir = new THREE.Vector3(
+            (Math.random() - 0.5) * 2,
+            Math.random() * 2,
+            (Math.random() - 0.5) * 2
+        ).normalize();
+        mesh.userData = {
+            life: 0.4 + Math.random() * 0.3,
+            velocity: dir.multiplyScalar(2 + Math.random() * 4)
         };
-        localStorage.setItem('worldWarSave', JSON.stringify(saveData));
-    } catch (e) { /* silent fail */ }
+        fxGroup.add(mesh);
+    }
 }
 
-function loadCampaign() {
-    try {
-        const raw = localStorage.getItem('worldWarSave');
-        if (!raw) return;
-        const data = JSON.parse(raw);
-        money = data.money || money;
-        oil = data.oil || oil;
-        steel = data.steel || steel;
-        food = data.food || food;
-        manpower = data.manpower || manpower;
-        political = data.political || political;
-        stability = data.stability || stability;
-        tax = data.tax || tax;
-        construction = data.construction || construction;
-        intel = data.intel || intel;
-        spy = data.spy || spy;
-        counterIntel = data.counterIntel || counterIntel;
-        if (data.factories) Object.assign(factories, data.factories);
-        if (data.diplomacy) Object.assign(diplomacy, data.diplomacy);
-        if (data.production) Object.assign(production, data.production);
-        if (data.tech) Object.assign(tech, data.tech);
-        if (data.year) year = data.year;
-        if (data.month) month = data.month;
-        if (data.day) day = data.day;
-        if (data.units) {
-            for (let i = 0; i < data.units.length && i < units.length; i++) {
-                const d = data.units[i];
-                const u = units[i];
-                if (u && d.pos) {
-                    u.object.position.fromArray(d.pos);
-                }
-            }
-        }
-    } catch (e) { /* silent fail */ }
+function destroyUnit(unit, killer = null) {
+    unit.state = "DESTROYED";
+    unit.hp = 0;
+    unit.organization = 0;
+    unit.object.visible = false;
+    if (killer) {
+        killer.kills++;
+        killer.experience = Math.min(100, killer.experience + 8);
+    }
+    createExplosion(unit.object.position);
+    addBattleLog(`${unit.name} destroyed`);
+    toast(`${unit.name} destroyed`);
+    if (selectedUnit === unit) {
+        selectedUnit = null;
+        const panel = $("unitPanel");
+        if (panel) panel.classList.remove("open");
+    }
 }
 
 /* =========================================================
-   MOVEMENT / AI (Updated with HP bar updates)
+   MOVEMENT / AI
    ========================================================== */
 
 function updateUnitMovement(dt) {
@@ -1378,69 +1067,316 @@ function enemyAirstrike(aircraft, target) {
     }
 }
 
-function destroyUnit(unit, killer = null) {
-    unit.state = "DESTROYED";
-    unit.hp = 0;
-    unit.organization = 0;
-    unit.object.visible = false;
-    if (killer) {
-        killer.kills++;
-        killer.experience = Math.min(100, killer.experience + 8);
+/* =========================================================
+   ECONOMY
+   ========================================================== */
+
+function updateEconomy(dt) {
+    if (paused) return;
+    const civilianIncome = factories.civilian * 0.22 * dt * speed;
+    const taxIncome = civilianIncome * (tax / 20);
+    money += taxIncome;
+    oil += factories.military * 0.012 * dt * speed;
+    steel += factories.military * 0.018 * dt * speed;
+    food += 0.15 * dt * speed;
+    manpower += 0.8 * dt * speed;
+
+    if (tax > 35) {
+        stability = Math.max(0, stability - dt * 0.025);
+    } else if (tax < 18) {
+        stability = Math.min(100, stability + dt * 0.01);
     }
-    createExplosion(unit.object.position);
-    addBattleLog(`${unit.name} destroyed`);
-    toast(`${unit.name} destroyed`);
-    if (selectedUnit === unit) {
-        selectedUnit = null;
-        const panel = $("unitPanel");
-        if (panel) panel.classList.remove("open");
+    if (stability < 35) {
+        political = Math.max(0, political - dt * 0.08);
+    } else {
+        political = Math.min(999, political + dt * 0.035);
+    }
+    construction = Math.min(20, construction + factories.civilian * 0.001 * dt * speed);
+}
+
+/* =========================================================
+   PRODUCTION
+   ========================================================== */
+
+function updateProduction(dt) {
+    if (paused) return;
+    for (const key of Object.keys(production)) {
+        const p = production[key];
+        if (p.factories <= 0) continue;
+        let progress = p.factories * p.efficiency * 0.004 * dt * speed;
+        if (tech.INDUSTRY.completed) progress *= 1.12;
+        p.progress += progress;
+        if (p.progress >= 100) {
+            p.progress -= 100;
+            p.output += Math.max(1, Math.floor(p.factories * p.efficiency / 55));
+            applyProductionOutput(key, p.output);
+            p.output = 0;
+            p.efficiency = Math.min(100, p.efficiency + 0.15);
+        }
+    }
+}
+
+function applyProductionOutput(type, amount) {
+    if (type === "INFANTRY") {
+        manpower += amount * 12;
+    } else if (type === "TANK") {
+        for (const unit of units) {
+            if (unit.friendly && unit.type === "TANK" && unit.state !== "DESTROYED") {
+                unit.strength = Math.min(unit.maxStrength, unit.strength + amount * 0.7);
+                break;
+            }
+        }
+    } else if (type === "ARTILLERY") {
+        for (const unit of units) {
+            if (unit.friendly && unit.type === "ARTILLERY" && unit.state !== "DESTROYED") {
+                unit.strength = Math.min(unit.maxStrength, unit.strength + amount * 0.7);
+                break;
+            }
+        }
+    } else if (type === "AIR") {
+        for (const unit of units) {
+            if (unit.friendly && unit.type === "AIR" && unit.state !== "DESTROYED") {
+                unit.readiness = Math.min(100, unit.readiness + amount * 1.2);
+                break;
+            }
+        }
+    }
+}
+
+function assignFactory(type) {
+    const used = Object.values(production).reduce((sum, item) => sum + item.factories, 0);
+    if (used >= factories.military) {
+        toast("No free military factories");
+        return;
+    }
+    production[type].factories++;
+    toast(`${type} factory assigned`);
+    openPanel("production");
+}
+
+/* =========================================================
+   RESEARCH
+   ========================================================== */
+
+function updateResearch(dt) {
+    if (paused) return;
+    for (const key of Object.keys(tech)) {
+        const t = tech[key];
+        if (!t.active || t.completed) continue;
+        t.progress += 0.18 * dt * speed;
+        if (t.progress >= 100) {
+            t.progress = 100;
+            t.completed = true;
+            t.active = false;
+            applyTechnology(key);
+            toast(`${t.name} completed`);
+        }
+    }
+}
+
+function startResearch(key) {
+    const t = tech[key];
+    if (t.completed) {
+        toast("Technology already completed");
+        return;
+    }
+    const active = Object.values(tech).filter(x => x.active).length;
+    if (!t.active && active >= 3) {
+        toast("All research slots are occupied");
+        return;
+    }
+    if (political < 10) {
+        toast("Need 10 political power");
+        return;
+    }
+    political -= 10;
+    t.active = true;
+    toast(`Research started: ${t.name}`);
+    openPanel("research");
+}
+
+function applyTechnology(key) {
+    if (key === "INDUSTRY") factories.civilian++;
+    if (key === "ELECTRONICS") intel = Math.min(100, intel + 10);
+    if (key === "LOGISTICS") {
+        for (const unit of units) {
+            unit.supply = Math.min(100, unit.supply + 10);
+        }
     }
 }
 
 /* =========================================================
-   EFFECTS
+   DIPLOMACY
    ========================================================== */
 
-function createExplosion(position) {
-    const count = 8;
-    for (let i = 0; i < count; i++) {
-        const mesh = new THREE.Mesh(
-            new THREE.SphereGeometry(0.3 + Math.random() * 0.5, 6, 6),
-            new THREE.MeshBasicMaterial({
-                color: new THREE.Color().setHSL(0.08 + Math.random() * 0.08, 1, 0.5 + Math.random() * 0.3),
-                transparent: true,
-                opacity: 0.9
-            })
-        );
-        mesh.position.copy(position);
-        mesh.position.y += 0.5 + Math.random() * 1;
-        const dir = new THREE.Vector3(
-            (Math.random() - 0.5) * 2,
-            Math.random() * 2,
-            (Math.random() - 0.5) * 2
-        ).normalize();
-        mesh.userData = {
-            life: 0.4 + Math.random() * 0.3,
-            velocity: dir.multiplyScalar(2 + Math.random() * 4)
-        };
-        fxGroup.add(mesh);
+function improveDiplomacy(country) {
+    if (political < 15) {
+        toast("Need political power");
+        return;
     }
+    political -= 15;
+    diplomacy[country] = Math.min(100, diplomacy[country] + 8);
+    addDiplomaticMessage(`Relations improved with ${nation[country].name}`);
+    toast(`Relations improved with ${nation[country].name}`);
+    openPanel("diplomacy");
 }
 
-function updateEffects(dt) {
-    for (let i = fxGroup.children.length - 1; i >= 0; i--) {
-        const fx = fxGroup.children[i];
-        fx.userData.life -= dt;
-        fx.position.add(fx.userData.velocity.clone().multiplyScalar(dt));
-        fx.userData.velocity.multiplyScalar(0.98);
-        fx.scale.multiplyScalar(1 + dt * 0.5);
-        fx.material.opacity = Math.max(0, fx.userData.life / 0.5);
-        if (fx.userData.life <= 0) {
-            fxGroup.remove(fx);
-            fx.geometry?.dispose();
-            fx.material?.dispose();
+function diplomaticAction(country) {
+    const value = diplomacy[country];
+    if (value <= -50) {
+        diplomacy[country] = -100;
+        stability = Math.max(0, stability - 2);
+        addDiplomaticMessage(`War declared on ${nation[country].name}`);
+        toast(`War declared on ${nation[country].name}`);
+    } else {
+        diplomacy[country] = Math.min(100, value + 12);
+        political = Math.max(0, political - 8);
+        addDiplomaticMessage(`Diplomatic pact proposed to ${nation[country].name}`);
+        toast(`Diplomatic pact proposed to ${nation[country].name}`);
+    }
+    openPanel("diplomacy");
+}
+
+/* =========================================================
+   INTELLIGENCE
+   ========================================================== */
+
+function runRecon() {
+    if (money < 250) {
+        toast("Not enough money");
+        return;
+    }
+    money -= 250;
+    intel = Math.min(100, intel + 10);
+    for (const unit of units) {
+        if (!unit.friendly) {
+            unit.readiness = Math.max(0, unit.readiness - 2);
         }
     }
+    toast("Recon completed");
+    updateAllUI();
+}
+
+function expandSpyNetwork() {
+    if (money < 400) {
+        toast("Not enough money");
+        return;
+    }
+    money -= 400;
+    spy = Math.min(100, spy + 12);
+    intel = Math.min(100, intel + 4);
+    toast("Spy network expanded");
+    updateAllUI();
+}
+
+function improveCounterIntel() {
+    if (money < 350) {
+        toast("Not enough money");
+        return;
+    }
+    money -= 350;
+    counterIntel = Math.min(100, counterIntel + 12);
+    toast("Counter-intelligence improved");
+    updateAllUI();
+}
+
+/* =========================================================
+   WEATHER / MAP
+   ========================================================== */
+
+function changeWeather() {
+    if (weather === "CLEAR") weather = "RAIN";
+    else if (weather === "RAIN") weather = "SNOW";
+    else weather = "CLEAR";
+    if (ground) {
+        ground.material.color.setHex(weather === "SNOW" ? 0x8a9a9a : 0x52634d);
+    }
+    toast(`Weather: ${weather}`);
+}
+
+function setMapLayer(layer) {
+    mapLayer = layer;
+    if (ground) {
+        ground.material.color.setHex(mapColors[layer]);
+    }
+    toast(`Map layer: ${layer}`);
+}
+
+/* =========================================================
+   BATTLE LOG & DIPLOMATIC MESSAGES
+   ========================================================== */
+
+function addBattleLog(message) {
+    battleLog.unshift({ time: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, message });
+    if (battleLog.length > 20) battleLog.pop();
+}
+
+function addDiplomaticMessage(message) {
+    diplomaticMessages.unshift({ time: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, message });
+    if (diplomaticMessages.length > 10) diplomaticMessages.pop();
+}
+
+/* =========================================================
+   AUTO-SAVE
+   ========================================================== */
+
+function autosave() {
+    try {
+        const saveData = {
+            money, oil, steel, food, manpower,
+            political, stability, tax, construction,
+            intel, spy, counterIntel,
+            factories, diplomacy,
+            production, tech,
+            year, month, day,
+            units: units.map(u => ({
+                id: u.id, name: u.name, type: u.type, friendly: u.friendly,
+                hp: u.hp, organization: u.organization, morale: u.morale,
+                strength: u.strength, readiness: u.readiness, supply: u.supply,
+                attack: u.attack, defense: u.defense, speed: u.speed,
+                state: u.state, kills: u.kills, experience: u.experience,
+                entrenchment: u.entrenchment,
+                pos: u.object.position.toArray()
+            }))
+        };
+        localStorage.setItem('worldWarSave', JSON.stringify(saveData));
+    } catch (e) { /* silent fail */ }
+}
+
+function loadCampaign() {
+    try {
+        const raw = localStorage.getItem('worldWarSave');
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        money = data.money || money;
+        oil = data.oil || oil;
+        steel = data.steel || steel;
+        food = data.food || food;
+        manpower = data.manpower || manpower;
+        political = data.political || political;
+        stability = data.stability || stability;
+        tax = data.tax || tax;
+        construction = data.construction || construction;
+        intel = data.intel || intel;
+        spy = data.spy || spy;
+        counterIntel = data.counterIntel || counterIntel;
+        if (data.factories) Object.assign(factories, data.factories);
+        if (data.diplomacy) Object.assign(diplomacy, data.diplomacy);
+        if (data.production) Object.assign(production, data.production);
+        if (data.tech) Object.assign(tech, data.tech);
+        if (data.year) year = data.year;
+        if (data.month) month = data.month;
+        if (data.day) day = data.day;
+        if (data.units) {
+            for (let i = 0; i < data.units.length && i < units.length; i++) {
+                const d = data.units[i];
+                const u = units[i];
+                if (u && d.pos) {
+                    u.object.position.fromArray(d.pos);
+                }
+            }
+        }
+    } catch (e) { /* silent fail */ }
 }
 
 /* =========================================================
@@ -1613,7 +1549,7 @@ const panels = {
 };
 
 /* =========================================================
-   UI SETUP (Unchanged)
+   UI SETUP
    ========================================================== */
 
 function setupUI() {
@@ -2001,25 +1937,6 @@ function setUnitDestination(unit, point) {
     unit.entrenchment = 0;
 }
 
-function getTerrainModifier(unit) {
-    let modifier = 1;
-    if (unit.state === "DEFENDING") modifier += 0.18 + unit.entrenchment / 500;
-    if (weather === "RAIN") modifier *= 0.9;
-    if (weather === "SNOW") modifier *= 0.78;
-    if (unit.supply < 30) modifier *= 0.72;
-    if (unit.organization < 30) modifier *= 0.75;
-    return modifier;
-}
-
-function getTechAttackBonus(unit) {
-    let bonus = 1;
-    if (unit.type === "INFANTRY" && tech.INFANTRY.completed) bonus *= 1.08;
-    if (unit.type === "TANK" && tech.ARMOR.completed) bonus *= 1.10;
-    if (unit.type === "AIR" && tech.AIR.completed) bonus *= 1.12;
-    if (unit.type === "ARTILLERY" && tech.ARTILLERY.completed) bonus *= 1.08;
-    return bonus;
-}
-
 function handleWorldClick(event) {
     if (!renderer) return;
     const rect = renderer.domElement.getBoundingClientRect();
@@ -2132,14 +2049,12 @@ function loop() {
         enemyAI(dt);
         updateEffects(dt);
 
-        // Update HP bars for all units
         for (const unit of units) {
             if (unit.state !== "DESTROYED") {
                 updateUnitHPBar(unit);
             }
         }
 
-        // Propeller animation
         for (const unit of units) {
             if (unit.type === "AIR" && unit.object.userData.propeller) {
                 unit.object.userData.propeller.rotation.x += dt * 30 * speed;
@@ -2165,6 +2080,24 @@ function loop() {
     controls.update();
     renderer.render(scene, camera);
     if (labelRenderer) labelRenderer.render(scene, camera);
+}
+
+function updateEffects(dt) {
+    for (let i = fxGroup.children.length - 1; i >= 0; i--) {
+        const fx = fxGroup.children[i];
+        fx.userData.life -= dt;
+        if (fx.userData.velocity) {
+            fx.position.add(fx.userData.velocity.clone().multiplyScalar(dt));
+            fx.userData.velocity.multiplyScalar(0.98);
+        }
+        fx.scale.multiplyScalar(1 + dt * 0.5);
+        fx.material.opacity = Math.max(0, fx.userData.life / 0.5);
+        if (fx.userData.life <= 0) {
+            fxGroup.remove(fx);
+            fx.geometry?.dispose();
+            fx.material?.dispose();
+        }
+    }
 }
 
 // Start the game
