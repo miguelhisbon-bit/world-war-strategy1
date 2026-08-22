@@ -4,260 +4,134 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 /* =========================================================
    WORLD WAR — 3D GRAND STRATEGY
    UPGRADED MAIN.JS
-   Army Command + Realistic Battlefield
+   Drop-in replacement for js/main.js
 ========================================================= */
 
 const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 let scene, camera, renderer, controls, clock;
 let ground, worldGroup, unitGroup, effectsGroup;
-
 let units = [];
 let selectedUnit = null;
-
 let gameRunning = true;
 let gameSpeed = 1;
-
-let gameDay = 1;
-let gameMonth = 1;
-let gameYear = 1940;
-
-let money = 12500;
-let oil = 850;
-let steel = 1250;
-let food = 1600;
-let manpower = 85000;
-
-let moveMode = false;
-let attackMode = false;
-
-let lastIncomeTick = 0;
-let lastAiTick = 0;
-let lastMiniTick = 0;
-
+let gameDay = 1, gameMonth = 1, gameYear = 1940;
+let money = 12500, oil = 850, steel = 1250, food = 1600, manpower = 85000;
+let moveMode = false, attackMode = false;
+let lastIncomeTick = 0, lastAiTick = 0, lastMiniTick = 0;
 let battleLog = [];
 let fogEnabled = true;
-
-const saveKey = "world_war_strategy_save_v3";
+let saveKey = "world_war_strategy_save_v3";
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
+const clockStart = performance.now();
 
 const countries = {
-  USA: {
-    name: "United States",
-    flag: "🇺🇸",
-    money: 12500,
-    oil: 850,
-    steel: 1250,
-    food: 1600,
-    manpower: 85000
-  },
-
-  GERMANY: {
-    name: "Germany",
-    flag: "🇩🇪",
-    money: 10000,
-    oil: 650,
-    steel: 1100,
-    food: 1200,
-    manpower: 95000
-  },
-
-  UK: {
-    name: "United Kingdom",
-    flag: "🇬🇧",
-    money: 11000,
-    oil: 700,
-    steel: 950,
-    food: 1300,
-    manpower: 70000
-  },
-
-  JAPAN: {
-    name: "Japan",
-    flag: "🇯🇵",
-    money: 9500,
-    oil: 500,
-    steel: 850,
-    food: 1000,
-    manpower: 80000
-  },
-
-  USSR: {
-    name: "Soviet Union",
-    flag: "☭",
-    money: 9000,
-    oil: 900,
-    steel: 1400,
-    food: 1800,
-    manpower: 130000
-  },
-
-  FRANCE: {
-    name: "France",
-    flag: "🇫🇷",
-    money: 9500,
-    oil: 600,
-    steel: 1000,
-    food: 1400,
-    manpower: 75000
-  }
+  USA:{name:"United States",flag:"🇺🇸",money:12500,oil:850,steel:1250,food:1600,manpower:85000},
+  GERMANY:{name:"Germany",flag:"🇩🇪",money:10000,oil:650,steel:1100,food:1200,manpower:95000},
+  UK:{name:"United Kingdom",flag:"🇬🇧",money:11000,oil:700,steel:950,food:1300,manpower:70000},
+  JAPAN:{name:"Japan",flag:"🇯🇵",money:9500,oil:500,steel:850,food:1000,manpower:80000},
+  USSR:{name:"Soviet Union",flag:"☭",money:9000,oil:900,steel:1400,food:1800,manpower:130000},
+  FRANCE:{name:"France",flag:"🇫🇷",money:9500,oil:600,steel:1000,food:1400,manpower:75000}
 };
 
 let currentCountry = "USA";
 
+function updateLoading(p, text) {
+  if ($("loadingProgress"))
+    $("loadingProgress").style.width = `${Math.min(100,p)}%`;
 
-/* =========================================================
-   LOADING
-========================================================= */
-
-function updateLoading(percent, text) {
-  if ($("loadingProgress")) {
-    $("loadingProgress").style.width = `${Math.min(100, percent)}%`;
-  }
-
-  if ($("loadingStatus")) {
+  if ($("loadingStatus"))
     $("loadingStatus").textContent = text;
-  }
 }
-
-
-/* =========================================================
-   INIT
-========================================================= */
 
 async function init() {
   try {
-    updateLoading(10, "Initializing command system...");
-
+    updateLoading(10,"Initializing command system...");
     createScene();
 
-    updateLoading(28, "Generating realistic terrain...");
+    updateLoading(28,"Generating terrain...");
     createTerrain();
 
-    updateLoading(50, "Deploying military forces...");
+    updateLoading(50,"Deploying military forces...");
     createUnits();
 
-    updateLoading(68, "Preparing command interface...");
+    updateLoading(68,"Preparing command interface...");
     setupUI();
 
-    updateLoading(82, "Loading campaign systems...");
+    updateLoading(82,"Loading campaign systems...");
     loadGame();
 
-    updateLoading(95, "Finalizing battlefield...");
+    updateLoading(95,"Finalizing battlefield...");
     startGameLoop();
 
-    updateLoading(100, "Battlefield ready.");
+    updateLoading(100,"Battlefield ready.");
+    setTimeout(hideLoading,350);
 
-    setTimeout(hideLoading, 350);
-
-  } catch (error) {
-    console.error(error);
-
+  } catch (e) {
+    console.error(e);
     hideLoading();
-
-    showToast(
-      "Recovery mode: battlefield initialized with limited systems."
-    );
+    showToast("Recovery mode: battlefield initialized with limited systems.");
   }
 }
 
-
-/* =========================================================
-   THREE.JS SCENE
-========================================================= */
-
 function createScene() {
-
   const canvas = $("gameCanvas");
 
-  if (!canvas) {
+  if (!canvas)
     throw new Error("gameCanvas not found");
-  }
 
   scene = new THREE.Scene();
-
   scene.background = new THREE.Color(0x081016);
-
-  scene.fog = new THREE.Fog(
-    0x081016,
-    75,
-    430
-  );
-
+  scene.fog = new THREE.Fog(0x081016,75,430);
 
   camera = new THREE.PerspectiveCamera(
     55,
-    innerWidth / innerHeight,
-    0.1,
+    innerWidth/innerHeight,
+    .1,
     1000
   );
 
-  camera.position.set(
-    0,
-    82,
-    86
-  );
-
+  camera.position.set(0,82,86);
 
   renderer = new THREE.WebGLRenderer({
     canvas,
-    antialias: true,
-    powerPreference: "high-performance"
+    antialias:true,
+    powerPreference:"high-performance"
   });
 
-  renderer.setPixelRatio(
-    Math.min(devicePixelRatio, 1.8)
-  );
-
-  renderer.setSize(
-    innerWidth,
-    innerHeight
-  );
+  renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));
+  renderer.setSize(innerWidth,innerHeight);
 
   renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-  renderer.shadowMap.type =
-    THREE.PCFSoftShadowMap;
-
-
-  const hemi =
-    new THREE.HemisphereLight(
-      0xb9c6c8,
-      0x182018,
-      1.45
-    );
+  const hemi = new THREE.HemisphereLight(
+    0xb9c6c8,
+    0x182018,
+    1.45
+  );
 
   scene.add(hemi);
 
-
-  const sun =
-    new THREE.DirectionalLight(
-      0xffe3b0,
-      2.15
-    );
-
-  sun.position.set(
-    -80,
-    140,
-    70
+  const sun = new THREE.DirectionalLight(
+    0xffe3b0,
+    2.15
   );
 
+  sun.position.set(-80,140,70);
   sun.castShadow = true;
 
-  sun.shadow.mapSize.set(
-    2048,
-    2048
-  );
+  sun.shadow.mapSize.set(2048,2048);
 
-  sun.shadow.camera.left = -180;
-  sun.shadow.camera.right = 180;
-  sun.shadow.camera.top = 180;
-  sun.shadow.camera.bottom = -180;
+  sun.shadow.camera.left=-180;
+  sun.shadow.camera.right=180;
+  sun.shadow.camera.top=180;
+  sun.shadow.camera.bottom=-180;
 
   scene.add(sun);
-
 
   worldGroup = new THREE.Group();
   unitGroup = new THREE.Group();
@@ -269,37 +143,22 @@ function createScene() {
     effectsGroup
   );
 
-
-  controls =
-    new OrbitControls(
-      camera,
-      renderer.domElement
-    );
-
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
-
-  controls.minDistance = 22;
-  controls.maxDistance = 245;
-
-  controls.maxPolarAngle =
-    Math.PI * 0.47;
-
-  controls.minPolarAngle = 0.16;
-
-  controls.target.set(
-    0,
-    0,
-    0
+  controls = new OrbitControls(
+    camera,
+    renderer.domElement
   );
+
+  controls.enableDamping=true;
+  controls.dampingFactor=.08;
+  controls.minDistance=22;
+  controls.maxDistance=245;
+  controls.maxPolarAngle=Math.PI*.47;
+  controls.minPolarAngle=.16;
+  controls.target.set(0,0,0);
 
   clock = new THREE.Clock();
 
-
-  addEventListener(
-    "resize",
-    onResize
-  );
+  addEventListener("resize",onResize);
 
   renderer.domElement.addEventListener(
     "pointerdown",
@@ -307,136 +166,87 @@ function createScene() {
   );
 }
 
-
-/* =========================================================
-   REALISTIC TERRAIN
-========================================================= */
-
 function createTerrain() {
-
   const size = 360;
-  const segments = 120;
+  const seg = 120;
 
-  const geometry =
-    new THREE.PlaneGeometry(
-      size,
-      size,
-      segments,
-      segments
-    );
+  const geo = new THREE.PlaneGeometry(
+    size,
+    size,
+    seg,
+    seg
+  );
 
-  const position =
-    geometry.attributes.position;
+  const pos = geo.attributes.position;
 
+  for(let i=0;i<pos.count;i++){
 
-  for (
-    let i = 0;
-    i < position.count;
-    i++
-  ) {
+    const x=pos.getX(i);
+    const y=pos.getY(i);
 
-    const x = position.getX(i);
-    const y = position.getY(i);
+    const h =
+      Math.sin(x*.055)*1.8 +
+      Math.cos(y*.045)*1.5 +
+      Math.sin((x+y)*.022)*3.2 +
+      Math.sin(x*.14+y*.08)*.65;
 
-    const height =
-      Math.sin(x * 0.055) * 1.8 +
-      Math.cos(y * 0.045) * 1.5 +
-      Math.sin((x + y) * 0.022) * 3.2 +
-      Math.sin(x * 0.14 + y * 0.08) * 0.65;
-
-    position.setZ(
-      i,
-      height
-    );
+    pos.setZ(i,h);
   }
 
+  geo.computeVertexNormals();
 
-  geometry.computeVertexNormals();
+  const tex = createTerrainTexture();
 
+  tex.wrapS=THREE.RepeatWrapping;
+  tex.wrapT=THREE.RepeatWrapping;
 
-  const texture =
-    createTerrainTexture();
+  tex.repeat.set(9,9);
+  tex.colorSpace=THREE.SRGBColorSpace;
 
-  texture.wrapS =
-    THREE.RepeatWrapping;
-
-  texture.wrapT =
-    THREE.RepeatWrapping;
-
-  texture.repeat.set(
-    9,
-    9
+  ground = new THREE.Mesh(
+    geo,
+    new THREE.MeshStandardMaterial({
+      map:tex,
+      color:0xffffff,
+      roughness:.97,
+      metalness:.015
+    })
   );
 
-  texture.colorSpace =
-    THREE.SRGBColorSpace;
+  ground.rotation.x=-Math.PI/2;
+  ground.receiveShadow=true;
+  ground.userData.isGround=true;
 
+  worldGroup.add(ground);
 
-  ground =
-    new THREE.Mesh(
-      geometry,
-      new THREE.MeshStandardMaterial({
-        map: texture,
-        color: 0xffffff,
-        roughness: 0.97,
-        metalness: 0.015
-      })
-    );
-
-
-  ground.rotation.x =
-    -Math.PI / 2;
-
-  ground.receiveShadow = true;
-
-  ground.userData.isGround = true;
-
-  worldGroup.add(
-    ground
+  const grid=new THREE.GridHelper(
+    360,
+    90,
+    0x69715f,
+    0x30392f
   );
 
-
-  const grid =
-    new THREE.GridHelper(
-      360,
-      90,
-      0x69715f,
-      0x30392f
-    );
-
-  grid.position.y = 0.18;
-
-  grid.material.opacity = 0.09;
-
-  grid.material.transparent = true;
+  grid.position.y=.18;
+  grid.material.opacity=.09;
+  grid.material.transparent=true;
 
   worldGroup.add(grid);
 
-
-  const water =
-    new THREE.Mesh(
-      new THREE.PlaneGeometry(
-        520,
-        520
-      ),
-      new THREE.MeshStandardMaterial({
-        color: 0x174354,
-        transparent: true,
-        opacity: 0.58,
-        roughness: 0.18,
-        metalness: 0.08
-      })
-    );
-
-  water.rotation.x =
-    -Math.PI / 2;
-
-  water.position.y = -4.2;
-
-  worldGroup.add(
-    water
+  const water=new THREE.Mesh(
+    new THREE.PlaneGeometry(520,520),
+    new THREE.MeshStandardMaterial({
+      color:0x174354,
+      transparent:true,
+      opacity:.58,
+      roughness:.18,
+      metalness:.08
+    })
   );
 
+  water.rotation.x=-Math.PI/2;
+  water.position.y=-4.2;
+
+  worldGroup.add(water);
 
   createRivers();
   createForests();
@@ -446,656 +256,388 @@ function createTerrain() {
   createBattleMarkers();
 }
 
+function createTerrainTexture(){
 
-/* =========================================================
-   TERRAIN TEXTURE
-========================================================= */
+  const c=document.createElement("canvas");
 
-function createTerrainTexture() {
+  c.width=512;
+  c.height=512;
 
-  const canvas =
-    document.createElement("canvas");
+  const ctx=c.getContext("2d");
 
-  canvas.width = 512;
-  canvas.height = 512;
+  const img=ctx.createImageData(512,512);
 
-  const ctx =
-    canvas.getContext("2d");
+  for(let y=0;y<512;y++){
 
-  const image =
-    ctx.createImageData(
-      512,
-      512
-    );
+    for(let x=0;x<512;x++){
 
-
-  for (
-    let y = 0;
-    y < 512;
-    y++
-  ) {
-
-    for (
-      let x = 0;
-      x < 512;
-      x++
-    ) {
-
-      const noise =
+      const n=
         (
-          Math.sin(x * 0.12) +
-          Math.sin(y * 0.16) +
-          Math.sin((x + y) * 0.055)
-        ) * 3;
+          Math.sin(x*.12)+
+          Math.sin(y*.16)+
+          Math.sin((x+y)*.055)
+        )*3;
 
-      const r =
-        47 + noise;
+      const r=47+n;
+      const g=63+n*.8;
+      const b=45+n*.45;
 
-      const g =
-        63 + noise * 0.8;
+      const i=(y*512+x)*4;
 
-      const b =
-        45 + noise * 0.45;
-
-
-      const index =
-        (y * 512 + x) * 4;
-
-      image.data[index] =
-        r;
-
-      image.data[index + 1] =
-        g;
-
-      image.data[index + 2] =
-        b;
-
-      image.data[index + 3] =
-        255;
+      img.data[i]=r;
+      img.data[i+1]=g;
+      img.data[i+2]=b;
+      img.data[i+3]=255;
     }
   }
 
+  ctx.putImageData(img,0,0);
 
-  ctx.putImageData(
-    image,
-    0,
-    0
-  );
+  ctx.globalAlpha=.18;
+  ctx.strokeStyle="#d4c89d";
+  ctx.lineWidth=1;
 
+  for(let i=0;i<80;i++){
 
-  ctx.globalAlpha = 0.18;
-
-  ctx.strokeStyle =
-    "#d4c89d";
-
-  ctx.lineWidth = 1;
-
-
-  for (
-    let i = 0;
-    i < 80;
-    i++
-  ) {
-
-    const x =
-      Math.random() * 512;
-
-    const y =
-      Math.random() * 512;
+    const x=Math.random()*512;
+    const y=Math.random()*512;
 
     ctx.beginPath();
 
     ctx.arc(
       x,
       y,
-      Math.random() * 2 + 0.5,
+      Math.random()*2+.5,
       0,
-      Math.PI * 2
+      Math.PI*2
     );
 
     ctx.stroke();
   }
 
-
-  return new THREE.CanvasTexture(
-    canvas
-  );
+  return new THREE.CanvasTexture(c);
 }
 
+function createRivers(){
 
-/* =========================================================
-   RIVERS
-========================================================= */
+  const mat=new THREE.MeshStandardMaterial({
+    color:0x245a70,
+    roughness:.16,
+    metalness:.05,
+    transparent:true,
+    opacity:.9
+  });
 
-function createRivers() {
+  for(let r=0;r<3;r++){
 
-  const material =
-    new THREE.MeshStandardMaterial({
-      color: 0x245a70,
-      roughness: 0.16,
-      metalness: 0.05,
-      transparent: true,
-      opacity: 0.9
-    });
+    const pts=[];
+    const base=-150+r*95;
 
+    for(let i=0;i<=14;i++){
 
-  for (
-    let river = 0;
-    river < 3;
-    river++
-  ) {
+      const x=base+i*22;
 
-    const points = [];
+      const z=
+        Math.sin(i*.8+r)*12+
+        r*12;
 
-    const base =
-      -150 + river * 95;
-
-
-    for (
-      let i = 0;
-      i <= 14;
-      i++
-    ) {
-
-      const x =
-        base + i * 22;
-
-      const z =
-        Math.sin(i * 0.8 + river) * 12 +
-        river * 12;
-
-
-      points.push(
+      pts.push(
         new THREE.Vector3(
           x,
-          0.12,
+          .12,
           z
         )
       );
     }
 
+    const curve=
+      new THREE.CatmullRomCurve3(pts);
 
-    const curve =
-      new THREE.CatmullRomCurve3(
-        points
-      );
-
-
-    const riverMesh =
-      new THREE.Mesh(
-        new THREE.TubeGeometry(
-          curve,
-          80,
-          1.15,
-          8,
-          false
-        ),
-        material.clone()
-      );
-
-
-    worldGroup.add(
-      riverMesh
+    const tube=new THREE.Mesh(
+      new THREE.TubeGeometry(
+        curve,
+        80,
+        1.15,
+        8,
+        false
+      ),
+      mat.clone()
     );
+
+    tube.rotation.x=0;
+
+    worldGroup.add(tube);
   }
 }
 
+function createForests(){
 
-/* =========================================================
-   FORESTS
-========================================================= */
+  const mat=new THREE.MeshStandardMaterial({
+    color:0x263d28,
+    roughness:1
+  });
 
-function createForests() {
+  for(let i=0;i<110;i++){
 
-  const foliageMaterial =
-    new THREE.MeshStandardMaterial({
-      color: 0x263d28,
-      roughness: 1
-    });
+    const g=new THREE.Group();
 
+    const trunk=new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        .12,
+        .18,
+        1.3,
+        5
+      ),
+      new THREE.MeshStandardMaterial({
+        color:0x493a2a,
+        roughness:1
+      })
+    );
 
-  for (
-    let i = 0;
-    i < 110;
-    i++
-  ) {
+    trunk.position.y=.65;
 
-    const tree =
-      new THREE.Group();
+    const crown=new THREE.Mesh(
+      new THREE.ConeGeometry(
+        .75+Math.random()*.35,
+        2.2+Math.random()*1.5,
+        7
+      ),
+      mat.clone()
+    );
 
+    crown.position.y=2;
 
-    const trunk =
-      new THREE.Mesh(
-        new THREE.CylinderGeometry(
-          0.12,
-          0.18,
-          1.3,
-          5
-        ),
-        new THREE.MeshStandardMaterial({
-          color: 0x493a2a,
-          roughness: 1
-        })
-      );
-
-
-    trunk.position.y =
-      0.65;
-
-
-    const crown =
-      new THREE.Mesh(
-        new THREE.ConeGeometry(
-          0.75 + Math.random() * 0.35,
-          2.2 + Math.random() * 1.5,
-          7
-        ),
-        foliageMaterial.clone()
-      );
-
-
-    crown.position.y =
-      2;
-
-
-    tree.add(
+    g.add(
       trunk,
       crown
     );
 
-
-    tree.position.set(
-      (Math.random() - 0.5) * 330,
-      0.25,
-      (Math.random() - 0.5) * 330
+    g.position.set(
+      (Math.random()-.5)*330,
+      .25,
+      (Math.random()-.5)*330
     );
 
-
-    tree.scale.setScalar(
-      0.7 + Math.random() * 0.8
+    g.scale.setScalar(
+      .7+Math.random()*.8
     );
 
-    tree.rotation.y =
-      Math.random() * Math.PI;
+    g.rotation.y=
+      Math.random()*Math.PI;
 
-    tree.castShadow = true;
+    g.castShadow=true;
 
-    worldGroup.add(
-      tree
-    );
+    worldGroup.add(g);
   }
 }
 
+function createSettlements(){
 
-/* =========================================================
-   SETTLEMENTS
-========================================================= */
+  for(let i=0;i<22;i++){
 
-function createSettlements() {
+    const g=new THREE.Group();
 
-  for (
-    let i = 0;
-    i < 22;
-    i++
-  ) {
+    for(let b=0;b<3;b++){
 
-    const settlement =
-      new THREE.Group();
-
-
-    for (
-      let b = 0;
-      b < 3;
-      b++
-    ) {
-
-      const house =
-        new THREE.Mesh(
-          new THREE.BoxGeometry(
-            1.4,
-            1 + Math.random(),
-            1.2
-          ),
-          new THREE.MeshStandardMaterial({
-            color: 0x77715f,
-            roughness: 0.9
-          })
-        );
-
+      const house=new THREE.Mesh(
+        new THREE.BoxGeometry(
+          1.4,
+          1+Math.random(),
+          1.2
+        ),
+        new THREE.MeshStandardMaterial({
+          color:0x77715f,
+          roughness:.9
+        })
+      );
 
       house.position.set(
-        (b - 1) * 1.6,
-        0.5,
-        (Math.random() - 0.5) * 2
+        (b-1)*1.6,
+        .5,
+        (Math.random()-.5)*2
       );
 
+      house.castShadow=true;
 
-      house.castShadow = true;
-
-      settlement.add(
-        house
-      );
+      g.add(house);
     }
 
-
-    settlement.position.set(
-      (Math.random() - 0.5) * 300,
-      0.25,
-      (Math.random() - 0.5) * 300
+    g.position.set(
+      (Math.random()-.5)*300,
+      .25,
+      (Math.random()-.5)*300
     );
 
-
-    worldGroup.add(
-      settlement
-    );
+    worldGroup.add(g);
   }
 }
 
+function createMountains(){
 
-/* =========================================================
-   MOUNTAINS
-========================================================= */
+  for(let i=0;i<34;i++){
 
-function createMountains() {
+    const h=10+Math.random()*22;
+    const w=4+Math.random()*9;
 
-  for (
-    let i = 0;
-    i < 34;
-    i++
-  ) {
+    const m=new THREE.Mesh(
+      new THREE.ConeGeometry(w,h,8),
+      new THREE.MeshStandardMaterial({
+        color:0x394039,
+        roughness:1
+      })
+    );
 
-    const height =
-      10 + Math.random() * 22;
+    m.position.set(
+      (Math.random()-.5)*320,
+      h/2,
+      (Math.random()-.5)*320
+    );
 
-    const width =
-      4 + Math.random() * 9;
+    m.rotation.y=Math.random()*Math.PI;
 
+    m.castShadow=true;
 
-    const mountain =
-      new THREE.Mesh(
+    worldGroup.add(m);
+
+    if(h>20){
+
+      const snow=new THREE.Mesh(
         new THREE.ConeGeometry(
-          width,
-          height,
+          w*.48,
+          h*.3,
           8
         ),
         new THREE.MeshStandardMaterial({
-          color: 0x394039,
-          roughness: 1
+          color:0xb9b8aa,
+          roughness:.95
         })
       );
 
-
-    mountain.position.set(
-      (Math.random() - 0.5) * 320,
-      height / 2,
-      (Math.random() - 0.5) * 320
-    );
-
-
-    mountain.rotation.y =
-      Math.random() * Math.PI;
-
-    mountain.castShadow = true;
-
-    worldGroup.add(
-      mountain
-    );
-
-
-    if (height > 20) {
-
-      const snow =
-        new THREE.Mesh(
-          new THREE.ConeGeometry(
-            width * 0.48,
-            height * 0.3,
-            8
-          ),
-          new THREE.MeshStandardMaterial({
-            color: 0xb9b8aa,
-            roughness: 0.95
-          })
-        );
-
-
       snow.position.set(
-        mountain.position.x,
-        height * 0.82,
-        mountain.position.z
+        m.position.x,
+        h*.82,
+        m.position.z
       );
 
+      snow.castShadow=true;
 
-      snow.castShadow = true;
-
-      worldGroup.add(
-        snow
-      );
+      worldGroup.add(snow);
     }
   }
 }
 
+function createRoads(){
 
-/* =========================================================
-   ROADS
-========================================================= */
-
-function createRoads() {
-
-  const roadMaterial =
+  const roadMat=
     new THREE.MeshStandardMaterial({
-      color: 0x33332f,
-      roughness: 0.96
+      color:0x33332f,
+      roughness:.96
     });
 
+  for(let i=0;i<16;i++){
 
-  for (
-    let i = 0;
-    i < 16;
-    i++
-  ) {
-
-    const road =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          115,
-          0.09,
-          1.7
-        ),
-        roadMaterial.clone()
-      );
-
+    const road=new THREE.Mesh(
+      new THREE.BoxGeometry(
+        115,
+        .09,
+        1.7
+      ),
+      roadMat.clone()
+    );
 
     road.position.set(
-      (Math.random() - 0.5) * 190,
-      0.3,
-      (Math.random() - 0.5) * 190
+      (Math.random()-.5)*190,
+      .3,
+      (Math.random()-.5)*190
     );
 
+    road.rotation.y=
+      Math.random()*Math.PI;
 
-    road.rotation.y =
-      Math.random() * Math.PI;
+    worldGroup.add(road);
 
-
-    worldGroup.add(
-      road
+    const line=new THREE.Mesh(
+      new THREE.BoxGeometry(
+        115,
+        .012,
+        .08
+      ),
+      new THREE.MeshBasicMaterial({
+        color:0xc6b98a,
+        transparent:true,
+        opacity:.35
+      })
     );
 
-
-    const centerLine =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          115,
-          0.012,
-          0.08
-        ),
-        new THREE.MeshBasicMaterial({
-          color: 0xc6b98a,
-          transparent: true,
-          opacity: 0.35
-        })
-      );
-
-
-    centerLine.position.copy(
+    line.position.copy(
       road.position
     );
 
-    centerLine.position.y =
-      0.36;
+    line.position.y=.36;
+    line.rotation.y=road.rotation.y;
 
-    centerLine.rotation.y =
-      road.rotation.y;
-
-
-    worldGroup.add(
-      centerLine
-    );
+    worldGroup.add(line);
   }
 }
 
+function createBattleMarkers(){
 
-/* =========================================================
-   BATTLE MARKERS
-========================================================= */
+  for(let i=0;i<18;i++){
 
-function createBattleMarkers() {
+    const ring=new THREE.Mesh(
+      new THREE.RingGeometry(
+        .7,
+        1,
+        16
+      ),
+      new THREE.MeshBasicMaterial({
+        color:0x8b3d32,
+        transparent:true,
+        opacity:.4,
+        side:THREE.DoubleSide
+      })
+    );
 
-  for (
-    let i = 0;
-    i < 18;
-    i++
-  ) {
-
-    const ring =
-      new THREE.Mesh(
-        new THREE.RingGeometry(
-          0.7,
-          1,
-          16
-        ),
-        new THREE.MeshBasicMaterial({
-          color: 0x8b3d32,
-          transparent: true,
-          opacity: 0.4,
-          side: THREE.DoubleSide
-        })
-      );
-
-
-    ring.rotation.x =
-      -Math.PI / 2;
-
+    ring.rotation.x=-Math.PI/2;
 
     ring.position.set(
-      (Math.random() - 0.5) * 280,
-      0.4,
-      (Math.random() - 0.5) * 280
+      (Math.random()-.5)*280,
+      .4,
+      (Math.random()-.5)*280
     );
 
-
-    worldGroup.add(
-      ring
-    );
+    worldGroup.add(ring);
   }
 }
 
+function createUnits(){
 
-/* =========================================================
-   MILITARY UNITS
-========================================================= */
+  units=[];
 
-function createUnits() {
+  const data=[
+    ["1st Armored Division","TANK",-30,12,true],
+    ["2nd Infantry Division","INFANTRY",-18,20,true],
+    ["3rd Infantry Division","INFANTRY",-5,28,true],
+    ["Air Wing Alpha","AIR",15,12,true],
 
-  units = [];
-
-
-  const data = [
-
-    [
-      "1st Armored Division",
-      "TANK",
-      -30,
-      12,
-      true
-    ],
-
-    [
-      "2nd Infantry Division",
-      "INFANTRY",
-      -18,
-      20,
-      true
-    ],
-
-    [
-      "3rd Infantry Division",
-      "INFANTRY",
-      -5,
-      28,
-      true
-    ],
-
-    [
-      "Air Wing Alpha",
-      "AIR",
-      15,
-      12,
-      true
-    ],
-
-    [
-      "Enemy Armor Group",
-      "TANK",
-      45,
-      -20,
-      false
-    ],
-
-    [
-      "Enemy Infantry Corps",
-      "INFANTRY",
-      35,
-      -5,
-      false
-    ],
-
-    [
-      "Enemy Defense Force",
-      "INFANTRY",
-      55,
-      12,
-      false
-    ],
-
-    [
-      "Enemy Air Wing",
-      "AIR",
-      65,
-      -18,
-      false
-    ]
+    ["Enemy Armor Group","TANK",45,-20,false],
+    ["Enemy Infantry Corps","INFANTRY",35,-5,false],
+    ["Enemy Defense Force","INFANTRY",55,12,false],
+    ["Enemy Air Wing","AIR",65,-18,false]
   ];
 
-
-  data.forEach(
-    unit =>
-      createMilitaryUnit(
-        unit[0],
-        unit[1],
-        unit[2],
-        unit[3],
-        unit[4]
-      )
+  data.forEach(d =>
+    createMilitaryUnit(
+      d[0],
+      d[1],
+      d[2],
+      d[3],
+      d[4]
+    )
   );
-
 
   refreshMiniMap();
 }
-
-
-/* =========================================================
-   CREATE MILITARY UNIT
-========================================================= */
 
 function createMilitaryUnit(
   name,
@@ -1103,98 +645,76 @@ function createMilitaryUnit(
   x,
   z,
   friendly
-) {
+){
 
-  const group =
-    new THREE.Group();
+  const group=new THREE.Group();
 
+  const mainMat=new THREE.MeshStandardMaterial({
+    color:
+      friendly
+        ?
+          (
+            type==="AIR"
+              ?0x65737a
+              :type==="TANK"
+                ?0x566b4f
+                :0x60715a
+          )
+        :
+          (
+            type==="AIR"
+              ?0x704842
+              :type==="TANK"
+                ?0x633b36
+                :0x68453f
+          ),
+    roughness:.72,
+    metalness:type==="TANK"?.2:.08
+  });
 
-  const material =
-    new THREE.MeshStandardMaterial({
+  if(type==="TANK"){
 
-      color:
-        friendly
-          ? (
-              type === "AIR"
-                ? 0x65737a
-                : type === "TANK"
-                  ? 0x566b4f
-                  : 0x60715a
-            )
-          : (
-              type === "AIR"
-                ? 0x704842
-                : type === "TANK"
-                  ? 0x633b36
-                  : 0x68453f
-            ),
-
-      roughness: 0.72,
-
-      metalness:
-        type === "TANK"
-          ? 0.2
-          : 0.08
-    });
-
-
-  if (type === "TANK") {
-
-    const body =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          5,
-          1.8,
-          3.2
-        ),
-        material
-      );
-
-    body.position.y =
-      1.2;
-
-    body.castShadow = true;
-
-    group.add(
-      body
+    const body=new THREE.Mesh(
+      new THREE.BoxGeometry(
+        5,
+        1.8,
+        3.2
+      ),
+      mainMat
     );
 
+    body.position.y=1.2;
+    body.castShadow=true;
 
-    const turret =
-      new THREE.Mesh(
-        new THREE.CylinderGeometry(
-          1.25,
-          1.35,
-          0.8,
-          12
-        ),
-        material
-      );
+    group.add(body);
 
-    turret.position.y =
-      2.25;
-
-    turret.castShadow = true;
-
-    group.add(
-      turret
+    const turret=new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        1.25,
+        1.35,
+        .8,
+        12
+      ),
+      mainMat
     );
 
+    turret.position.y=2.25;
+    turret.castShadow=true;
 
-    const cannon =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          0.35,
-          0.35,
-          3.8
-        ),
-        new THREE.MeshStandardMaterial({
-          color: 0x202521,
-          metalness: 0.6,
-          roughness: 0.4
-        })
-      );
+    group.add(turret);
 
+    const cannon=new THREE.Mesh(
+      new THREE.BoxGeometry(
+        .35,
+        .35,
+        3.8
+      ),
+      new THREE.MeshStandardMaterial({
+        color:0x202521,
+        metalness:.6,
+        roughness:.4
+      })
+    );
 
     cannon.position.set(
       0,
@@ -1202,252 +722,198 @@ function createMilitaryUnit(
       2.1
     );
 
+    group.add(cannon);
 
-    group.add(
-      cannon
+  } else if(type==="INFANTRY"){
+
+    const body=new THREE.Mesh(
+      new THREE.CapsuleGeometry(
+        .65,
+        1.4,
+        5,
+        8
+      ),
+      mainMat
     );
 
-  }
+    body.position.y=1.5;
+    body.castShadow=true;
 
-  else if (type === "INFANTRY") {
+    group.add(body);
 
-    const body =
-      new THREE.Mesh(
-        new THREE.CapsuleGeometry(
-          0.65,
-          1.4,
-          5,
-          8
-        ),
-        material
-      );
-
-
-    body.position.y =
-      1.5;
-
-    body.castShadow = true;
-
-    group.add(
-      body
+    const head=new THREE.Mesh(
+      new THREE.SphereGeometry(
+        .48,
+        12,
+        12
+      ),
+      new THREE.MeshStandardMaterial({
+        color:0x8c6c50
+      })
     );
 
+    head.position.y=2.8;
+    head.castShadow=true;
 
-    const head =
-      new THREE.Mesh(
-        new THREE.SphereGeometry(
-          0.48,
-          12,
-          12
-        ),
-        new THREE.MeshStandardMaterial({
-          color: 0x8c6c50
-        })
-      );
+    group.add(head);
 
-
-    head.position.y =
-      2.8;
-
-    head.castShadow = true;
-
-    group.add(
-      head
+    const rifle=new THREE.Mesh(
+      new THREE.BoxGeometry(
+        .18,
+        .18,
+        2.2
+      ),
+      new THREE.MeshStandardMaterial({
+        color:0x151817
+      })
     );
-
-
-    const rifle =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          0.18,
-          0.18,
-          2.2
-        ),
-        new THREE.MeshStandardMaterial({
-          color: 0x151817
-        })
-      );
-
 
     rifle.position.set(
-      0.5,
+      .5,
       1.5,
-      0.5
+      .5
     );
 
-    rifle.rotation.x =
-      -0.2;
+    rifle.rotation.x=-.2;
 
-    group.add(
-      rifle
+    group.add(rifle);
+
+  } else {
+
+    const fuselage=new THREE.Mesh(
+      new THREE.CapsuleGeometry(
+        .7,
+        4,
+        5,
+        10
+      ),
+      mainMat
     );
 
+    fuselage.rotation.x=Math.PI/2;
+    fuselage.castShadow=true;
+
+    group.add(fuselage);
+
+    const wing=new THREE.Mesh(
+      new THREE.BoxGeometry(
+        5,
+        .2,
+        1.3
+      ),
+      mainMat
+    );
+
+    group.add(wing);
+
+    group.position.y=8;
   }
-
-  else {
-
-    const fuselage =
-      new THREE.Mesh(
-        new THREE.CapsuleGeometry(
-          0.7,
-          4,
-          5,
-          10
-        ),
-        material
-      );
-
-
-    fuselage.rotation.x =
-      Math.PI / 2;
-
-    fuselage.castShadow = true;
-
-    group.add(
-      fuselage
-    );
-
-
-    const wing =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          5,
-          0.2,
-          1.3
-        ),
-        material
-      );
-
-
-    group.add(
-      wing
-    );
-
-
-    group.position.y =
-      8;
-  }
-
 
   group.position.set(
     x,
-    type === "AIR" ? 8 : 0.5,
+    type==="AIR"?8:.5,
     z
   );
 
-
-  const unit = {
-
+  const unit={
     id:
       crypto.randomUUID
         ? crypto.randomUUID()
-        : Math.random()
-            .toString(36)
-            .slice(2),
+        : Math.random().toString(36).slice(2),
 
     name,
     type,
     friendly,
 
-    object: group,
+    object:group,
 
-    hp: 100,
-    maxHp: 100,
+    hp:100,
+    maxHp:100,
 
-    organization: 100,
-
-    morale: 85,
+    organization:100,
+    morale:85,
 
     strength:
-      type === "TANK"
-        ? 85
-        : type === "AIR"
-          ? 75
-          : 70,
+      type==="TANK"
+        ?85
+        :type==="AIR"
+          ?75
+          :70,
 
     speed:
-      type === "TANK"
-        ? 18
-        : type === "AIR"
-          ? 35
-          : 12,
+      type==="TANK"
+        ?18
+        :type==="AIR"
+          ?35
+          :12,
 
     attack:
-      type === "TANK"
-        ? 24
-        : type === "AIR"
-          ? 30
-          : 16,
+      type==="TANK"
+        ?24
+        :type==="AIR"
+          ?30
+          :16,
 
     range:
-      type === "TANK"
-        ? 22
-        : type === "AIR"
-          ? 55
-          : 16,
+      type==="TANK"
+        ?22
+        :type==="AIR"
+          ?55
+          :16,
 
-    destination: null,
+    destination:null,
+    state:"READY",
 
-    state: "READY",
+    cooldown:0,
+    experience:0,
 
-    cooldown: 0,
-
-    experience: 0,
-
-    maxOrganization: 100,
-
-    maxMorale: 100,
+    maxOrganization:100,
+    maxMorale:100,
 
     manpowerCost:
-      type === "TANK"
-        ? 2400
-        : type === "AIR"
-          ? 1800
-          : 18000,
+      type==="TANK"
+        ?2400
+        :type==="AIR"
+          ?1800
+          :18000,
 
     equipment:
-      type === "TANK"
-        ? 85
-        : type === "AIR"
-          ? 90
-          : 100,
+      type==="TANK"
+        ?85
+        :type==="AIR"
+          ?90
+          :100,
 
     fuelPerHour:
-      type === "TANK"
-        ? 18
-        : type === "AIR"
-          ? 34
-          : 7,
+      type==="TANK"
+        ?18
+        :type==="AIR"
+          ?34
+          :7,
 
-    supply: 92,
+    supply:92,
+    entrenchment:0,
+    readiness:100,
 
-    entrenchment: 0,
-
-    readiness: 100,
-
-    orders: [],
+    orders:[],
 
     template:
-      type === "TANK"
-        ? "Armored Breakthrough"
-        : type === "AIR"
-          ? "Air Superiority"
-          : "Line Infantry",
+      type==="TANK"
+        ?"Armored Breakthrough"
+        :type==="AIR"
+          ?"Air Superiority"
+          :"Line Infantry",
 
     doctrine:
-      type === "TANK"
-        ? "Mobile Warfare"
-        : "Combined Arms",
+      type==="TANK"
+        ?"Mobile Warfare"
+        :"Combined Arms",
 
-    experienceLevel: 1,
-
-    losses: 0
+    experienceLevel:1,
+    losses:0
   };
 
-
-  group.userData.unit =
-    unit;
-
+  group.userData.unit=unit;
 
   group.add(
     createUnitLabel(
@@ -1456,59 +922,32 @@ function createMilitaryUnit(
     )
   );
 
-
-  unitGroup.add(
-    group
-  );
-
-  units.push(
-    unit
-  );
+  unitGroup.add(group);
+  units.push(unit);
 }
-
-
-/* =========================================================
-   UNIT LABEL
-========================================================= */
 
 function createUnitLabel(
   text,
   friendly
-) {
+){
 
-  const canvas =
-    document.createElement("canvas");
+  const c=document.createElement("canvas");
 
-  canvas.width = 512;
-  canvas.height = 80;
+  c.width=512;
+  c.height=80;
 
-  const ctx =
-    canvas.getContext("2d");
+  const ctx=c.getContext("2d");
 
+  ctx.fillStyle="rgba(5,8,10,.85)";
+  ctx.fillRect(0,0,512,80);
 
-  ctx.fillStyle =
-    "rgba(5,8,10,.85)";
+  ctx.font="bold 25px Arial";
+  ctx.textAlign="center";
 
-  ctx.fillRect(
-    0,
-    0,
-    512,
-    80
-  );
-
-
-  ctx.font =
-    "bold 25px Arial";
-
-  ctx.textAlign =
-    "center";
-
-
-  ctx.fillStyle =
+  ctx.fillStyle=
     friendly
-      ? "#d5ad55"
-      : "#e45d5d";
-
+      ?"#d5ad55"
+      :"#e45d5d";
 
   ctx.fillText(
     text,
@@ -1516,110 +955,69 @@ function createUnitLabel(
     48
   );
 
+  const s=new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map:new THREE.CanvasTexture(c),
+      transparent:true
+    })
+  );
 
-  const sprite =
-    new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map:
-          new THREE.CanvasTexture(
-            canvas
-          ),
-        transparent: true
-      })
-    );
-
-
-  sprite.scale.set(
+  s.scale.set(
     8,
     1.25,
     1
   );
 
+  s.position.y=5;
 
-  sprite.position.y =
-    5;
-
-
-  return sprite;
+  return s;
 }
 
-
-/* =========================================================
-   UI
-========================================================= */
-
-function setupUI() {
+function setupUI(){
 
   setupPanelButtons();
-
   setupUnitCommands();
-
   setupCountrySelection();
 
   setupSpeed();
-
   setupPause();
-
   setupCamera();
-
   setupTutorial();
-
   setupCloseButtons();
 
   updateResources();
-
   updateDate();
 
   openPanel("overview");
 }
 
-
-/* =========================================================
-   PANEL BUTTONS
-========================================================= */
-
-function setupPanelButtons() {
+function setupPanelButtons(){
 
   document
     .querySelectorAll(".panel-button")
-    .forEach(button => {
+    .forEach(btn=>{
 
-      button.addEventListener(
+      btn.addEventListener(
         "click",
-        () => {
+        ()=>{
 
           document
             .querySelectorAll(".panel-button")
-            .forEach(
-              b =>
-                b.classList.remove(
-                  "active"
-                )
+            .forEach(b =>
+              b.classList.remove("active")
             );
 
-
-          button.classList.add(
-            "active"
-          );
-
+          btn.classList.add("active");
 
           openPanel(
-            button.dataset.panel
+            btn.dataset.panel
           );
         }
       );
     });
 }
 
-
-/* =========================================================
-   BASIC STAT
-========================================================= */
-
-function stat(
-  label,
-  value
-) {
+function stat(label,value){
 
   return `
     <div class="stat-row">
@@ -1629,1133 +1027,1095 @@ function stat(
   `;
 }
 
+function openPanel(type){
 
-/* =========================================================
-   OPEN PANELS
-========================================================= */
+  const panel=$("mainPanel");
+  const title=$("panelTitle");
+  const kicker=$("panelKicker");
+  const content=$("panelContent");
 
-function openPanel(type) {
-
-  const panel =
-    $("mainPanel");
-
-  const title =
-    $("panelTitle");
-
-  const kicker =
-    $("panelKicker");
-
-  const content =
-    $("panelContent");
-
-
-  if (
-    !panel ||
-    !title ||
-    !kicker ||
+  if(
+    !panel||
+    !title||
+    !kicker||
     !content
-  ) {
+  )
     return;
-  }
 
+  panel.classList.add("open");
 
-  panel.classList.add(
-    "open"
-  );
-
-
-  const friendly =
+  const friendly=
     units.filter(
       u =>
         u.friendly &&
-        u.state !== "DESTROYED"
+        u.state!=="DESTROYED"
     );
 
+  const data={
 
-  const data = {
-
-    overview: [
+    overview:[
       "World Overview",
       "STRATEGIC COMMAND",
 
       `
-        <div class="info-card">
-
-          <h3>
-            Global Situation
-          </h3>
-
-          <p>
-            Command your army,
-            manage resources and
-            defeat enemy forces.
-          </p>
-
-          ${stat(
-            "Active Fronts",
-            countBattles()
-          )}
-
-          ${stat(
-            "Army Units",
-            friendly.length
-          )}
-
-          ${stat(
-            "Threat Level",
-            enemyThreat()
-          )}
-
-        </div>
-
-
-        <div class="info-card">
-
-          <h3>
-            Military Readiness
-          </h3>
-
-          ${stat(
-            "Army Strength",
-            Math.round(
-              avg("strength")
-            ) + "%"
-          )}
-
-          ${stat(
-            "Morale",
-            Math.round(
-              avg("morale")
-            ) + "%"
-          )}
-
-          ${stat(
-            "Organization",
-            Math.round(
-              avg("organization")
-            ) + "%"
-          )}
-
-        </div>
-      `
-    ],
-
-
-    army: [
-      "Army Command",
-      "MILITARY COMMAND",
-      armyCommandHTML(
-        friendly
-      )
-    ],
-
-
-    economy: [
-      "National Economy",
-      "ECONOMIC COMMAND",
-
-      `
-        <div class="info-card">
-
-          <h3>
-            National Production
-          </h3>
-
-          ${stat(
-            "Treasury",
-            money.toLocaleString()
-          )}
-
-          ${stat(
-            "Oil",
-            Math.floor(oil)
-          )}
-
-          ${stat(
-            "Steel",
-            Math.floor(steel)
-          )}
-
-          ${stat(
-            "Food",
-            Math.floor(food)
-          )}
-
-          ${stat(
-            "Manpower",
-            Math.floor(
-              manpower
-            ).toLocaleString()
-          )}
-
-        </div>
-
-        <button
-          class="action-btn"
-          id="economyBoost"
-        >
-          INVEST IN INDUSTRY — $1000
-        </button>
-      `
-    ],
-
-
-    production: [
-      "Military Production",
-      "INDUSTRIAL COMMAND",
-
-      `
-        <div class="info-card">
-
-          <h3>
-            Production Queue
-          </h3>
-
-          ${stat(
-            "Tank production",
-            "67%"
-          )}
-
-          ${stat(
-            "Aircraft",
-            "31%"
-          )}
-
-          ${stat(
-            "Infantry equipment",
-            "42%"
-          )}
-
-        </div>
-
-        <button
-          class="action-btn"
-          id="produceTank"
-        >
-          PRODUCE TANK — $800 / 80 STEEL
-        </button>
-
-        <button
-          class="action-btn"
-          id="reinforce"
-        >
-          REINFORCE ARMY — 500 MANPOWER
-        </button>
-      `
-    ],
-
-
-    research: [
-      "Technology",
-      "RESEARCH COMMAND",
-
-      `
-        <div class="info-card">
-
-          <h3>
-            Research
-          </h3>
-
-          ${stat(
-            "Armored Warfare",
-            "64%"
-          )}
-
-          ${stat(
-            "Logistics",
-            "42%"
-          )}
-
-          ${stat(
-            "Air Doctrine",
-            "28%"
-          )}
-
-        </div>
-
-        <button
-          class="action-btn"
-          id="researchBtn"
-        >
-          ADVANCE RESEARCH — $1200
-        </button>
-      `
-    ],
-
-
-    diplomacy: [
-      "Diplomacy",
-      "FOREIGN AFFAIRS",
-
-      `
-        <div class="info-card">
-
-          <h3>
-            International Relations
-          </h3>
-
-          ${stat(
-            "Germany",
-            "HOSTILE"
-          )}
-
-          ${stat(
-            "United Kingdom",
-            "NEUTRAL"
-          )}
-
-          ${stat(
-            "USSR",
-            "CAUTIOUS"
-          )}
-
-          ${stat(
-            "Japan",
-            "TENSE"
-          )}
-
-        </div>
-      `
-    ],
-
-
-    intel: [
-      "Intelligence",
-      "INTELLIGENCE COMMAND",
-
-      `
-        <div class="info-card">
-
-          <h3>
-            Enemy Intelligence
-          </h3>
-
-          ${stat(
-            "Enemy Army",
-            enemyThreat()
-          )}
-
-          ${stat(
-            "Enemy Armor",
-            enemyArmor()
-          )}
-
-          ${stat(
-            "Threat Level",
-            enemyThreat()
-          )}
-
-        </div>
-
-        <button
-          class="action-btn"
-          id="intelBtn"
-        >
-          RUN RECON — $250
-        </button>
-      `
-    ],
-
-
-    settings: [
-      "Game Settings",
-      "SYSTEM CONTROL",
-
-      `
-        <div class="info-card">
-
-          <h3>
-            Graphics
-          </h3>
-
-          <button
-            class="action-btn"
-            id="toggleFog"
-          >
-            TOGGLE BATTLEFIELD FOG
-          </button>
-
-          <button
-            class="action-btn"
-            id="resetBtn"
-          >
-            RESET CAMERA
-          </button>
-
-          <button
-            class="action-btn"
-            id="saveBtn"
-          >
-            SAVE CAMPAIGN
-          </button>
-
-          <button
-            class="action-btn"
-            id="loadBtn"
-          >
-            LOAD CAMPAIGN
-          </button>
-
-        </div>
-      `
-    ]
-
-  };
-
-
-  const selected =
-    data[type] ||
-    data.overview;
-
-
-  title.textContent =
-    selected[0];
-
-  kicker.textContent =
-    selected[1];
-
-  content.innerHTML =
-    selected[2];
-
-
-  bindUnitButtons();
-
-
-  if (type === "army") {
-
-    bindArmyPanel();
-
-    if ($("armyNewOrder")) {
-
-      $("armyNewOrder").onclick =
-        () =>
-          showToast(
-            "Select a unit, then use MOVE or ATTACK to issue an order."
-          );
-    }
-
-
-    if ($("armyMerge")) {
-
-      $("armyMerge").onclick =
-        () =>
-          showToast(
-            "Select two compatible units to merge."
-          );
-    }
-
-
-    if ($("armySplit")) {
-
-      $("armySplit").onclick =
-        () =>
-          showToast(
-            "Select a unit to split its formation."
-          );
-    }
-
-
-    if ($("armyDisband")) {
-
-      $("armyDisband").onclick =
-        () =>
-          showToast(
-            "Select a unit before disbanding."
-          );
-    }
-  }
-
-
-  if ($("economyBoost")) {
-
-    $("economyBoost").onclick =
-      () => {
-
-        if (money >= 1000) {
-
-          money -= 1000;
-
-          steel += 150;
-
-          saveGame();
-
-          updateResources();
-
-          showToast(
-            "Industrial investment completed."
-          );
-
-        } else {
-
-          showToast(
-            "Insufficient funds."
-          );
-        }
-      };
-  }
-
-
-  if ($("produceTank")) {
-
-    $("produceTank").onclick =
-      produceTank;
-  }
-
-
-  if ($("reinforce")) {
-
-    $("reinforce").onclick =
-      reinforceArmy;
-  }
-
-
-  if ($("researchBtn")) {
-
-    $("researchBtn").onclick =
-      () => {
-
-        if (money >= 1200) {
-
-          money -= 1200;
-
-          units
-            .filter(
-              u => u.friendly
-            )
-            .forEach(
-              u =>
-                u.strength =
-                  Math.min(
-                    100,
-                    u.strength + 3
-                  )
-            );
-
-          updateResources();
-
-          showToast(
-            "Research breakthrough completed."
-          );
-
-        } else {
-
-          showToast(
-            "Insufficient funds."
-          );
-        }
-      };
-  }
-
-
-  if ($("intelBtn")) {
-
-    $("intelBtn").onclick =
-      () => {
-
-        if (money >= 250) {
-
-          money -= 250;
-
-          updateResources();
-
-          showToast(
-            "Recon report updated: enemy positions revealed."
-          );
-
-        } else {
-
-          showToast(
-            "Insufficient funds."
-          );
-        }
-      };
-  }
-
-
-  if ($("supplyArmy")) {
-
-    $("supplyArmy").onclick =
-      () => {
-
-        if (oil < 120) {
-
-          return showToast(
-            "Insufficient fuel reserve."
-          );
-        }
-
-
-        oil -= 120;
-
-
-        units
-          .filter(
-            u =>
-              u.friendly &&
-              u.state !== "DESTROYED"
-          )
-          .forEach(
-            u => {
-
-              u.supply =
-                Math.min(
-                  100,
-                  u.supply + 15
-                );
-
-              u.readiness =
-                Math.min(
-                  100,
-                  u.readiness + 8
-                );
-            }
-          );
-
-
-        updateResources();
-
-        showToast(
-          "Army supply priority activated."
-        );
-      };
-  }
-
-
-  if ($("upgradeDoctrine")) {
-
-    $("upgradeDoctrine").onclick =
-      () => {
-
-        if (money < 900) {
-
-          return showToast(
-            "Need $900 for doctrine research."
-          );
-        }
-
-
-        money -= 900;
-
-
-        units
-          .filter(
-            u => u.friendly
-          )
-          .forEach(
-            u =>
-              u.strength =
-                Math.min(
-                  100,
-                  u.strength + 2
-                )
-          );
-
-
-        updateResources();
-
-        showToast(
-          "Doctrine upgraded."
-        );
-      };
-  }
-
-
-  if ($("createTemplate")) {
-
-    $("createTemplate").onclick =
-      () =>
-        showToast(
-          "Template editor ready for future expansion."
-        );
-  }
-
-
-  if ($("toggleFog")) {
-
-    $("toggleFog").onclick =
-      () => {
-
-        fogEnabled =
-          !fogEnabled;
-
-
-        scene.fog =
-          fogEnabled
-            ? new THREE.Fog(
-                0x081016,
-                75,
-                430
-              )
-            : null;
-
-
-        showToast(
-          fogEnabled
-            ? "Fog enabled."
-            : "Fog disabled."
-        );
-      };
-  }
-
-
-  if ($("resetBtn")) {
-
-    $("resetBtn").onclick =
-      resetCamera;
-  }
-
-
-  if ($("saveBtn")) {
-
-    $("saveBtn").onclick =
-      saveGame;
-  }
-
-
-  if ($("loadBtn")) {
-
-    $("loadBtn").onclick =
-      () => {
-
-        loadGame();
-
-        showToast(
-          "Campaign loaded."
-        );
-      };
-  }
-}
-
-
-/* =========================================================
-   ARMY COMMAND
-========================================================= */
-
-function armyCommandHTML(
-  friendly
-) {
-
-  const averageStrength =
-    Math.round(
-      avg("strength")
-    );
-
-  const averageOrganization =
-    Math.round(
-      avg("organization")
-    );
-
-  const averageMorale =
-    Math.round(
-      avg("morale")
-    );
-
-
-  const ready =
-    friendly.filter(
-      u =>
-        u.readiness >= 75 &&
-        u.hp > 35
-    ).length;
-
-
-  const tanks =
-    friendly.filter(
-      u =>
-        u.type === "TANK"
-    ).length * 8;
-
-
-  const infantry =
-    friendly.filter(
-      u =>
-        u.type === "INFANTRY"
-    ).length * 12;
-
-
-  const air =
-    friendly.filter(
-      u =>
-        u.type === "AIR"
-    ).length * 6;
-
-
-  const artillery =
-    friendly.filter(
-      u =>
-        u.type === "ARTILLERY"
-    ).length * 6;
-
-
-  return `
-
-    <div
-      class="army-tabs"
-      style="
-        display:flex;
-        gap:6px;
-        flex-wrap:wrap;
-        margin-bottom:12px
-      "
-    >
-
-      <button
-        class="action-btn army-tab active"
-        data-tab="overview"
-      >
-        OVERVIEW
-      </button>
-
-      <button
-        class="action-btn army-tab"
-        data-tab="units"
-      >
-        UNITS
-      </button>
-
-      <button
-        class="action-btn army-tab"
-        data-tab="templates"
-      >
-        TEMPLATES
-      </button>
-
-      <button
-        class="action-btn army-tab"
-        data-tab="doctrine"
-      >
-        DOCTRINE
-      </button>
-
-      <button
-        class="action-btn army-tab"
-        data-tab="logistics"
-      >
-        LOGISTICS
-      </button>
-
-    </div>
-
-
-    <div id="armyTabContent">
-
       <div class="info-card">
 
-        <h3>
-          Available Forces
+        <h3>Global Situation</h3>
 
-          <span style="float:right">
-            ${ready}/${friendly.length}
-            READY
-          </span>
-        </h3>
+        <p>
+          Monitor the entire war:
+          fronts, military balance,
+          national resources,
+          enemy activity and
+          strategic readiness.
+        </p>
 
+        ${stat(
+          "Active Fronts",
+          countBattles()
+        )}
 
-        ${
-          friendly
-            .slice(0, 8)
-            .map(
-              u => `
+        ${stat(
+          "Friendly Forces",
+          friendly.length
+        )}
 
-                <button
-                  class="action-btn unit-select"
-                  data-unit="${u.id}"
-                  style="
-                    text-align:left;
-                    margin:5px 0;
-                    width:100%
-                  "
-                >
+        ${stat(
+          "Enemy Forces",
+          units.filter(
+            u =>
+              !u.friendly &&
+              u.state!=="DESTROYED"
+          ).length
+        )}
 
-                  <b>
-                    ${unitIcon(u.type)}
-                    ${u.name}
-                  </b>
+        ${stat(
+          "Threat Level",
+          enemyThreat()
+        )}
 
-                  <br>
-
-                  <small>
-                    ${u.type}
-                    •
-                    ${Math.round(u.hp)}% HP
-                    •
-                    ${Math.round(u.readiness)}% READY
-                  </small>
-
-                </button>
-
-              `
-            )
-            .join("")
-        }
+        ${stat(
+          "Campaign Year",
+          gameYear
+        )}
 
       </div>
 
-
       <div class="info-card">
 
-        <h3>
-          Army Statistics
-        </h3>
+        <h3>Military Strength</h3>
 
         ${barStat(
           "Army Strength",
-          averageStrength
+          Math.round(avg("strength"))
         )}
 
         ${barStat(
           "Organization",
-          averageOrganization
+          Math.round(avg("organization"))
         )}
 
         ${barStat(
           "Morale",
-          averageMorale
+          Math.round(avg("morale"))
         )}
 
         ${barStat(
           "Readiness",
-          Math.round(
-            avg("readiness")
-          )
+          Math.round(avg("readiness"))
         )}
 
         ${stat(
           "Manpower",
-          Math.floor(
-            manpower
-          ).toLocaleString()
+          Math.floor(manpower)
+            .toLocaleString()
         )}
 
       </div>
 
-
       <div class="info-card">
 
-        <h3>
-          Composition
-        </h3>
+        <h3>War Status</h3>
 
-        <div
-          style="
-            display:grid;
-            grid-template-columns:
-              repeat(4,1fr);
-            gap:4px
-          "
-        >
+        ${stat(
+          "National Status",
+          friendsStatus()
+        )}
 
-          ${stat(
-            "Tanks",
-            tanks
-          )}
+        ${stat(
+          "Enemy Threat",
+          enemyThreat()
+        )}
 
-          ${stat(
-            "Infantry",
-            infantry
-          )}
+        ${stat(
+          "Enemy Armor",
+          enemyArmor()
+        )}
 
-          ${stat(
-            "Artillery",
-            artillery
-          )}
-
-          ${stat(
-            "Aircraft",
-            air
-          )}
-
-        </div>
-
-      </div>
-
-
-      <div class="info-card">
-
-        <h3>
-
-          Active Orders
-
-          <span style="float:right">
-
-            ${
-              friendly.filter(
-                u =>
-                  u.destination ||
-                  [
-                    "ATTACKING",
-                    "DEFENDING",
-                    "HOLDING",
-                    "ADVANCING"
-                  ].includes(u.state)
-              ).length
-            }
-
-            /
-
-            ${Math.max(
-              5,
-              friendly.length
-            )}
-
-          </span>
-
-        </h3>
-
-
-        ${
-          friendly
-            .filter(
-              u =>
-                u.destination ||
-                u.state !== "READY"
-            )
-            .slice(0, 5)
-            .map(
-              u => `
-
-                <div
-                  class="stat-row"
-                >
-
-                  <span>
-
-                    ${unitIcon(
-                      u.type
-                    )}
-
-                    ${u.name}
-
-                    <small
-                      style="
-                        display:block;
-                        opacity:.65
-                      "
-                    >
-
-                      ${
-                        u.destination
-                          ? "Moving to objective"
-                          : "Holding / combat posture"
-                      }
-
-                    </small>
-
-                  </span>
-
-                  <b>
-                    ${u.state}
-                  </b>
-
-                </div>
-
-              `
-            )
-            .join("")
-        }
-
-        ${
+        ${stat(
+          "Active Orders",
           friendly.filter(
             u =>
               u.destination ||
-              u.state !== "READY"
-          ).length === 0
-            ? "<p>No active orders.</p>"
-            : ""
-        }
+              u.state!=="READY"
+          ).length
+        )}
 
       </div>
 
+      <div class="info-card">
+
+        <h3>National Economy</h3>
+
+        ${stat(
+          "Treasury",
+          "$"+
+          Math.floor(money)
+            .toLocaleString()
+        )}
+
+        ${stat(
+          "Oil",
+          Math.floor(oil)
+            .toLocaleString()
+        )}
+
+        ${stat(
+          "Steel",
+          Math.floor(steel)
+            .toLocaleString()
+        )}
+
+        ${stat(
+          "Food",
+          Math.floor(food)
+            .toLocaleString()
+        )}
+
+      </div>
+
+      <div class="info-card">
+
+        <h3>Strategic Intelligence</h3>
+
+        ${stat(
+          "Enemy Units Spotted",
+          units.filter(
+            u =>
+              !u.friendly &&
+              u.state!=="DESTROYED"
+          ).length
+        )}
+
+        ${stat(
+          "Enemy Armor Groups",
+          units.filter(
+            u =>
+              !u.friendly &&
+              u.type==="TANK" &&
+              u.state!=="DESTROYED"
+          ).length
+        )}
+
+        ${stat(
+          "Air Threat",
+          units.filter(
+            u =>
+              !u.friendly &&
+              u.type==="AIR" &&
+              u.state!=="DESTROYED"
+          ).length
+            ?"DETECTED"
+            :"LOW"
+        )}
+
+        ${stat(
+          "Battle Log",
+          battleLog.length
+            ?"UPDATED"
+            :"NO RECENT REPORT"
+        )}
+
+      </div>
 
       <div
         style="
           display:grid;
-          grid-template-columns:
-            repeat(4,1fr);
+          grid-template-columns:repeat(2,1fr);
           gap:6px
         "
       >
 
         <button
           class="action-btn"
-          id="armyNewOrder"
+          id="overviewArmyBtn"
         >
-          NEW ORDER
+          VIEW ARMY
         </button>
 
         <button
           class="action-btn"
-          id="armyMerge"
+          id="overviewIntelBtn"
         >
-          MERGE
+          RUN INTELLIGENCE
+        </button>
+
+      </div>
+      `
+    ],
+
+    army:[
+      "Army Command",
+      "MILITARY COMMAND",
+      armyCommandHTML(friendly)
+    ],
+
+    economy:[
+      "National Economy",
+      "ECONOMIC COMMAND",
+
+      `
+      <div class="info-card">
+
+        <h3>National Production</h3>
+
+        ${stat(
+          "Treasury",
+          money.toLocaleString()
+        )}
+
+        ${stat(
+          "Oil",
+          Math.floor(oil)
+        )}
+
+        ${stat(
+          "Steel",
+          Math.floor(steel)
+        )}
+
+        ${stat(
+          "Food",
+          Math.floor(food)
+        )}
+
+        ${stat(
+          "Manpower",
+          Math.floor(manpower)
+            .toLocaleString()
+        )}
+
+      </div>
+
+      <button
+        class="action-btn"
+        id="economyBoost"
+      >
+        INVEST IN INDUSTRY — $1000
+      </button>
+      `
+    ],
+
+    production:[
+      "Military Production",
+      "INDUSTRIAL COMMAND",
+
+      `
+      <div class="info-card">
+
+        <h3>Production Queue</h3>
+
+        ${stat(
+          "Tank production",
+          "67%"
+        )}
+
+        ${stat(
+          "Aircraft",
+          "31%"
+        )}
+
+        ${stat(
+          "Infantry equipment",
+          "42%"
+        )}
+
+      </div>
+
+      <button
+        class="action-btn"
+        id="produceTank"
+      >
+        PRODUCE TANK — $800 / 80 STEEL
+      </button>
+
+      <button
+        class="action-btn"
+        id="reinforce"
+      >
+        REINFORCE ARMY — 500 MANPOWER
+      </button>
+      `
+    ],
+
+    research:[
+      "Technology",
+      "RESEARCH COMMAND",
+
+      `
+      <div class="info-card">
+
+        <h3>Research</h3>
+
+        ${stat(
+          "Armored Warfare",
+          "64%"
+        )}
+
+        ${stat(
+          "Logistics",
+          "42%"
+        )}
+
+        ${stat(
+          "Air Doctrine",
+          "28%"
+        )}
+
+      </div>
+
+      <button
+        class="action-btn"
+        id="researchBtn"
+      >
+        ADVANCE RESEARCH — $1200
+      </button>
+      `
+    ],
+
+    diplomacy:[
+      "Diplomacy",
+      "FOREIGN AFFAIRS",
+
+      `
+      <div class="info-card">
+
+        <h3>International Relations</h3>
+
+        ${stat(
+          "Germany",
+          "HOSTILE"
+        )}
+
+        ${stat(
+          "United Kingdom",
+          "NEUTRAL"
+        )}
+
+        ${stat(
+          "USSR",
+          "CAUTIOUS"
+        )}
+
+        ${stat(
+          "Japan",
+          "TENSE"
+        )}
+
+      </div>
+      `
+    ],
+
+    intel:[
+      "Intelligence",
+      "INTELLIGENCE COMMAND",
+
+      `
+      <div class="info-card">
+
+        <h3>Enemy Intelligence</h3>
+
+        ${stat(
+          "Enemy Army",
+          enemyThreat()
+        )}
+
+        ${stat(
+          "Enemy Armor",
+          enemyArmor()
+        )}
+
+        ${stat(
+          "Threat Level",
+          enemyThreat()
+        )}
+
+      </div>
+
+      <button
+        class="action-btn"
+        id="intelBtn"
+      >
+        RUN RECON — $250
+      </button>
+      `
+    ],
+
+    settings:[
+      "Game Settings",
+      "SYSTEM CONTROL",
+
+      `
+      <div class="info-card">
+
+        <h3>Graphics</h3>
+
+        <button
+          class="action-btn"
+          id="toggleFog"
+        >
+          TOGGLE BATTLEFIELD FOG
         </button>
 
         <button
           class="action-btn"
-          id="armySplit"
+          id="resetBtn"
         >
-          SPLIT
+          RESET CAMERA
         </button>
 
         <button
           class="action-btn"
-          id="armyDisband"
+          id="saveBtn"
         >
-          DISBAND
+          SAVE CAMPAIGN
         </button>
+
+        <button
+          class="action-btn"
+          id="loadBtn"
+        >
+          LOAD CAMPAIGN
+        </button>
+
+      </div>
+      `
+    ]
+  };
+
+  const d=data[type]||data.overview;
+
+  title.textContent=d[0];
+  kicker.textContent=d[1];
+  content.innerHTML=d[2];
+
+  bindUnitButtons();
+
+  if(type==="army"){
+
+    bindArmyPanel();
+
+    if($("armyNewOrder"))
+      $("armyNewOrder").onclick=() =>
+        showToast(
+          "Select a unit, then use MOVE or ATTACK to issue an order."
+        );
+
+    if($("armyMerge"))
+      $("armyMerge").onclick=() =>
+        showToast(
+          "Select two compatible units to merge."
+        );
+
+    if($("armySplit"))
+      $("armySplit").onclick=() =>
+        showToast(
+          "Select a unit to split its formation."
+        );
+
+    if($("armyDisband"))
+      $("armyDisband").onclick=() =>
+        showToast(
+          "Select a unit before disbanding."
+        );
+  }
+
+  if($("economyBoost"))
+    $("economyBoost").onclick=()=>{
+
+      if(money>=1000){
+
+        money-=1000;
+        steel+=150;
+
+        saveGame();
+        updateResources();
+
+        showToast(
+          "Industrial investment completed."
+        );
+
+      }else{
+
+        showToast(
+          "Insufficient funds."
+        );
+      }
+    };
+
+  if($("produceTank"))
+    $("produceTank").onclick=
+      produceTank;
+
+  if($("reinforce"))
+    $("reinforce").onclick=
+      reinforceArmy;
+
+  if($("researchBtn"))
+    $("researchBtn").onclick=()=>{
+
+      if(money>=1200){
+
+        money-=1200;
+
+        units
+          .filter(u=>u.friendly)
+          .forEach(
+            u =>
+              u.strength=
+                Math.min(
+                  100,
+                  u.strength+3
+                )
+          );
+
+        updateResources();
+
+        showToast(
+          "Research breakthrough completed."
+        );
+
+      }else{
+
+        showToast(
+          "Insufficient funds."
+        );
+      }
+    };
+
+  if($("intelBtn"))
+    $("intelBtn").onclick=()=>{
+
+      if(money>=250){
+
+        money-=250;
+
+        updateResources();
+
+        showToast(
+          "Recon report updated: enemy positions revealed."
+        );
+
+      }else{
+
+        showToast(
+          "Insufficient funds."
+        );
+      }
+    };
+
+  if($("supplyArmy"))
+    $("supplyArmy").onclick=()=>{
+
+      if(oil<120)
+        return showToast(
+          "Insufficient fuel reserve."
+        );
+
+      oil-=120;
+
+      units
+        .filter(
+          u =>
+            u.friendly &&
+            u.state!=="DESTROYED"
+        )
+        .forEach(u=>{
+
+          u.supply=
+            Math.min(
+              100,
+              u.supply+15
+            );
+
+          u.readiness=
+            Math.min(
+              100,
+              u.readiness+8
+            );
+        });
+
+      updateResources();
+
+      showToast(
+        "Army supply priority activated."
+      );
+    };
+
+  if($("upgradeDoctrine"))
+    $("upgradeDoctrine").onclick=()=>{
+
+      if(money<900)
+        return showToast(
+          "Need $900 for doctrine research."
+        );
+
+      money-=900;
+
+      units
+        .filter(u=>u.friendly)
+        .forEach(
+          u =>
+            u.strength=
+              Math.min(
+                100,
+                u.strength+2
+              )
+        );
+
+      updateResources();
+
+      showToast(
+        "Doctrine upgraded."
+      );
+    };
+
+  if($("createTemplate"))
+    $("createTemplate").onclick=() =>
+      showToast(
+        "Template editor ready for future expansion."
+      );
+
+  if($("toggleFog"))
+    $("toggleFog").onclick=()=>{
+
+      fogEnabled=!fogEnabled;
+
+      scene.fog=
+        fogEnabled
+          ?new THREE.Fog(
+              0x081016,
+              75,
+              430
+            )
+          :null;
+
+      showToast(
+        fogEnabled
+          ?"Fog enabled."
+          :"Fog disabled."
+      );
+    };
+
+  if($("resetBtn"))
+    $("resetBtn").onclick=
+      resetCamera;
+
+  if($("saveBtn"))
+    $("saveBtn").onclick=
+      saveGame;
+
+  if($("loadBtn"))
+    $("loadBtn").onclick=()=>{
+
+      loadGame();
+
+      showToast(
+        "Campaign loaded."
+      );
+    };
+
+  if($("overviewArmyBtn"))
+    $("overviewArmyBtn").onclick=
+      () => openPanel("army");
+
+  if($("overviewIntelBtn"))
+    $("overviewIntelBtn").onclick=()=>{
+
+      if(money>=250){
+
+        money-=250;
+
+        updateResources();
+
+        addBattleLog(
+          "Strategic intelligence report updated."
+        );
+
+        showToast(
+          "Intelligence report updated."
+        );
+
+        openPanel("overview");
+
+      }else{
+
+        showToast(
+          "Insufficient funds."
+        );
+      }
+    };
+}
+
+function armyCommandHTML(friendly){
+
+  const avgStrength=
+    Math.round(
+      avg("strength")
+    );
+
+  const avgOrg=
+    Math.round(
+      avg("organization")
+    );
+
+  const avgMorale=
+    Math.round(
+      avg("morale")
+    );
+
+  const ready=
+    friendly.filter(
+      u =>
+        u.readiness>=75 &&
+        u.hp>35
+    ).length;
+
+  const tanks=
+    friendly.filter(
+      u=>u.type==="TANK"
+    ).length*8;
+
+  const infantry=
+    friendly.filter(
+      u=>u.type==="INFANTRY"
+    ).length*12;
+
+  const air=
+    friendly.filter(
+      u=>u.type==="AIR"
+    ).length*6;
+
+  const artillery=
+    friendly.filter(
+      u=>u.type==="ARTILLERY"
+    ).length*6;
+
+  return `
+  <div
+    class="army-tabs"
+    style="
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      margin-bottom:12px
+    "
+  >
+
+    <button
+      class="action-btn army-tab active"
+      data-tab="overview"
+    >
+      OVERVIEW
+    </button>
+
+    <button
+      class="action-btn army-tab"
+      data-tab="units"
+    >
+      UNITS
+    </button>
+
+    <button
+      class="action-btn army-tab"
+      data-tab="templates"
+    >
+      TEMPLATES
+    </button>
+
+    <button
+      class="action-btn army-tab"
+      data-tab="doctrine"
+    >
+      DOCTRINE
+    </button>
+
+    <button
+      class="action-btn army-tab"
+      data-tab="logistics"
+    >
+      LOGISTICS
+    </button>
+
+  </div>
+
+  <div id="armyTabContent">
+
+    <div class="info-card">
+
+      <h3>
+        Available Forces
+
+        <span style="float:right">
+          ${ready}/${friendly.length} READY
+        </span>
+      </h3>
+
+      ${friendly
+        .slice(0,8)
+        .map(
+          u=>`
+          <button
+            class="action-btn unit-select"
+            data-unit="${u.id}"
+            style="
+              text-align:left;
+              margin:5px 0;
+              width:100%
+            "
+          >
+
+            <b>
+              ${unitIcon(u.type)}
+              ${u.name}
+            </b>
+
+            <br>
+
+            <small>
+              ${u.type}
+              • ${Math.round(u.hp)}% HP
+              • ${Math.round(u.readiness)}% READY
+            </small>
+
+          </button>
+          `
+        )
+        .join("")}
+
+    </div>
+
+    <div class="info-card">
+
+      <h3>
+        Army Statistics
+      </h3>
+
+      ${barStat(
+        "Army Strength",
+        avgStrength
+      )}
+
+      ${barStat(
+        "Organization",
+        avgOrg
+      )}
+
+      ${barStat(
+        "Morale",
+        avgMorale
+      )}
+
+      ${barStat(
+        "Readiness",
+        Math.round(avg("readiness"))
+      )}
+
+      ${stat(
+        "Manpower",
+        Math.floor(manpower)
+          .toLocaleString()
+      )}
+
+    </div>
+
+    <div class="info-card">
+
+      <h3>
+        Composition
+      </h3>
+
+      <div
+        style="
+          display:grid;
+          grid-template-columns:repeat(4,1fr);
+          gap:4px
+        "
+      >
+
+        ${stat(
+          "Tanks",
+          tanks
+        )}
+
+        ${stat(
+          "Infantry",
+          infantry
+        )}
+
+        ${stat(
+          "Artillery",
+          artillery
+        )}
+
+        ${stat(
+          "Aircraft",
+          air
+        )}
 
       </div>
 
     </div>
+
+    <div class="info-card">
+
+      <h3>
+
+        Active Orders
+
+        <span style="float:right">
+
+          ${
+            friendly.filter(
+              u =>
+                u.destination ||
+                [
+                  "ATTACKING",
+                  "DEFENDING",
+                  "HOLDING",
+                  "ADVANCING"
+                ].includes(u.state)
+            ).length
+          }
+
+          /
+          ${Math.max(5,friendly.length)}
+
+        </span>
+
+      </h3>
+
+      ${
+        friendly
+          .filter(
+            u =>
+              u.destination ||
+              u.state!=="READY"
+          )
+          .slice(0,5)
+          .map(
+            u=>`
+            <div class="stat-row">
+
+              <span>
+
+                ${unitIcon(u.type)}
+                ${u.name}
+
+                <small
+                  style="
+                    display:block;
+                    opacity:.65
+                  "
+                >
+                  ${
+                    u.destination
+                      ?"Moving to objective"
+                      :"Holding / combat posture"
+                  }
+                </small>
+
+              </span>
+
+              <b>
+                ${u.state}
+              </b>
+
+            </div>
+            `
+          )
+          .join("")
+        ||
+        "<p>No active orders.</p>"
+      }
+
+    </div>
+
+    <div
+      style="
+        display:grid;
+        grid-template-columns:repeat(4,1fr);
+        gap:6px
+      "
+    >
+
+      <button
+        class="action-btn"
+        id="armyNewOrder"
+      >
+        NEW ORDER
+      </button>
+
+      <button
+        class="action-btn"
+        id="armyMerge"
+      >
+        MERGE
+      </button>
+
+      <button
+        class="action-btn"
+        id="armySplit"
+      >
+        SPLIT
+      </button>
+
+      <button
+        class="action-btn"
+        id="armyDisband"
+      >
+        DISBAND
+      </button>
+
+    </div>
+
+  </div>
   `;
 }
 
+function unitIcon(type){
 
-/* =========================================================
-   ICONS
-========================================================= */
-
-function unitIcon(type) {
-
-  if (type === "TANK") {
-    return "🛡️";
-  }
-
-  if (type === "AIR") {
-    return "✈️";
-  }
-
-  if (type === "ARTILLERY") {
-    return "🎯";
-  }
-
-  return "🪖";
+  return type==="TANK"
+    ?"🛡️"
+    :type==="AIR"
+      ?"✈️"
+      :type==="ARTILLERY"
+        ?"🎯"
+        :"🪖";
 }
 
-
-/* =========================================================
-   BAR STAT
-========================================================= */
-
-function barStat(
-  label,
-  value
-) {
+function barStat(label,value){
 
   return `
-
     <div class="unit-stat">
 
-      <span>
-        ${label}
-      </span>
+      <span>${label}</span>
 
       <div class="progress">
 
         <i
           style="
-            width:
-            ${Math.max(
+            width:${Math.max(
               0,
               Math.min(
                 100,
@@ -2767,73 +2127,52 @@ function barStat(
 
       </div>
 
-      <b>
-        ${value}%
-      </b>
+      <b>${value}%</b>
 
     </div>
-
   `;
 }
 
-
-/* =========================================================
-   ARMY TABS
-========================================================= */
-
-function bindArmyPanel() {
+function bindArmyPanel(){
 
   document
-    .querySelectorAll(
-      ".army-tab"
-    )
-    .forEach(button => {
+    .querySelectorAll(".army-tab")
+    .forEach(
+      b =>
+        b.onclick=()=>{
 
-      button.onclick = () => {
+          document
+            .querySelectorAll(".army-tab")
+            .forEach(
+              x =>
+                x.classList.remove(
+                  "active"
+                )
+            );
 
-        document
-          .querySelectorAll(
-            ".army-tab"
-          )
-          .forEach(
-            b =>
-              b.classList.remove(
-                "active"
-              )
+          b.classList.add("active");
+
+          const box=$(
+            "armyTabContent"
           );
 
+          if(!box)
+            return;
 
-        button.classList.add(
-          "active"
-        );
+          const tab=
+            b.dataset.tab;
 
+          if(tab==="units"){
 
-        const box =
-          $("armyTabContent");
-
-
-        if (!box) {
-          return;
-        }
-
-
-        const tab =
-          button.dataset.tab;
-
-
-        if (tab === "units") {
-
-          box.innerHTML =
-            units
-              .filter(
-                u =>
-                  u.friendly &&
-                  u.state !==
-                    "DESTROYED"
-              )
-              .map(
-                u => `
-
+            box.innerHTML=
+              units
+                .filter(
+                  u =>
+                    u.friendly &&
+                    u.state!=="DESTROYED"
+                )
+                .map(
+                  u=>`
                   <button
                     class="action-btn unit-select"
                     data-unit="${u.id}"
@@ -2844,450 +2183,390 @@ function bindArmyPanel() {
                     "
                   >
 
-                    ${unitIcon(
-                      u.type
-                    )}
+                    ${unitIcon(u.type)}
 
                     <b>
                       ${u.name}
                     </b>
 
                     —
-
                     ${u.type}
 
                     —
-
                     HP
-                    ${Math.round(
-                      u.hp
-                    )}%
+                    ${Math.round(u.hp)}%
 
                     —
-
                     ORG
-                    ${Math.round(
-                      u.organization
-                    )}%
+                    ${Math.round(u.organization)}%
 
                     —
-
                     XP
-                    ${Math.round(
-                      u.experience
-                    )}
+                    ${Math.round(u.experience)}
 
                   </button>
+                  `
+                )
+                .join("")
+              ||
+              "<p>No active units.</p>";
 
-                `
-              )
-              .join("")
-            ||
-            "<p>No active units.</p>";
-        }
+          }else if(tab==="templates"){
 
+            box.innerHTML=`
+              <div class="info-card">
 
-        else if (
-          tab === "templates"
-        ) {
+                <h3>
+                  Division Templates
+                </h3>
 
-          box.innerHTML = `
-
-            <div class="info-card">
-
-              <h3>
-                Division Templates
-              </h3>
-
-              ${
-                [
-                  "Armored Breakthrough",
-                  "Mechanized Infantry",
-                  "Line Infantry",
-                  "Air Assault"
-                ]
+                ${
+                  [
+                    "Armored Breakthrough",
+                    "Mechanized Infantry",
+                    "Line Infantry",
+                    "Air Assault"
+                  ]
                   .map(
-                    (name, index) => `
+                    (x,i)=>`
+                    <div class="stat-row">
 
-                      <div
-                        class="stat-row"
-                      >
+                      <span>
 
-                        <span>
+                        ${x}
 
-                          ${name}
+                        <small
+                          style="
+                            display:block;
+                            opacity:.6
+                          "
+                        >
 
-                          <small
-                            style="
-                              display:block;
-                              opacity:.6
-                            "
-                          >
+                          ${
+                            i===0
+                              ?"High armor / breakthrough"
+                              :i===1
+                                ?"Fast combined arms"
+                                :"Balanced frontline formation"
+                          }
 
-                            ${
-                              index === 0
-                                ? "High armor / breakthrough"
-                                : index === 1
-                                  ? "Fast combined arms"
-                                  : "Balanced frontline formation"
-                            }
+                        </small>
 
-                          </small>
+                      </span>
 
-                        </span>
+                      <b>
+                        EDIT
+                      </b>
 
-                        <b>
-                          EDIT
-                        </b>
-
-                      </div>
-
+                    </div>
                     `
                   )
                   .join("")
-              }
+                }
 
+                <button
+                  class="action-btn"
+                  id="createTemplate"
+                >
+                  CREATE TEMPLATE
+                </button>
 
-              <button
-                class="action-btn"
-                id="createTemplate"
-              >
-                CREATE TEMPLATE
-              </button>
+              </div>
+            `;
 
-            </div>
+          }else if(tab==="doctrine"){
 
-          `;
-        }
+            box.innerHTML=`
+              <div class="info-card">
 
+                <h3>
+                  Army Doctrine
+                </h3>
 
-        else if (
-          tab === "doctrine"
-        ) {
+                ${stat(
+                  "Current Doctrine",
+                  "Combined Arms"
+                )}
 
-          box.innerHTML = `
+                ${stat(
+                  "Armored Warfare",
+                  "LEVEL II"
+                )}
 
-            <div class="info-card">
+                ${stat(
+                  "Air Support",
+                  "LEVEL I"
+                )}
 
-              <h3>
-                Army Doctrine
-              </h3>
+                ${stat(
+                  "Entrenchment",
+                  "LEVEL II"
+                )}
 
-              ${stat(
-                "Current Doctrine",
-                "Combined Arms"
-              )}
+                <button
+                  class="action-btn"
+                  id="upgradeDoctrine"
+                >
+                  RESEARCH DOCTRINE — $900
+                </button>
 
-              ${stat(
-                "Armored Warfare",
-                "LEVEL II"
-              )}
+              </div>
+            `;
 
-              ${stat(
-                "Air Support",
-                "LEVEL I"
-              )}
+          }else if(tab==="logistics"){
 
-              ${stat(
-                "Entrenchment",
-                "LEVEL II"
-              )}
+            box.innerHTML=`
+              <div class="info-card">
 
-              <button
-                class="action-btn"
-                id="upgradeDoctrine"
-              >
-                RESEARCH DOCTRINE — $900
-              </button>
+                <h3>
+                  Army Logistics
+                </h3>
 
-            </div>
+                ${barStat(
+                  "Supply Coverage",
+                  Math.round(
+                    avg("supply")
+                  )
+                )}
 
-          `;
-        }
+                ${stat(
+                  "Fuel Demand",
+                  Math.round(
+                    units
+                      .filter(
+                        u =>
+                          u.friendly &&
+                          u.state!=="DESTROYED"
+                      )
+                      .reduce(
+                        (s,u)=>
+                          s+u.fuelPerHour,
+                        0
+                      )
+                  )+" / h"
+                )}
 
+                ${stat(
+                  "Equipment",
+                  Math.round(
+                    units
+                      .filter(
+                        u =>
+                          u.friendly &&
+                          u.state!=="DESTROYED"
+                      )
+                      .reduce(
+                        (s,u)=>
+                          s+u.equipment,
+                        0
+                      )
+                      /
+                      Math.max(
+                        1,
+                        units.filter(
+                          u =>
+                            u.friendly &&
+                            u.state!=="DESTROYED"
+                        ).length
+                      )
+                  )+"%"
+                )}
 
-        else if (
-          tab === "logistics"
-        ) {
+                ${stat(
+                  "Fuel Reserve",
+                  Math.floor(oil)
+                )}
 
-          box.innerHTML = `
+                <button
+                  class="action-btn"
+                  id="supplyArmy"
+                >
+                  PRIORITIZE SUPPLY — 120 OIL
+                </button>
 
-            <div class="info-card">
+              </div>
+            `;
 
-              <h3>
-                Army Logistics
-              </h3>
+          }else{
 
-              ${barStat(
-                "Supply Coverage",
-                Math.round(
-                  avg("supply")
+            box.outerHTML=
+              armyCommandHTML(
+                units.filter(
+                  u =>
+                    u.friendly &&
+                    u.state!=="DESTROYED"
                 )
-              )}
-
-              ${stat(
-                "Fuel Demand",
-                Math.round(
-                  units
-                    .filter(
-                      u => u.friendly
-                    )
-                    .reduce(
-                      (sum, u) =>
-                        sum +
-                        u.fuelPerHour,
-                      0
-                    )
-                ) + " / h"
-              )}
-
-              ${stat(
-                "Equipment",
-                Math.round(
-                  units
-                    .filter(
-                      u => u.friendly
-                    )
-                    .reduce(
-                      (sum, u) =>
-                        sum +
-                        u.equipment,
-                      0
-                    ) /
-                    Math.max(
-                      1,
-                      units.filter(
-                        u => u.friendly
-                      ).length
-                    )
-                ) + "%"
-              )}
-
-              ${stat(
-                "Fuel Reserve",
-                Math.floor(oil)
-              )}
-
-              <button
-                class="action-btn"
-                id="supplyArmy"
-              >
-                PRIORITIZE SUPPLY — 120 OIL
-              </button>
-
-            </div>
-
-          `;
-        }
-
-
-        else {
-
-          box.innerHTML =
-            armyCommandHTML(
-              units.filter(
-                u =>
-                  u.friendly &&
-                  u.state !==
-                    "DESTROYED"
               )
-            )
-            .replace(
-              /^.*?<div id="armyTabContent">/s,
-              ""
-            )
-            .replace(
-              /<\/div>\s*$/s,
-              ""
-            );
+              .match(
+                /<div id="armyTabContent">([\s\S]*)<\/div>\s*$/
+              )?.[0]
+              ||
+              box.outerHTML;
+          }
+
+          bindArmyPanel();
+          bindUnitButtons();
         }
-
-
-        bindArmyPanel();
-
-        bindUnitButtons();
-      };
-    });
-}
-
-
-/* =========================================================
-   UNIT SELECTION
-========================================================= */
-
-function bindUnitButtons() {
-
-  document
-    .querySelectorAll(
-      ".unit-select"
-    )
-    .forEach(
-      button => {
-
-        button.onclick =
-          () => {
-
-            const unit =
-              units.find(
-                u =>
-                  u.id ===
-                  button.dataset.unit
-              );
-
-
-            if (unit) {
-              selectUnit(unit);
-            }
-          };
-      }
     );
 }
 
+function bindUnitButtons(){
 
-/* =========================================================
-   AVERAGES
-========================================================= */
+  document
+    .querySelectorAll(".unit-select")
+    .forEach(
+      b =>
+        b.onclick=()=>{
 
-function avg(key) {
+          const u=
+            units.find(
+              x =>
+                x.id===
+                b.dataset.unit
+            );
 
-  const active =
+          if(u)
+            selectUnit(u);
+        }
+    );
+}
+
+function avg(k){
+
+  const a=
     units.filter(
       u =>
         u.friendly &&
-        u.state !== "DESTROYED"
+        u.state!=="DESTROYED"
     );
 
-
-  if (!active.length) {
-    return 0;
-  }
-
-
-  return (
-    active.reduce(
-      (sum, unit) =>
-        sum + unit[key],
-      0
-    ) /
-    active.length
-  );
+  return a.length
+    ?
+      a.reduce(
+        (s,u)=>s+u[k],
+        0
+      )/a.length
+    :
+      0;
 }
 
+function enemyThreat(){
 
-/* =========================================================
-   ENEMY STATUS
-========================================================= */
-
-function enemyThreat() {
-
-  const enemies =
+  const e=
     units.filter(
       u =>
         !u.friendly &&
-        u.state !== "DESTROYED"
+        u.state!=="DESTROYED"
     );
 
-
-  if (enemies.length >= 4) {
-    return "HIGH";
-  }
-
-  if (enemies.length >= 2) {
-    return "MEDIUM";
-  }
-
-  return "LOW";
+  return e.length>=4
+    ?"HIGH"
+    :e.length>=2
+      ?"MEDIUM"
+      :"LOW";
 }
 
-
-function enemyArmor() {
-
-  const tanks =
-    units.filter(
-      u =>
-        !u.friendly &&
-        u.type === "TANK" &&
-        u.state !== "DESTROYED"
-    );
-
-
-  return tanks.length
-    ? "HIGH"
-    : "LOW";
-}
-
-
-function countBattles() {
+function enemyArmor(){
 
   return units.filter(
     u =>
-      u.state === "ATTACKING" ||
-      u.state === "UNDER ATTACK"
+      !u.friendly &&
+      u.type==="TANK" &&
+      u.state!=="DESTROYED"
+  ).length
+    ?"HIGH"
+    :"LOW";
+}
+
+function friendsStatus(){
+
+  const f=
+    units.filter(
+      u =>
+        u.friendly &&
+        u.state!=="DESTROYED"
+    );
+
+  if(!f.length)
+    return "DEFEAT";
+
+  const avgHp=
+    f.reduce(
+      (s,u)=>s+u.hp,
+      0
+    )/f.length;
+
+  const avgOrg=
+    f.reduce(
+      (s,u)=>s+u.organization,
+      0
+    )/f.length;
+
+  if(
+    avgHp<35 ||
+    avgOrg<30
+  )
+    return "CRITICAL";
+
+  if(
+    avgHp<60 ||
+    avgOrg<55
+  )
+    return "UNDER PRESSURE";
+
+  if(
+    avgHp<80 ||
+    avgOrg<75
+  )
+    return "STABLE";
+
+  return "STRONG";
+}
+
+function countBattles(){
+
+  return units.filter(
+    u =>
+      u.state==="ATTACKING" ||
+      u.state==="UNDER ATTACK"
   ).length;
 }
 
+function selectUnit(u){
 
-/* =========================================================
-   SELECT UNIT
-========================================================= */
+  selectedUnit=u;
 
-function selectUnit(unit) {
-
-  selectedUnit =
-    unit;
-
-
-  if ($("unitPanel")) {
-
+  if($("unitPanel"))
     $("unitPanel")
-      .classList
-      .add("open");
-  }
+      .classList.add("open");
 
-
-  if ($("selectedUnitType")) {
-
+  if($("selectedUnitType"))
     $("selectedUnitType")
-      .textContent =
-      `${unit.type} • ${unit.state}`;
-  }
+      .textContent=
+        `${u.type} • ${u.state}`;
 
-
-  if ($("selectedUnitName")) {
-
+  if($("selectedUnitName"))
     $("selectedUnitName")
-      .textContent =
-      unit.name;
-  }
-
+      .textContent=u.name;
 
   updateUnitStats();
 
   showToast(
-    `${unit.name} selected`
+    `${u.name} selected`
   );
 }
 
+function updateUnitStats(){
 
-/* =========================================================
-   UNIT STATS
-========================================================= */
-
-function updateUnitStats() {
-
-  if (
+  if(
     !selectedUnit ||
     !$("unitStats")
-  ) {
+  )
     return;
-  }
 
+  const u=selectedUnit;
 
-  const unit =
-    selectedUnit;
-
-
-  $("unitStats").innerHTML = `
+  $("unitStats").innerHTML=`
 
     <div class="unit-stat">
 
@@ -3297,20 +2576,15 @@ function updateUnitStats() {
 
       <div class="progress">
         <i
-          style="
-            width:${unit.strength}%
-          "
+          style="width:${u.strength}%"
         ></i>
       </div>
 
       <b>
-        ${Math.round(
-          unit.strength
-        )}
+        ${Math.round(u.strength)}
       </b>
 
     </div>
-
 
     <div class="unit-stat">
 
@@ -3320,20 +2594,15 @@ function updateUnitStats() {
 
       <div class="progress">
         <i
-          style="
-            width:${unit.organization}%
-          "
+          style="width:${u.organization}%"
         ></i>
       </div>
 
       <b>
-        ${Math.round(
-          unit.organization
-        )}
+        ${Math.round(u.organization)}
       </b>
 
     </div>
-
 
     <div class="unit-stat">
 
@@ -3343,20 +2612,15 @@ function updateUnitStats() {
 
       <div class="progress">
         <i
-          style="
-            width:${unit.morale}%
-          "
+          style="width:${u.morale}%"
         ></i>
       </div>
 
       <b>
-        ${Math.round(
-          unit.morale
-        )}
+        ${Math.round(u.morale)}
       </b>
 
     </div>
-
 
     <div class="unit-stat">
 
@@ -3366,74 +2630,50 @@ function updateUnitStats() {
 
       <div class="progress">
         <i
-          style="
-            width:${unit.hp}%
-          "
+          style="width:${u.hp}%"
         ></i>
       </div>
 
       <b>
-        ${Math.round(
-          unit.hp
-        )}
+        ${Math.round(u.hp)}
       </b>
 
     </div>
 
-
     ${stat(
       "Speed",
-      unit.speed + " km/h"
+      u.speed+" km/h"
     )}
 
     ${stat(
       "Experience",
-      Math.round(
-        unit.experience
-      )
+      Math.round(u.experience)
     )}
 
     ${stat(
       "Status",
-      unit.state
+      u.state
     )}
-
   `;
 }
 
+function setupUnitCommands(){
 
-/* =========================================================
-   UNIT COMMANDS
-========================================================= */
-
-function setupUnitCommands() {
-
-  const on =
-    (id, fn) => {
-
-      if ($(id)) {
-        $(id).onclick =
-          fn;
-      }
-    };
-
+  const on=(id,fn)=>{
+    if($(id))
+      $(id).onclick=fn;
+  };
 
   on(
     "moveCommand",
-    () => {
-
-      if (!selectedUnit) {
-
+    ()=>{
+      if(!selectedUnit)
         return showToast(
           "Select a unit first."
         );
-      }
 
-
-      moveMode = true;
-
-      attackMode = false;
-
+      moveMode=true;
+      attackMode=false;
 
       showToast(
         "Tap battlefield for destination."
@@ -3441,23 +2681,16 @@ function setupUnitCommands() {
     }
   );
 
-
   on(
     "attackCommand",
-    () => {
-
-      if (!selectedUnit) {
-
+    ()=>{
+      if(!selectedUnit)
         return showToast(
           "Select a unit first."
         );
-      }
 
-
-      attackMode = true;
-
-      moveMode = false;
-
+      attackMode=true;
+      moveMode=false;
 
       showToast(
         "Select an enemy target."
@@ -3465,56 +2698,43 @@ function setupUnitCommands() {
     }
   );
 
-
   on(
     "defendCommand",
-    () => {
-
-      if (!selectedUnit) {
+    ()=>{
+      if(!selectedUnit)
         return;
-      }
 
-
-      selectedUnit.state =
+      selectedUnit.state=
         "DEFENDING";
 
-      selectedUnit.destination =
+      selectedUnit.destination=
         null;
 
-
-      selectedUnit.organization =
+      selectedUnit.organization=
         Math.min(
           100,
-          selectedUnit.organization +
-            8
+          selectedUnit.organization+8
         );
-
 
       showToast(
         `${selectedUnit.name} is defending.`
       );
 
-
       updateUnitStats();
     }
   );
 
-
   on(
     "holdCommand",
-    () => {
-
-      if (!selectedUnit) {
+    ()=>{
+      if(!selectedUnit)
         return;
-      }
 
-
-      selectedUnit.destination =
+      selectedUnit.destination=
         null;
 
-      selectedUnit.state =
+      selectedUnit.state=
         "HOLDING";
-
 
       showToast(
         `${selectedUnit.name} holding.`
@@ -3522,27 +2742,21 @@ function setupUnitCommands() {
     }
   );
 
-
   on(
     "retreatCommand",
-    () => {
-
-      if (!selectedUnit) {
+    ()=>{
+      if(!selectedUnit)
         return;
-      }
 
-
-      selectedUnit.state =
+      selectedUnit.state=
         "RETREATING";
 
-
-      selectedUnit.destination =
+      selectedUnit.destination=
         new THREE.Vector3(
-          selectedUnit.object.position.x - 25,
+          selectedUnit.object.position.x-25,
           selectedUnit.object.position.y,
-          selectedUnit.object.position.z + 25
+          selectedUnit.object.position.z+25
         );
-
 
       showToast(
         `${selectedUnit.name} retreating.`
@@ -3550,536 +2764,362 @@ function setupUnitCommands() {
     }
   );
 
-
   on(
     "airstrikeCommand",
-    () => {
+    ()=>{
 
-      if (!selectedUnit) {
-
+      if(!selectedUnit)
         return showToast(
           "Select an aircraft."
         );
-      }
 
-
-      if (
-        selectedUnit.type !==
-        "AIR"
-      ) {
-
+      if(selectedUnit.type!=="AIR")
         return showToast(
           "Only aircraft can perform airstrikes."
         );
-      }
 
-
-      if (
-        selectedUnit.cooldown > 0
-      ) {
-
+      if(selectedUnit.cooldown>0)
         return showToast(
           `Airstrike ready in ${Math.ceil(
             selectedUnit.cooldown
           )}s.`
         );
-      }
-
 
       performAirstrike();
     }
   );
 }
 
+function handleWorldClick(e){
 
-/* =========================================================
-   WORLD CLICK
-========================================================= */
-
-function handleWorldClick(event) {
-
-  const rect =
+  const r=
     renderer.domElement
       .getBoundingClientRect();
 
+  mouse.x=
+    ((e.clientX-r.left)/r.width)*2-1;
 
-  mouse.x =
-    (
-      (event.clientX - rect.left) /
-      rect.width
-    ) * 2 - 1;
-
-
-  mouse.y =
-    -(
-      (event.clientY - rect.top) /
-      rect.height
-    ) * 2 + 1;
-
+  mouse.y=
+    -((e.clientY-r.top)/r.height)*2+1;
 
   raycaster.setFromCamera(
     mouse,
     camera
   );
 
-
-  const objects = [];
-
+  const objects=[];
 
   units.forEach(
-    unit =>
-      unit.object.traverse(
-        object => {
-
-          if (
-            object.isMesh ||
-            object.isSprite
-          ) {
-            objects.push(
-              object
-            );
-          }
+    u =>
+      u.object.traverse(
+        o=>{
+          if(
+            o.isMesh ||
+            o.isSprite
+          )
+            objects.push(o);
         }
       )
   );
 
-
-  const hits =
+  const hits=
     raycaster.intersectObjects(
       objects,
       true
     );
 
+  if(hits.length){
 
-  if (hits.length) {
-
-    let object =
+    let o=
       hits[0].object;
 
+    while(
+      o &&
+      !o.userData.unit
+    )
+      o=o.parent;
 
-    while (
-      object &&
-      !object.userData.unit
-    ) {
+    if(o?.userData.unit){
 
-      object =
-        object.parent;
-    }
+      const u=
+        o.userData.unit;
 
-
-    if (
-      object?.userData.unit
-    ) {
-
-      const unit =
-        object.userData.unit;
-
-
-      if (
+      if(
         attackMode &&
         selectedUnit &&
-        !unit.friendly
-      ) {
+        !u.friendly
+      ){
 
         attackUnit(
           selectedUnit,
-          unit
+          u
         );
 
-        attackMode = false;
+        attackMode=false;
 
         return;
       }
 
-
-      selectUnit(
-        unit
-      );
+      selectUnit(u);
 
       return;
     }
   }
 
-
-  if (
+  if(
     moveMode &&
     selectedUnit
-  ) {
+  ){
 
-    const groundHits =
+    const hits2=
       raycaster.intersectObject(
         ground
       );
 
+    if(hits2.length){
 
-    if (
-      groundHits.length
-    ) {
-
-      const point =
-        groundHits[0].point;
-
+      const p=
+        hits2[0].point;
 
       setDestination(
         selectedUnit,
-        point
+        p
       );
 
-
-      moveMode = false;
+      moveMode=false;
     }
   }
 }
 
+function setDestination(u,p){
 
-/* =========================================================
-   MOVE UNIT
-========================================================= */
-
-function setDestination(
-  unit,
-  point
-) {
-
-  unit.destination =
+  u.destination=
     new THREE.Vector3(
-      point.x,
-      unit.object.position.y,
-      point.z
+      p.x,
+      u.object.position.y,
+      p.z
     );
 
+  u.state="MOVING";
 
-  unit.state =
-    "MOVING";
-
-
-  createDestinationMarker(
-    point
-  );
-
+  createDestinationMarker(p);
 
   showToast(
-    `${unit.name} moving to new position.`
+    `${u.name} moving to new position.`
   );
 }
 
+function createDestinationMarker(p){
 
-/* =========================================================
-   DESTINATION MARKER
-========================================================= */
+  const ring=new THREE.Mesh(
+    new THREE.RingGeometry(
+      1.1,
+      1.35,
+      24
+    ),
+    new THREE.MeshBasicMaterial({
+      color:0xd5ad55,
+      transparent:true,
+      opacity:.8,
+      side:THREE.DoubleSide
+    })
+  );
 
-function createDestinationMarker(
-  point
-) {
-
-  const ring =
-    new THREE.Mesh(
-      new THREE.RingGeometry(
-        1.1,
-        1.35,
-        24
-      ),
-      new THREE.MeshBasicMaterial({
-        color: 0xd5ad55,
-        transparent: true,
-        opacity: 0.8,
-        side: THREE.DoubleSide
-      })
-    );
-
-
-  ring.rotation.x =
-    -Math.PI / 2;
-
+  ring.rotation.x=-Math.PI/2;
 
   ring.position.set(
-    point.x,
-    0.45,
-    point.z
+    p.x,
+    .45,
+    p.z
   );
 
+  effectsGroup.add(ring);
 
-  effectsGroup.add(
-    ring
-  );
+  const t=performance.now();
 
+  const animate=n=>{
 
-  const start =
-    performance.now();
-
-
-  const animate =
-    now => {
-
-      const progress =
-        Math.min(
-          (now - start) /
-            1200,
-          1
-        );
-
-
-      ring.scale.setScalar(
-        1 + progress * 2
+    const q=
+      Math.min(
+        (n-t)/1200,
+        1
       );
 
+    ring.scale.setScalar(
+      1+q*2
+    );
 
-      ring.material.opacity =
-        0.8 *
-        (1 - progress);
+    ring.material.opacity=
+      .8*(1-q);
 
+    if(q<1)
+      requestAnimationFrame(
+        animate
+      );
+    else{
 
-      if (
-        progress < 1
-      ) {
+      effectsGroup.remove(
+        ring
+      );
 
-        requestAnimationFrame(
-          animate
-        );
-
-      } else {
-
-        effectsGroup.remove(
-          ring
-        );
-
-        ring.geometry.dispose();
-
-        ring.material.dispose();
-      }
-    };
-
+      ring.geometry.dispose();
+      ring.material.dispose();
+    }
+  };
 
   requestAnimationFrame(
     animate
   );
 }
 
+function attackUnit(a,t){
 
-/* =========================================================
-   ATTACK UNIT
-========================================================= */
-
-function attackUnit(
-  attacker,
-  target
-) {
-
-  if (
-    !attacker ||
-    !target ||
-    !attacker.friendly ||
-    target.friendly
-  ) {
+  if(
+    !a ||
+    !t ||
+    !a.friendly ||
+    t.friendly
+  )
     return;
-  }
 
-
-  const distance =
-    attacker.object.position
-      .distanceTo(
-        target.object.position
-      );
-
-
-  if (
-    distance >
-    attacker.range + 5
-  ) {
-
-    setDestination(
-      attacker,
-      target.object.position
+  const d=
+    a.object.position.distanceTo(
+      t.object.position
     );
 
+  if(d>a.range+5){
 
-    attacker.state =
-      "ATTACKING";
+    setDestination(
+      a,
+      t.object.position
+    );
 
+    a.state="ATTACKING";
 
     showToast(
       "Target out of range — unit advancing."
     );
 
-
     return;
   }
 
-
-  if (
-    attacker.cooldown > 0
-  ) {
-
+  if(a.cooldown>0)
     return showToast(
-      `Weapon reload: ${attacker.cooldown.toFixed(
-        1
-      )}s`
-    );
-  }
-
-
-  attacker.cooldown =
-    attacker.type === "AIR"
-      ? 8
-      : attacker.type === "TANK"
-        ? 2.2
-        : 3;
-
-
-  attacker.state =
-    "ATTACKING";
-
-
-  target.state =
-    "UNDER ATTACK";
-
-
-  const terrainBonus =
-    target.state === "DEFENDING"
-      ? 0.8
-      : 1;
-
-
-  const damage =
-    Math.max(
-      2,
-      attacker.attack *
-        (
-          0.65 +
-          Math.random() * 0.7
-        ) *
-        (attacker.organization / 100) *
-        (attacker.morale / 100) *
-        terrainBonus
+      `Weapon reload: ${a.cooldown.toFixed(1)}s`
     );
 
+  a.cooldown=
+    a.type==="AIR"
+      ?8
+      :a.type==="TANK"
+        ?2.2
+        :3;
 
-  target.hp =
+  a.state="ATTACKING";
+  t.state="UNDER ATTACK";
+
+  const terrainBonus=
+    t.state==="DEFENDING"
+      ?.8
+      :1;
+
+  const damage=Math.max(
+    2,
+    (
+      a.attack*
+      (.65+Math.random()*.7)*
+      (a.organization/100)*
+      (a.morale/100)*
+      terrainBonus
+    )
+  );
+
+  t.hp=
     Math.max(
       0,
-      target.hp - damage
+      t.hp-damage
     );
 
-
-  target.organization =
+  t.organization=
     Math.max(
       0,
-      target.organization -
-        damage * 0.8
+      t.organization-damage*.8
     );
 
-
-  target.morale =
+  t.morale=
     Math.max(
       0,
-      target.morale -
-        damage * 0.25
+      t.morale-damage*.25
     );
 
-
-  attacker.experience =
+  a.experience=
     Math.min(
       100,
-      attacker.experience + 1.2
+      a.experience+1.2
     );
 
-
-  attacker.strength =
+  a.strength=
     Math.min(
       100,
-      attacker.strength + 0.05
+      a.strength+.05
     );
-
 
   createExplosion(
-    target.object.position.clone()
+    t.object.position.clone()
   );
-
 
   addBattleLog(
-    `${attacker.name} hit ${target.name} for ${Math.round(
-      damage
-    )} damage.`
+    `${a.name} hit ${t.name} for ${Math.round(damage)} damage.`
   );
 
-
-  if ($("battleStatus")) {
-
-    $("battleStatus").textContent =
-      `BATTLE: ${attacker.name} vs ${target.name}`;
-  }
-
+  if($("battleStatus"))
+    $("battleStatus").textContent=
+      `BATTLE: ${a.name} vs ${t.name}`;
 
   showToast(
-    `${attacker.name} attacked ${target.name}`
+    `${a.name} attacked ${t.name}`
   );
 
-
-  if (
-    target.hp <= 0
-  ) {
-
-    destroyUnit(
-      target
-    );
-  }
-
+  if(t.hp<=0)
+    destroyUnit(t);
 
   updateUnitStats();
 }
 
+function performAirstrike(){
 
-/* =========================================================
-   AIRSTRIKE
-========================================================= */
-
-function performAirstrike() {
-
-  const enemies =
+  const enemies=
     units.filter(
-      unit =>
-        !unit.friendly &&
-        unit.state !==
-          "DESTROYED"
+      u =>
+        !u.friendly &&
+        u.state!=="DESTROYED"
     );
 
-
-  if (!enemies.length) {
-
+  if(!enemies.length)
     return showToast(
       "No enemy targets."
     );
-  }
 
-
-  const target =
+  const target=
     enemies.reduce(
-      (best, unit) =>
-        unit.hp < best.hp
-          ? unit
-          : best,
+      (best,u)=>
+        u.hp<best.hp
+          ?u
+          :best,
       enemies[0]
     );
 
+  selectedUnit.cooldown=8;
 
-  selectedUnit.cooldown =
-    8;
-
-
-  const position =
+  const p=
     target.object.position.clone();
 
+  p.y=1;
 
-  position.y = 1;
-
-
-  createExplosion(
-    position
-  );
-
+  createExplosion(p);
 
   createExplosion(
-    position.clone().add(
+    p.clone().add(
       new THREE.Vector3(
         3,
         0,
@@ -4088,916 +3128,606 @@ function performAirstrike() {
     )
   );
 
-
-  target.hp =
+  target.hp=
     Math.max(
       0,
-      target.hp -
-        28 -
-        Math.random() * 14
+      target.hp-
+      28-
+      Math.random()*14
     );
 
-
-  target.organization =
+  target.organization=
     Math.max(
       0,
-      target.organization - 24
+      target.organization-24
     );
 
-
-  target.morale =
+  target.morale=
     Math.max(
       0,
-      target.morale - 12
+      target.morale-12
     );
-
 
   addBattleLog(
     `Airstrike hit ${target.name}.`
   );
 
-
   showToast(
     `Airstrike hit ${target.name}`
   );
 
-
-  if (
-    target.hp <= 0
-  ) {
-
-    destroyUnit(
-      target
-    );
-  }
+  if(target.hp<=0)
+    destroyUnit(target);
 }
 
+function createExplosion(pos){
 
-/* =========================================================
-   EXPLOSION
-========================================================= */
-
-function createExplosion(
-  position
-) {
-
-  const geometry =
+  const g=
     new THREE.SphereGeometry(
       1,
       16,
       16
     );
 
-
-  const material =
+  const m=
     new THREE.MeshBasicMaterial({
-      color: 0xff8a27,
-      transparent: true,
-      opacity: 0.9
+      color:0xff8a27,
+      transparent:true,
+      opacity:.9
     });
 
-
-  const explosion =
+  const e=
     new THREE.Mesh(
-      geometry,
-      material
+      g,
+      m
     );
 
+  e.position.copy(pos);
 
-  explosion.position.copy(
-    position
-  );
+  effectsGroup.add(e);
 
-
-  effectsGroup.add(
-    explosion
-  );
-
-
-  const start =
+  const start=
     performance.now();
 
+  const animate=n=>{
 
-  const animate =
-    now => {
-
-      const progress =
-        Math.min(
-          (now - start) /
-            650,
-          1
-        );
-
-
-      explosion.scale.setScalar(
-        1 + progress * 5
+    const p=
+      Math.min(
+        (n-start)/650,
+        1
       );
 
+    e.scale.setScalar(
+      1+p*5
+    );
 
-      material.opacity =
-        0.9 *
-        (1 - progress);
+    m.opacity=
+      .9*(1-p);
 
+    if(p<1)
+      requestAnimationFrame(
+        animate
+      );
+    else{
 
-      if (
-        progress < 1
-      ) {
+      effectsGroup.remove(e);
 
-        requestAnimationFrame(
-          animate
-        );
-
-      } else {
-
-        effectsGroup.remove(
-          explosion
-        );
-
-        geometry.dispose();
-
-        material.dispose();
-      }
-    };
-
+      g.dispose();
+      m.dispose();
+    }
+  };
 
   requestAnimationFrame(
     animate
   );
 
-
-  createSmoke(
-    position
-  );
+  createSmoke(pos);
 }
 
+function createSmoke(pos){
 
-/* =========================================================
-   SMOKE
-========================================================= */
-
-function createSmoke(
-  position
-) {
-
-  const geometry =
+  const g=
     new THREE.SphereGeometry(
-      0.7,
+      .7,
       10,
       10
     );
 
-
-  const material =
+  const m=
     new THREE.MeshBasicMaterial({
-      color: 0x3b3b35,
-      transparent: true,
-      opacity: 0.5
+      color:0x3b3b35,
+      transparent:true,
+      opacity:.5
     });
 
-
-  const smoke =
+  const s=
     new THREE.Mesh(
-      geometry,
-      material
+      g,
+      m
     );
 
+  s.position.copy(pos);
+  s.position.y+=1;
 
-  smoke.position.copy(
-    position
-  );
+  effectsGroup.add(s);
 
-
-  smoke.position.y += 1;
-
-
-  effectsGroup.add(
-    smoke
-  );
-
-
-  const start =
+  const start=
     performance.now();
 
+  const animate=n=>{
 
-  const animate =
-    now => {
-
-      const progress =
-        Math.min(
-          (now - start) /
-            1400,
-          1
-        );
-
-
-      smoke.position.y +=
-        0.012;
-
-
-      smoke.scale.setScalar(
-        1 + progress * 3
+    const p=
+      Math.min(
+        (n-start)/1400,
+        1
       );
 
+    s.position.y+=.012;
 
-      material.opacity =
-        0.5 *
-        (1 - progress);
+    s.scale.setScalar(
+      1+p*3
+    );
 
+    m.opacity=
+      .5*(1-p);
 
-      if (
-        progress < 1
-      ) {
+    if(p<1)
+      requestAnimationFrame(
+        animate
+      );
+    else{
 
-        requestAnimationFrame(
-          animate
-        );
+      effectsGroup.remove(s);
 
-      } else {
-
-        effectsGroup.remove(
-          smoke
-        );
-
-        geometry.dispose();
-
-        material.dispose();
-      }
-    };
-
+      g.dispose();
+      m.dispose();
+    }
+  };
 
   requestAnimationFrame(
     animate
   );
 }
 
+function destroyUnit(u){
 
-/* =========================================================
-   DESTROY UNIT
-========================================================= */
-
-function destroyUnit(
-  unit
-) {
-
-  unit.state =
-    "DESTROYED";
-
-
-  unit.object.visible =
-    false;
-
-
-  unit.destination =
-    null;
-
+  u.state="DESTROYED";
+  u.object.visible=false;
+  u.destination=null;
 
   createExplosion(
-    unit.object.position.clone()
+    u.object.position.clone()
   );
 
+  if(selectedUnit===u){
 
-  if (
-    selectedUnit === unit
-  ) {
+    selectedUnit=null;
 
-    selectedUnit =
-      null;
-
-
-    if ($("unitPanel")) {
-
+    if($("unitPanel"))
       $("unitPanel")
-        .classList
-        .remove("open");
-    }
+        .classList.remove("open");
   }
 
-
   addBattleLog(
-    `${unit.name} was destroyed.`
+    `${u.name} was destroyed.`
   );
-
 
   refreshMiniMap();
 
   checkVictory();
 
-
   showToast(
-    `${unit.name} destroyed.`
+    `${u.name} destroyed.`
   );
 }
 
+function updateGame(dt){
 
-/* =========================================================
-   GAME UPDATE
-========================================================= */
-
-function updateGame(
-  delta
-) {
-
-  if (!gameRunning) {
+  if(!gameRunning)
     return;
-  }
 
+  const d=
+    dt*gameSpeed;
 
-  const scaledDelta =
-    delta * gameSpeed;
+  units.forEach(u=>{
 
+    if(u.state==="DESTROYED")
+      return;
 
-  units.forEach(
-    unit => {
+    u.cooldown=
+      Math.max(
+        0,
+        u.cooldown-d
+      );
 
-      if (
-        unit.state ===
-        "DESTROYED"
-      ) {
-        return;
-      }
+    if(u.destination){
 
+      const target=
+        u.destination;
 
-      unit.cooldown =
-        Math.max(
-          0,
-          unit.cooldown -
-            scaledDelta
+      const dist=
+        u.object.position.distanceTo(
+          target
         );
 
+      if(dist<1){
 
-      if (
-        unit.destination
-      ) {
+        u.destination=null;
 
-        const target =
-          unit.destination;
+        if(
+          u.state==="MOVING" ||
+          u.state==="RETREATING"
+        )
+          u.state="READY";
 
+      }else{
 
-        const distance =
-          unit.object.position
-            .distanceTo(
-              target
-            );
-
-
-        if (
-          distance < 1
-        ) {
-
-          unit.destination =
-            null;
-
-
-          if (
-            unit.state === "MOVING" ||
-            unit.state === "RETREATING"
-          ) {
-
-            unit.state =
-              "READY";
-          }
-
-        } else {
-
-          const direction =
-            new THREE.Vector3()
-              .subVectors(
-                target,
-                unit.object.position
-              )
-              .normalize();
-
-
-          const speed =
-            unit.speed *
-            0.055 *
-            scaledDelta;
-
-
-          unit.object.position.add(
-            direction.multiplyScalar(
-              Math.min(
-                speed,
-                distance
-              )
+        const dir=
+          new THREE.Vector3()
+            .subVectors(
+              target,
+              u.object.position
             )
-          );
+            .normalize();
 
+        const speed=
+          u.speed*.055*d;
 
-          unit.object.lookAt(
-            target.x,
-            unit.object.position.y,
-            target.z
-          );
-
-
-          unit.organization =
-            Math.max(
-              0,
-              unit.organization -
-                0.004 *
-                scaledDelta
-            );
-
-
-          if (
-            unit.type === "TANK"
-          ) {
-
-            oil =
-              Math.max(
-                0,
-                oil -
-                  0.006 *
-                  scaledDelta
-              );
-          }
-        }
-      }
-
-
-      if (
-        unit.state ===
-        "DEFENDING"
-      ) {
-
-        unit.organization =
-          Math.min(
-            100,
-            unit.organization +
-              0.012 *
-              scaledDelta
-          );
-      }
-
-
-      if (
-        unit.state ===
-        "HOLDING"
-      ) {
-
-        unit.morale =
-          Math.min(
-            100,
-            unit.morale +
-              0.006 *
-              scaledDelta
-          );
-      }
-
-
-      unit.supply =
-        Math.max(
-          0,
-          Math.min(
-            100,
-            unit.supply -
-              (
-                unit.destination
-                  ? 0.018
-                  : 0.006
-              ) *
-              scaledDelta
+        u.object.position.add(
+          dir.multiplyScalar(
+            Math.min(
+              speed,
+              dist
+            )
           )
         );
 
-
-      unit.readiness =
-        Math.max(
-          0,
-          Math.min(
-            100,
-            unit.readiness +
-              (
-                unit.supply > 45
-                  ? 0.012
-                  : -0.035
-              ) *
-              scaledDelta
-          )
+        u.object.lookAt(
+          target.x,
+          u.object.position.y,
+          target.z
         );
 
-
-      if (
-        unit.type === "AIR"
-      ) {
-
-        oil =
+        u.organization=
           Math.max(
             0,
-            oil -
-              0.01 *
-              scaledDelta
+            u.organization-.004*d
           );
+
+        if(u.type==="TANK")
+          oil=
+            Math.max(
+              0,
+              oil-.006*d
+            );
       }
     }
-  );
 
+    if(u.state==="DEFENDING")
+      u.organization=
+        Math.min(
+          100,
+          u.organization+.012*d
+        );
 
-  lastIncomeTick +=
-    delta;
+    if(u.state==="HOLDING")
+      u.morale=
+        Math.min(
+          100,
+          u.morale+.006*d
+        );
 
+    u.supply=
+      Math.max(
+        0,
+        Math.min(
+          100,
+          u.supply-
+          (
+            u.destination
+              ?.018
+              :.006
+          )*d
+        )
+      );
 
-  if (
-    lastIncomeTick >= 1
-  ) {
+    u.readiness=
+      Math.max(
+        0,
+        Math.min(
+          100,
+          u.readiness+
+          (
+            u.supply>45
+              ?.012
+              :-0.035
+          )*d
+        )
+      );
 
-    const income =
-      lastIncomeTick *
+    if(u.type==="AIR")
+      oil=
+        Math.max(
+          0,
+          oil-.01*d
+        );
+  });
+
+  lastIncomeTick+=dt;
+
+  if(lastIncomeTick>=1){
+
+    const income=
+      lastIncomeTick*
       gameSpeed;
 
+    money+=
+      1.8*income;
 
-    money +=
-      1.8 *
-      income;
+    steel+=
+      .55*income;
 
+    food+=
+      .4*income;
 
-    steel +=
-      0.55 *
-      income;
+    oil+=
+      .18*income;
 
-
-    food +=
-      0.4 *
-      income;
-
-
-    oil +=
-      0.18 *
-      income;
-
-
-    lastIncomeTick = 0;
-
+    lastIncomeTick=0;
 
     updateResources();
   }
 
+  lastAiTick+=dt;
 
-  lastAiTick +=
-    delta;
-
-
-  if (
-    lastAiTick >
-    2 / gameSpeed
-  ) {
+  if(
+    lastAiTick>
+    2/gameSpeed
+  ){
 
     enemyAI();
 
-    lastAiTick = 0;
+    lastAiTick=0;
   }
 
-
-  if (
-    performance.now() -
-      lastMiniTick >
-    700
-  ) {
+  if(
+    performance.now()-
+    lastMiniTick>700
+  ){
 
     refreshMiniMap();
 
-    lastMiniTick =
+    lastMiniTick=
       performance.now();
   }
 
-
-  if (
-    selectedUnit
-  ) {
-
+  if(selectedUnit)
     updateUnitStats();
-  }
 }
 
+function enemyAI(){
 
-/* =========================================================
-   ENEMY AI
-========================================================= */
-
-function enemyAI() {
-
-  const enemies =
+  const enemies=
     units.filter(
-      unit =>
-        !unit.friendly &&
-        unit.state !==
-          "DESTROYED"
+      u =>
+        !u.friendly &&
+        u.state!=="DESTROYED"
     );
 
-
-  const friendlies =
+  const friendlies=
     units.filter(
-      unit =>
-        unit.friendly &&
-        unit.state !==
-          "DESTROYED"
+      u =>
+        u.friendly &&
+        u.state!=="DESTROYED"
     );
 
-
-  if (
+  if(
     !friendlies.length ||
     !enemies.length
-  ) {
+  )
     return;
-  }
 
+  enemies.forEach(e=>{
 
-  enemies.forEach(
-    enemy => {
+    const target=
+      friendlies.reduce(
+        (best,u)=>{
 
-      const target =
-        friendlies.reduce(
-          (best, unit) => {
+          const bd=
+            best.object.position
+              .distanceTo(
+                e.object.position
+              );
 
-            const bestDistance =
-              best.object.position
-                .distanceTo(
-                  enemy.object.position
-                );
+          const d=
+            u.object.position
+              .distanceTo(
+                e.object.position
+              );
 
+          return d<bd
+            ?u
+            :best;
 
-            const distance =
-              unit.object.position
-                .distanceTo(
-                  enemy.object.position
-                );
+        },
+        friendlies[0]
+      );
 
-
-            return distance <
-              bestDistance
-              ? unit
-              : best;
-
-          },
-          friendlies[0]
+    const d=
+      e.object.position
+        .distanceTo(
+          target.object.position
         );
 
+    if(d<=e.range+2){
 
-      const distance =
-        enemy.object.position
-          .distanceTo(
-            target.object.position
-          );
+      e.state="ATTACKING";
 
+      if(e.cooldown<=0)
+        attackEnemy(
+          e,
+          target
+        );
 
-      if (
-        distance <=
-        enemy.range + 2
-      ) {
+    }else if(
+      !e.destination ||
+      Math.random()<.025
+    ){
 
-        enemy.state =
-          "ATTACKING";
+      const p=
+        target.object.position
+          .clone();
 
+      p.x+=
+        (Math.random()-.5)*8;
 
-        if (
-          enemy.cooldown <= 0
-        ) {
+      p.z+=
+        (Math.random()-.5)*8;
 
-          attackEnemy(
-            enemy,
-            target
-          );
-        }
+      e.destination=
+        new THREE.Vector3(
+          p.x,
+          e.object.position.y,
+          p.z
+        );
 
-      }
-
-      else if (
-        !enemy.destination ||
-        Math.random() < 0.025
-      ) {
-
-        const point =
-          target.object.position
-            .clone();
-
-
-        point.x +=
-          (Math.random() - 0.5) *
-          8;
-
-
-        point.z +=
-          (Math.random() - 0.5) *
-          8;
-
-
-        enemy.destination =
-          new THREE.Vector3(
-            point.x,
-            enemy.object.position.y,
-            point.z
-          );
-
-
-        enemy.state =
-          "ADVANCING";
-      }
+      e.state="ADVANCING";
     }
-  );
+  });
 }
 
+function attackEnemy(a,t){
 
-/* =========================================================
-   ENEMY ATTACK
-========================================================= */
-
-function attackEnemy(
-  attacker,
-  target
-) {
-
-  if (
-    attacker.cooldown > 0
-  ) {
+  if(a.cooldown>0)
     return;
-  }
 
+  a.cooldown=
+    a.type==="TANK"
+      ?2.6
+      :a.type==="AIR"
+        ?7
+        :3.4;
 
-  attacker.cooldown =
-    attacker.type === "TANK"
-      ? 2.6
-      : attacker.type === "AIR"
-        ? 7
-        : 3.4;
+  const damage=Math.max(
+    2,
+    a.attack*
+    (.5+Math.random()*.55)*
+    (a.organization/100)*
+    (a.morale/100)
+  );
 
-
-  const damage =
-    Math.max(
-      2,
-      attacker.attack *
-        (
-          0.5 +
-          Math.random() * 0.55
-        ) *
-        (attacker.organization / 100) *
-        (attacker.morale / 100)
-    );
-
-
-  target.hp =
+  t.hp=
     Math.max(
       0,
-      target.hp -
-        damage
+      t.hp-damage
     );
 
-
-  target.organization =
+  t.organization=
     Math.max(
       0,
-      target.organization -
-        damage * 0.65
+      t.organization-
+      damage*.65
     );
 
-
-  target.morale =
+  t.morale=
     Math.max(
       0,
-      target.morale -
-        damage * 0.18
+      t.morale-
+      damage*.18
     );
-
 
   createExplosion(
-    target.object.position.clone()
+    t.object.position.clone()
   );
-
 
   addBattleLog(
-    `${attacker.name} attacked ${target.name}.`
+    `${a.name} attacked ${t.name}.`
   );
 
-
-  if (
-    target.hp <= 0
-  ) {
-
-    destroyUnit(
-      target
-    );
-  }
+  if(t.hp<=0)
+    destroyUnit(t);
 }
 
+function checkVictory(){
 
-/* =========================================================
-   VICTORY / DEFEAT
-========================================================= */
-
-function checkVictory() {
-
-  const enemies =
+  const enemies=
     units.filter(
-      unit =>
-        !unit.friendly &&
-        unit.state !==
-          "DESTROYED"
+      u =>
+        !u.friendly &&
+        u.state!=="DESTROYED"
     );
 
-
-  const friends =
+  const friends=
     units.filter(
-      unit =>
-        unit.friendly &&
-        unit.state !==
-          "DESTROYED"
+      u =>
+        u.friendly &&
+        u.state!=="DESTROYED"
     );
 
+  if(!enemies.length){
 
-  if (
-    !enemies.length
-  ) {
-
-    gameRunning =
-      false;
-
+    gameRunning=false;
 
     showToast(
       "VICTORY — Enemy forces eliminated."
     );
 
-
-    if ($("statusText")) {
-
-      $("statusText").textContent =
+    if($("statusText"))
+      $("statusText").textContent=
         "VICTORY";
-    }
 
-  }
+  }else if(!friends.length){
 
-  else if (
-    !friends.length
-  ) {
-
-    gameRunning =
-      false;
-
+    gameRunning=false;
 
     showToast(
       "DEFEAT — All friendly forces destroyed."
     );
 
-
-    if ($("statusText")) {
-
-      $("statusText").textContent =
+    if($("statusText"))
+      $("statusText").textContent=
         "DEFEAT";
-    }
   }
 }
 
+function produceTank(){
 
-/* =========================================================
-   PRODUCE TANK
-========================================================= */
-
-function produceTank() {
-
-  if (
-    money < 800 ||
-    steel < 80
-  ) {
-
+  if(
+    money<800 ||
+    steel<80
+  )
     return showToast(
       "Need $800 and 80 steel."
     );
-  }
 
+  money-=800;
+  steel-=80;
 
-  money -= 800;
-
-  steel -= 80;
-
-
-  const base =
+  const base=
     units.find(
-      unit =>
-        unit.friendly &&
-        unit.type === "TANK" &&
-        unit.state !==
-          "DESTROYED"
+      u =>
+        u.friendly &&
+        u.type==="TANK" &&
+        u.state!=="DESTROYED"
     );
 
-
-  const x =
+  const x=
     base
-      ? base.object.position.x - 7
-      : -35;
+      ?base.object.position.x-7
+      :-35;
 
-
-  const z =
+  const z=
     base
-      ? base.object.position.z + 5
-      : 15;
-
+      ?base.object.position.z+5
+      :15;
 
   createMilitaryUnit(
     `Reserve Tank ${
       units.filter(
         u =>
           u.friendly &&
-          u.type === "TANK"
-      ).length + 1
+          u.type==="TANK"
+      ).length+1
     }`,
     "TANK",
     x,
@@ -5005,191 +3735,125 @@ function produceTank() {
     true
   );
 
-
   updateResources();
-
   refreshMiniMap();
-
 
   showToast(
     "New tank deployed."
   );
 }
 
+function reinforceArmy(){
 
-/* =========================================================
-   REINFORCE
-========================================================= */
-
-function reinforceArmy() {
-
-  if (
-    manpower < 500 ||
-    food < 100
-  ) {
-
+  if(
+    manpower<500 ||
+    food<100
+  )
     return showToast(
       "Need 500 manpower and 100 food."
     );
-  }
 
-
-  manpower -= 500;
-
-  food -= 100;
-
+  manpower-=500;
+  food-=100;
 
   units
     .filter(
-      unit =>
-        unit.friendly &&
-        unit.state !==
-          "DESTROYED"
+      u =>
+        u.friendly &&
+        u.state!=="DESTROYED"
     )
-    .forEach(
-      unit => {
+    .forEach(u=>{
 
-        unit.hp =
-          Math.min(
-            100,
-            unit.hp + 12
-          );
+      u.hp=
+        Math.min(
+          100,
+          u.hp+12
+        );
 
-
-        unit.organization =
-          Math.min(
-            100,
-            unit.organization + 15
-          );
-      }
-    );
-
+      u.organization=
+        Math.min(
+          100,
+          u.organization+15
+        );
+    });
 
   updateResources();
-
 
   showToast(
     "Reinforcements arrived."
   );
 }
 
+function setupSpeed(){
 
-/* =========================================================
-   SPEED
-========================================================= */
-
-function setupSpeed() {
-
-  if (!$("speedBtn")) {
+  if(!$("speedBtn"))
     return;
-  }
 
+  $("speedBtn").onclick=()=>{
 
-  $("speedBtn").onclick =
-    () => {
+    const a=[
+      1,
+      2,
+      4,
+      8
+    ];
 
-      const speeds =
-        [
-          1,
-          2,
-          4,
-          8
-        ];
+    const i=
+      a.indexOf(
+        gameSpeed
+      );
 
+    gameSpeed=
+      a[
+        (i+1)%a.length
+      ];
 
-      const index =
-        speeds.indexOf(
-          gameSpeed
-        );
-
-
-      gameSpeed =
-        speeds[
-          (index + 1) %
-          speeds.length
-        ];
-
-
-      $("speedBtn").textContent =
-        `${gameSpeed}×`;
-    };
+    $("speedBtn").textContent=
+      `${gameSpeed}×`;
+  };
 }
 
+function setupPause(){
 
-/* =========================================================
-   PAUSE
-========================================================= */
-
-function setupPause() {
-
-  if (!$("pauseBtn")) {
+  if(!$("pauseBtn"))
     return;
-  }
 
+  $("pauseBtn").onclick=()=>{
 
-  $("pauseBtn").onclick =
-    () => {
+    gameRunning=
+      !gameRunning;
 
-      gameRunning =
-        !gameRunning;
+    $("pauseBtn").textContent=
+      gameRunning
+        ?"Ⅱ"
+        :"▶";
 
-
-      $("pauseBtn").textContent =
+    if($("statusText"))
+      $("statusText").textContent=
         gameRunning
-          ? "Ⅱ"
-          : "▶";
+          ?"All systems operational"
+          :"GAME PAUSED";
+  };
+}
 
+function setupCamera(){
 
-      if ($("statusText")) {
-
-        $("statusText").textContent =
-          gameRunning
-            ? "All systems operational"
-            : "GAME PAUSED";
-      }
+  if($("zoomIn"))
+    $("zoomIn").onclick=()=>{
+      camera.position.multiplyScalar(.85);
     };
-}
 
+  if($("zoomOut"))
+    $("zoomOut").onclick=()=>{
+      camera.position.multiplyScalar(1.15);
+    };
 
-/* =========================================================
-   CAMERA
-========================================================= */
-
-function setupCamera() {
-
-  if ($("zoomIn")) {
-
-    $("zoomIn").onclick =
-      () => {
-
-        camera.position.multiplyScalar(
-          0.85
-        );
-      };
-  }
-
-
-  if ($("zoomOut")) {
-
-    $("zoomOut").onclick =
-      () => {
-
-        camera.position.multiplyScalar(
-          1.15
-        );
-      };
-  }
-
-
-  if ($("resetCamera")) {
-
-    $("resetCamera").onclick =
+  if($("resetCamera"))
+    $("resetCamera").onclick=
       resetCamera;
-  }
 }
 
-
-function resetCamera() {
+function resetCamera(){
 
   camera.position.set(
     0,
@@ -5197,160 +3861,94 @@ function resetCamera() {
     86
   );
 
-
   controls.target.set(
     0,
     0,
     0
   );
 
-
   controls.update();
-
 
   showToast(
     "Strategic camera reset."
   );
 }
 
-
-/* =========================================================
-   COUNTRY SELECTION
-========================================================= */
-
-function setupCountrySelection() {
+function setupCountrySelection(){
 
   document
-    .querySelectorAll(
-      ".country-card"
-    )
+    .querySelectorAll(".country-card")
     .forEach(
-      card =>
-        card.addEventListener(
+      c =>
+        c.addEventListener(
           "click",
-          () =>
-            selectCountry(
-              card.dataset.country
-            )
+          ()=>selectCountry(
+            c.dataset.country
+          )
         )
     );
 
+  if($("closeCountryModal"))
+    $("closeCountryModal").onclick=()=>{
 
-  if (
-    $("closeCountryModal")
-  ) {
-
-    $("closeCountryModal").onclick =
-      () => {
-
-        if ($("countryModal")) {
-
-          $("countryModal")
-            .classList
-            .remove("open");
-        }
-      };
-  }
+      if($("countryModal"))
+        $("countryModal")
+          .classList.remove("open");
+    };
 }
 
+function selectCountry(id){
 
-function selectCountry(
-  id
-) {
+  const c=countries[id];
 
-  const country =
-    countries[id];
-
-
-  if (!country) {
+  if(!c)
     return;
-  }
 
+  currentCountry=id;
 
-  currentCountry =
-    id;
+  money=c.money;
+  oil=c.oil;
+  steel=c.steel;
+  food=c.food;
+  manpower=c.manpower;
 
+  if($("countryFlag"))
+    $("countryFlag").textContent=
+      c.flag;
 
-  money =
-    country.money;
-
-  oil =
-    country.oil;
-
-  steel =
-    country.steel;
-
-  food =
-    country.food;
-
-  manpower =
-    country.manpower;
-
-
-  if ($("countryFlag")) {
-
-    $("countryFlag").textContent =
-      country.flag;
-  }
-
-
-  if ($("countryName")) {
-
-    $("countryName").textContent =
-      country.name;
-  }
-
+  if($("countryName"))
+    $("countryName").textContent=
+      c.name;
 
   updateResources();
 
-
-  if ($("countryModal")) {
-
+  if($("countryModal"))
     $("countryModal")
-      .classList
-      .remove("open");
-  }
-
+      .classList.remove("open");
 
   saveGame();
 
-
   showToast(
-    `Now commanding ${country.name}`
+    `Now commanding ${c.name}`
   );
 }
 
+function setupTutorial(){
 
-/* =========================================================
-   TUTORIAL
-========================================================= */
+  const t=$("tutorial");
+  const title=$("tutorialTitle");
+  const text=$("tutorialText");
+  const btn=$("tutorialNext");
 
-function setupTutorial() {
-
-  const tutorial =
-    $("tutorial");
-
-  const title =
-    $("tutorialTitle");
-
-  const text =
-    $("tutorialText");
-
-  const button =
-    $("tutorialNext");
-
-
-  if (
-    !tutorial ||
+  if(
+    !t ||
     !title ||
     !text ||
-    !button
-  ) {
+    !btn
+  )
     return;
-  }
 
-
-  const pages = [
+  const pages=[
 
     [
       "Welcome, Commander",
@@ -5376,198 +3974,120 @@ function setupTutorial() {
       "Campaign",
       "Use Economy, Production, Research and Intelligence to win the war."
     ]
-
   ];
 
+  let page=0;
 
-  let page = 0;
+  btn.onclick=()=>{
 
+    page++;
 
-  button.onclick =
-    () => {
+    if(page>=pages.length){
 
-      page++;
+      t.style.display="none";
 
+      return;
+    }
 
-      if (
-        page >=
-        pages.length
-      ) {
+    title.textContent=
+      pages[page][0];
 
-        tutorial.style.display =
-          "none";
+    text.textContent=
+      pages[page][1];
+  };
+}
 
-        return;
-      }
+function setupCloseButtons(){
 
+  if($("closePanel"))
+    $("closePanel").onclick=() =>
+      $("mainPanel")
+        ?.classList.remove("open");
 
-      title.textContent =
-        pages[page][0];
+  if($("closeUnit"))
+    $("closeUnit").onclick=()=>{
 
+      $("unitPanel")
+        ?.classList.remove("open");
 
-      text.textContent =
-        pages[page][1];
+      selectedUnit=null;
     };
 }
 
+function refreshMiniMap(){
 
-/* =========================================================
-   CLOSE BUTTONS
-========================================================= */
+  const c=$("miniUnits");
 
-function setupCloseButtons() {
-
-  if ($("closePanel")) {
-
-    $("closePanel").onclick =
-      () =>
-        $("mainPanel")
-          ?.classList
-          .remove("open");
-  }
-
-
-  if ($("closeUnit")) {
-
-    $("closeUnit").onclick =
-      () => {
-
-        $("unitPanel")
-          ?.classList
-          .remove("open");
-
-
-        selectedUnit =
-          null;
-      };
-  }
-}
-
-
-/* =========================================================
-   MINI MAP
-========================================================= */
-
-function refreshMiniMap() {
-
-  const container =
-    $("miniUnits");
-
-
-  if (!container) {
+  if(!c)
     return;
-  }
 
+  c.innerHTML="";
 
-  container.innerHTML =
-    "";
+  units.forEach(u=>{
 
+    if(u.state==="DESTROYED")
+      return;
 
-  units.forEach(
-    unit => {
+    const d=
+      document.createElement("div");
 
-      if (
-        unit.state ===
-        "DESTROYED"
-      ) {
-        return;
-      }
+    d.style.cssText=`
+      position:absolute;
+      width:6px;
+      height:6px;
+      border-radius:50%;
+      left:${Math.max(
+        3,
+        Math.min(
+          97,
+          50+
+          u.object.position.x/3
+        )
+      )}%;
+      top:${Math.max(
+        3,
+        Math.min(
+          97,
+          50+
+          u.object.position.z/3
+        )
+      )}%;
+      background:${
+        u.friendly
+          ?"#55d18a"
+          :"#e45d5d"
+      };
+      box-shadow:
+        0 0 5px currentColor;
+    `;
 
-
-      const dot =
-        document.createElement(
-          "div"
-        );
-
-
-      dot.style.cssText = `
-
-        position:absolute;
-
-        width:6px;
-
-        height:6px;
-
-        border-radius:50%;
-
-        left:${Math.max(
-          3,
-          Math.min(
-            97,
-            50 +
-              unit.object.position.x /
-                3
-          )
-        )}%;
-
-        top:${Math.max(
-          3,
-          Math.min(
-            97,
-            50 +
-              unit.object.position.z /
-                3
-          )
-        )}%;
-
-        background:${
-          unit.friendly
-            ? "#55d18a"
-            : "#e45d5d"
-        };
-
-        box-shadow:
-          0 0 5px currentColor;
-
-      `;
-
-
-      container.appendChild(
-        dot
-      );
-    }
-  );
+    c.appendChild(d);
+  });
 }
 
-
-/* =========================================================
-   DATE
-========================================================= */
-
-function advanceDate() {
+function advanceDate(){
 
   gameDay++;
 
+  if(gameDay>30){
 
-  if (
-    gameDay > 30
-  ) {
-
-    gameDay = 1;
-
+    gameDay=1;
     gameMonth++;
 
+    if(gameMonth>12){
 
-    if (
-      gameMonth > 12
-    ) {
-
-      gameMonth = 1;
-
+      gameMonth=1;
       gameYear++;
     }
   }
 
-
   updateDate();
-
   saveGame();
 }
 
+function updateDate(){
 
-function updateDate() {
-
-  const months = [
+  const m=[
     "JAN",
     "FEB",
     "MAR",
@@ -5582,346 +4102,183 @@ function updateDate() {
     "DEC"
   ];
 
-
-  if ($("gameDate")) {
-
-    $("gameDate").textContent =
+  if($("gameDate"))
+    $("gameDate").textContent=
       `${gameYear} • ${
-        months[gameMonth - 1]
-      } • ${String(
-        gameDay
-      ).padStart(2, "0")}`;
-  }
+        m[gameMonth-1]
+      } ${
+        String(gameDay)
+          .padStart(2,"0")
+      }`;
 }
 
+function updateResources(){
 
-/* =========================================================
-   RESOURCES
-========================================================= */
+  const set=(id,v)=>{
 
-function updateResources() {
+    if($(id))
+      $(id).textContent=
+        Math.floor(v)
+          .toLocaleString();
+  };
 
-  const set =
-    (id, value) => {
-
-      if ($(id)) {
-
-        $(id).textContent =
-          Math.floor(
-            value
-          ).toLocaleString();
-      }
-    };
-
-
-  set(
-    "money",
-    money
-  );
-
-  set(
-    "oil",
-    oil
-  );
-
-  set(
-    "steel",
-    steel
-  );
-
-  set(
-    "food",
-    food
-  );
-
-  set(
-    "manpower",
-    manpower
-  );
+  set("money",money);
+  set("oil",oil);
+  set("steel",steel);
+  set("food",food);
+  set("manpower",manpower);
 }
 
-
-/* =========================================================
-   BATTLE LOG
-========================================================= */
-
-function addBattleLog(
-  text
-) {
+function addBattleLog(text){
 
   battleLog.unshift(
     `[${gameYear}-${
       String(gameMonth)
-        .padStart(2, "0")
+        .padStart(2,"0")
     }-${
       String(gameDay)
-        .padStart(2, "0")
+        .padStart(2,"0")
     }] ${text}`
   );
 
-
-  battleLog =
+  battleLog=
     battleLog.slice(
       0,
       20
     );
 
+  const el=$("battleLog");
 
-  const element =
-    $("battleLog");
-
-
-  if (element) {
-
-    element.innerHTML =
+  if(el)
+    el.innerHTML=
       battleLog
         .map(
-          entry =>
-            `<div>${entry}</div>`
+          x=>`<div>${x}</div>`
         )
         .join("");
-  }
 }
 
+function saveGame(){
 
-/* =========================================================
-   SAVE GAME
-========================================================= */
+  try{
 
-function saveGame() {
-
-  try {
-
-    const data = {
+    const data={
 
       currentCountry,
 
       money,
-
       oil,
-
       steel,
-
       food,
-
       manpower,
 
       gameDay,
-
       gameMonth,
-
       gameYear,
 
       units:
         units.map(
-          unit => ({
+          u=>({
 
-            id:
-              unit.id,
+            id:u.id,
+            name:u.name,
+            type:u.type,
+            friendly:u.friendly,
 
-            name:
-              unit.name,
-
-            type:
-              unit.type,
-
-            friendly:
-              unit.friendly,
-
-            hp:
-              unit.hp,
-
+            hp:u.hp,
             organization:
-              unit.organization,
+              u.organization,
 
-            morale:
-              unit.morale,
-
-            strength:
-              unit.strength,
+            morale:u.morale,
+            strength:u.strength,
 
             experience:
-              unit.experience,
+              u.experience,
 
-            state:
-              unit.state,
+            state:u.state,
 
-            supply:
-              unit.supply,
-
+            supply:u.supply,
             readiness:
-              unit.readiness,
+              u.readiness,
 
-            losses:
-              unit.losses,
+            losses:u.losses,
 
-            x:
-              unit.object.position.x,
-
-            y:
-              unit.object.position.y,
-
-            z:
-              unit.object.position.z
+            x:u.object.position.x,
+            y:u.object.position.y,
+            z:u.object.position.z
           })
         )
     };
-
 
     localStorage.setItem(
       saveKey,
       JSON.stringify(data)
     );
 
-  } catch (error) {
+  }catch(e){
 
     console.warn(
       "Save failed",
-      error
+      e
     );
   }
 }
 
+function loadGame(){
 
-/* =========================================================
-   LOAD GAME
-========================================================= */
+  try{
 
-function loadGame() {
-
-  try {
-
-    const raw =
+    const raw=
       localStorage.getItem(
         saveKey
       );
 
-
-    if (!raw) {
+    if(!raw)
       return;
-    }
 
+    const d=
+      JSON.parse(raw);
 
-    const data =
-      JSON.parse(
-        raw
-      );
+    if(d.currentCountry)
+      currentCountry=
+        d.currentCountry;
 
+    [
+      "money",
+      "oil",
+      "steel",
+      "food",
+      "manpower",
+      "gameDay",
+      "gameMonth",
+      "gameYear"
+    ]
+    .forEach(
+      k=>{
 
-    if (
-      data.currentCountry
-    ) {
+        if(
+          Number.isFinite(
+            d[k]
+          )
+        )
+          window[k]=d[k];
+      }
+    );
 
-      currentCountry =
-        data.currentCountry;
-    }
+    if(Array.isArray(d.units)){
 
+      d.units.forEach(s=>{
 
-    if (
-      Number.isFinite(
-        data.money
-      )
-    ) {
-      money =
-        data.money;
-    }
+        const u=
+          units.find(
+            x =>
+              x.id===s.id ||
+              x.name===s.name
+          );
 
+        if(u){
 
-    if (
-      Number.isFinite(
-        data.oil
-      )
-    ) {
-      oil =
-        data.oil;
-    }
-
-
-    if (
-      Number.isFinite(
-        data.steel
-      )
-    ) {
-      steel =
-        data.steel;
-    }
-
-
-    if (
-      Number.isFinite(
-        data.food
-      )
-    ) {
-      food =
-        data.food;
-    }
-
-
-    if (
-      Number.isFinite(
-        data.manpower
-      )
-    ) {
-      manpower =
-        data.manpower;
-    }
-
-
-    if (
-      Number.isFinite(
-        data.gameDay
-      )
-    ) {
-      gameDay =
-        data.gameDay;
-    }
-
-
-    if (
-      Number.isFinite(
-        data.gameMonth
-      )
-    ) {
-      gameMonth =
-        data.gameMonth;
-    }
-
-
-    if (
-      Number.isFinite(
-        data.gameYear
-      )
-    ) {
-      gameYear =
-        data.gameYear;
-    }
-
-
-    if (
-      Array.isArray(
-        data.units
-      )
-    ) {
-
-      data.units.forEach(
-        savedUnit => {
-
-          const unit =
-            units.find(
-              existing =>
-                existing.id ===
-                  savedUnit.id ||
-                existing.name ===
-                  savedUnit.name
-            );
-
-
-          if (!unit) {
-            return;
-          }
-
-
-          const fields = [
+          [
             "hp",
             "organization",
             "morale",
@@ -5930,127 +4287,84 @@ function loadGame() {
             "supply",
             "readiness",
             "losses"
-          ];
+          ]
+          .forEach(
+            k=>{
 
-
-          fields.forEach(
-            field => {
-
-              if (
+              if(
                 Number.isFinite(
-                  savedUnit[field]
+                  s[k]
                 )
-              ) {
-
-                unit[field] =
-                  savedUnit[field];
-              }
+              )
+                u[k]=s[k];
             }
           );
 
+          if(s.state)
+            u.state=s.state;
 
-          if (
-            savedUnit.state
-          ) {
-
-            unit.state =
-              savedUnit.state;
-          }
-
-
-          if (
-            Number.isFinite(
-              savedUnit.x
-            )
-          ) {
-
-            unit.object.position.set(
-              savedUnit.x,
-              Number.isFinite(
-                savedUnit.y
-              )
-                ? savedUnit.y
-                : unit.object.position.y,
-              Number.isFinite(
-                savedUnit.z
-              )
-                ? savedUnit.z
-                : unit.object.position.z
+          if(
+            Number.isFinite(s.x)
+          )
+            u.object.position.set(
+              s.x,
+              s.y ??
+                u.object.position.y,
+              s.z ??
+                u.object.position.z
             );
-          }
 
-
-          if (
-            unit.state ===
-            "DESTROYED"
-          ) {
-
-            unit.object.visible =
-              false;
-          }
+          if(
+            u.state==="DESTROYED"
+          )
+            u.object.visible=false;
         }
-      );
+      });
     }
 
-
     updateResources();
-
     updateDate();
-
     refreshMiniMap();
 
-  } catch (error) {
+  }catch(e){
 
     console.warn(
       "Load failed",
-      error
+      e
     );
   }
 }
 
+function startGameLoop(){
 
-/* =========================================================
-   GAME LOOP
-========================================================= */
-
-function startGameLoop() {
-
-  let lastDateTick =
+  let lastDateTick=
     performance.now();
 
-
-  function animate() {
+  function animate(){
 
     requestAnimationFrame(
       animate
     );
 
-
-    const delta =
+    const delta=
       Math.min(
         clock.getDelta(),
-        0.1
+        .1
       );
 
+    updateGame(delta);
 
-    updateGame(
-      delta
-    );
-
-
-    if (
-      performance.now() -
-        lastDateTick >
-      4000 /
-        gameSpeed
-    ) {
+    if(
+      performance.now()-
+      lastDateTick>
+      4000/gameSpeed
+    ){
 
       advanceDate();
 
-      lastDateTick =
+      lastDateTick=
         performance.now();
     }
-
 
     controls.update();
 
@@ -6060,43 +4374,28 @@ function startGameLoop() {
     );
   }
 
-
   animate();
 }
 
+function showToast(message){
 
-/* =========================================================
-   TOAST
-========================================================= */
+  const toast=$("toast");
 
-function showToast(
-  message
-) {
-
-  const toast =
-    $("toast");
-
-
-  if (!toast) {
+  if(!toast)
     return;
-  }
 
-
-  toast.textContent =
+  toast.textContent=
     message;
-
 
   toast.classList.add(
     "show"
   );
 
-
   clearTimeout(
     showToast.timer
   );
 
-
-  showToast.timer =
+  showToast.timer=
     setTimeout(
       () =>
         toast.classList.remove(
@@ -6106,40 +4405,27 @@ function showToast(
     );
 }
 
-
-/* =========================================================
-   LOADING HIDE
-========================================================= */
-
-function hideLoading() {
+function hideLoading(){
 
   $("loadingScreen")
-    ?.classList
-    .add("hidden");
+    ?.classList.add(
+      "hidden"
+    );
 }
 
+function onResize(){
 
-/* =========================================================
-   RESIZE
-========================================================= */
-
-function onResize() {
-
-  if (
+  if(
     !camera ||
     !renderer
-  ) {
+  )
     return;
-  }
 
-
-  camera.aspect =
-    innerWidth /
+  camera.aspect=
+    innerWidth/
     innerHeight;
 
-
   camera.updateProjectionMatrix();
-
 
   renderer.setSize(
     innerWidth,
@@ -6147,63 +4433,42 @@ function onResize() {
   );
 }
 
-
-/* =========================================================
-   ERROR HANDLING
-========================================================= */
-
 addEventListener(
   "error",
-  event =>
+  e =>
     console.error(
       "Runtime error:",
-      event.error
+      e.error
     )
 );
-
 
 addEventListener(
   "unhandledrejection",
-  event =>
+  e =>
     console.error(
       "Promise error:",
-      event.reason
+      e.reason
     )
 );
 
+setTimeout(()=>{
 
-/* =========================================================
-   RECOVERY
-========================================================= */
+  const l=$("loadingScreen");
 
-setTimeout(
-  () => {
+  if(
+    l &&
+    !l.classList.contains(
+      "hidden"
+    )
+  ){
 
-    const loading =
-      $("loadingScreen");
+    hideLoading();
 
+    showToast(
+      "Battlefield loaded in recovery mode."
+    );
+  }
 
-    if (
-      loading &&
-      !loading.classList.contains(
-        "hidden"
-      )
-    ) {
-
-      hideLoading();
-
-      showToast(
-        "Battlefield loaded in recovery mode."
-      );
-    }
-
-  },
-  10000
-);
-
-
-/* =========================================================
-   START
-========================================================= */
+},10000);
 
 init();
