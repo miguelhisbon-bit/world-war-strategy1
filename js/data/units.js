@@ -109,7 +109,6 @@ export const UNITS_DATA = {
     }
 };
 
-// Unit upgrade paths
 export const UNIT_UPGRADES = {
     INFANTRY: [
         { level: 1, cost: { money: 200, steel: 20 }, bonus: { attack: 2, defense: 2 } },
@@ -133,19 +132,26 @@ export const UNIT_UPGRADES = {
     ]
 };
 
-// Helper function to get unit stats
 export function getUnitStats(unitId) {
     return UNITS_DATA[unitId]?.stats || null;
 }
 
-// Helper function to get unit cost
 export function getUnitCost(unitId) {
     return UNITS_DATA[unitId]?.cost || null;
 }
 
-// Helper function to get upgrade cost
+export function getUnitCounters(unitId) {
+    return UNITS_DATA[unitId]?.counters || null;
+}
+
 export function getUpgradeCost(unitId, level) {
     const upgrades = UNIT_UPGRADES[unitId];
     if (!upgrades || level < 1 || level > upgrades.length) return null;
     return upgrades[level - 1].cost;
+}
+
+export function getUpgradeBonus(unitId, level) {
+    const upgrades = UNIT_UPGRADES[unitId];
+    if (!upgrades || level < 1 || level > upgrades.length) return null;
+    return upgrades[level - 1].bonus;
 }
