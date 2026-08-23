@@ -1,10 +1,89 @@
+// =========================================================
+// MAIN.JS — Complete Game Engine
+// =========================================================
+
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 
-/* =========================================================
-   WORLD WAR — V9 (FIXED - READY TO COPY)
-   ========================================================== */
+// Import from data folder
+import { BUILDINGS } from './data/buildings.js';
+import { TECH_TREE, getAllTechs, isTechAvailable } from './data/techTree.js';
+import { UNITS_DATA, getUnitStats, getUnitCost, getUpgradeCost } from './data/units.js';
+
+// Import from systems folder
+import { 
+    calculateBattleDamage, 
+    executeBattle, 
+    generateBattleReport,
+    findNearestEnemy,
+    TERRAIN_EFFECTS,
+    WEATHER_EFFECTS 
+} from './systems/battle.js';
+import {
+    getDiplomacyState,
+    formAlliance,
+    breakAlliance,
+    isAllied,
+    declareWar,
+    proposePeace,
+    establishTradeRoute,
+    generateIncident,
+    diplomacy,
+    alliances,
+    wars
+} from './systems/diplomacy.js';
+import {
+    economyState,
+    productionMultipliers,
+    buildingQueue,
+    researchQueue,
+    addBuildingToQueue,
+    processBuildingQueue,
+    addResearchToQueue,
+    processResearchQueue,
+    processEconomy,
+    tradeResource,
+    takeLoan
+} from './systems/economy.js';
+
+// Import from utils folder
+import {
+    saveGame,
+    loadGame,
+    deleteSave,
+    hasSave,
+    getSaveInfo,
+    autoSaveLoop,
+    SAVE_KEY
+} from './utils/saveLoad.js';
+import {
+    random,
+    randomInt,
+    clamp,
+    lerp,
+    distance,
+    distance2D,
+    shuffleArray,
+    randomItem,
+    chunkArray,
+    capitalize,
+    truncate,
+    formatNumber,
+    formatDate,
+    getTimeString,
+    hexToRGB,
+    rgbToHex,
+    hexToCSS,
+    log,
+    debugObject,
+    throttle,
+    debounce
+} from './utils/helpers.js';
+
+// =========================================================
+// GAME STATE
+// =========================================================
 
 const $ = id => document.getElementById(id);
 
@@ -29,6 +108,7 @@ let currentCountry = "BANGLADESH";
 let weather = "CLEAR";
 let mapLayer = "MILITARY";
 
+// ================= RESOURCES =================
 let money = 12500;
 let oil = 850;
 let steel = 1250;
@@ -54,123 +134,33 @@ const countryMeshMap = {};
 const stateMeshMap = {};
 let stateBorderPoints = {};
 
-/* =========================================================
-   NATIONS DATA
-   ========================================================== */
-
+// ================= NATIONS DATA =================
 const nation = {
-    BANGLADESH: { 
-        flag: "🇧🇩", name: "Bangladesh", color: 0x006a4e, lightColor: 0x00a87a, 
-        capital: "Dhaka", region: "South Asia", 
-        states: ["Dhaka", "Chittagong", "Rajshahi", "Khulna", "Sylhet", "Barisal", "Rangpur", "Mymensingh"],
-        desc: "Bangladesh is a South Asian country with a rich history and strategic location."
-    },
-    PAKISTAN: { 
-        flag: "🇵🇰", name: "Pakistan", color: 0x01411c, lightColor: 0x027a35,
-        capital: "Islamabad", region: "South Asia",
-        states: ["Punjab", "Sindh", "KPK", "Balochistan", "Gilgit", "Azad Kashmir", "Islamabad"],
-        desc: "Pakistan is a South Asian nation with diverse landscapes."
-    },
-    TURKEY: { 
-        flag: "🇹🇷", name: "Turkey", color: 0xe30a17, lightColor: 0xff1a2a,
-        capital: "Ankara", region: "Eurasia",
-        states: ["Istanbul", "Ankara", "Izmir", "Bursa", "Antalya", "Konya", "Adana", "Gaziantep"],
-        desc: "Turkey is a transcontinental country bridging Europe and Asia."
-    },
-    IRAN: { 
-        flag: "🇮🇷", name: "Iran", color: 0x239f40, lightColor: 0x3ad060,
-        capital: "Tehran", region: "Middle East",
-        states: ["Tehran", "Isfahan", "Khuzestan", "Fars", "Razavi", "East Azerbaijan", "Mazandaran", "Gilan"],
-        desc: "Iran is a Middle Eastern country with ancient history."
-    },
-    SAUDI: { 
-        flag: "🇸🇦", name: "Saudi Arabia", color: 0x165d31, lightColor: 0x229544,
-        capital: "Riyadh", region: "Middle East",
-        states: ["Riyadh", "Makkah", "Madinah", "Eastern", "Asir", "Tabuk", "Jazan", "Najran"],
-        desc: "Saudi Arabia is the largest country in the Middle East."
-    },
-    EGYPT: { 
-        flag: "🇪🇬", name: "Egypt", color: 0xce1126, lightColor: 0xff1a33,
-        capital: "Cairo", region: "North Africa",
-        states: ["Cairo", "Alexandria", "Giza", "Luxor", "Aswan", "Port Said", "Suez", "Minya"],
-        desc: "Egypt spans North Africa and the Middle East."
-    },
-    PALESTINE: { 
-        flag: "🇵🇸", name: "Palestine", color: 0x007a3d, lightColor: 0x00b85a,
-        capital: "Jerusalem", region: "Middle East",
-        states: ["West Bank", "Gaza Strip", "Jerusalem", "Ramallah", "Hebron", "Nablus"],
-        desc: "Palestine is a historic region in the Middle East."
-    },
-    INDONESIA: { 
-        flag: "🇮🇩", name: "Indonesia", color: 0xce1126, lightColor: 0xff1a33,
-        capital: "Jakarta", region: "Southeast Asia",
-        states: ["Java", "Sumatra", "Kalimantan", "Sulawesi", "Papua", "Bali", "Lombok", "Flores"],
-        desc: "Indonesia is the world's largest archipelago nation."
-    },
-    AFGHANISTAN: { 
-        flag: "🇦🇫", name: "Afghanistan", color: 0x000000, lightColor: 0x333333,
-        capital: "Kabul", region: "Central Asia",
-        states: ["Kabul", "Kandahar", "Herat", "Mazar", "Nangarhar", "Balkh", "Ghazni", "Helmand"],
-        desc: "Afghanistan is a landlocked country at the crossroads of Central and South Asia."
-    },
-    INDIA: { 
-        flag: "🇮🇳", name: "India", color: 0xff9933, lightColor: 0xffbb55,
-        capital: "New Delhi", region: "South Asia",
-        states: ["UP", "Maharashtra", "Tamil Nadu", "Gujarat", "Karnataka", "Rajasthan", "West Bengal", "Punjab"],
-        desc: "India is the world's largest democracy."
-    },
-    USA: { 
-        flag: "🇺🇸", name: "United States", color: 0x2a5c8a, lightColor: 0x4a8cc0,
-        capital: "Washington DC", region: "North America",
-        states: ["California", "Texas", "Florida", "New York", "Illinois", "Pennsylvania", "Ohio", "Georgia"],
-        desc: "The United States is a global superpower."
-    },
-    CHINA: { 
-        flag: "🇨🇳", name: "China", color: 0xcc2222, lightColor: 0xff3333,
-        capital: "Beijing", region: "East Asia",
-        states: ["Guangdong", "Shandong", "Henan", "Sichuan", "Jiangsu", "Hebei", "Hunan", "Anhui"],
-        desc: "China is the world's most populous country."
-    },
-    RUSSIA: { 
-        flag: "🇷🇺", name: "Russia", color: 0x003399, lightColor: 0x0055cc,
-        capital: "Moscow", region: "Eurasia",
-        states: ["Moscow", "St Petersburg", "Novosibirsk", "Yekaterinburg", "Kazan", "Nizhny", "Samara", "Omsk"],
-        desc: "Russia is the world's largest country by area."
-    },
-    UK: { 
-        flag: "🇬🇧", name: "United Kingdom", color: 0x8a2a2a, lightColor: 0xcc4040,
-        capital: "London", region: "Europe",
-        states: ["England", "Scotland", "Wales", "Northern Ireland"],
-        desc: "The United Kingdom is a European island nation."
-    },
-    FRANCE: { 
-        flag: "🇫🇷", name: "France", color: 0x2a5a8a, lightColor: 0x4a88c0,
-        capital: "Paris", region: "Europe",
-        states: ["Île-de-France", "Provence", "Brittany", "Normandy", "Alsace", "Aquitaine", "Lyon", "Marseille"],
-        desc: "France is a European nation with a rich cultural heritage."
-    },
-    GERMANY: { 
-        flag: "🇩🇪", name: "Germany", color: 0x3a3a3a, lightColor: 0x666666,
-        capital: "Berlin", region: "Europe",
-        states: ["Bavaria", "North Rhine", "Baden", "Saxony", "Hesse", "Berlin", "Hamburg", "Munich"],
-        desc: "Germany is Europe's largest economy."
-    }
+    BANGLADESH: { flag: "🇧🇩", name: "Bangladesh", color: 0x006a4e, lightColor: 0x00a87a, capital: "Dhaka", region: "South Asia", states: ["Dhaka", "Chittagong", "Rajshahi", "Khulna", "Sylhet", "Barisal", "Rangpur", "Mymensingh"], desc: "Bangladesh is a South Asian country with a rich history." },
+    PAKISTAN: { flag: "🇵🇰", name: "Pakistan", color: 0x01411c, lightColor: 0x027a35, capital: "Islamabad", region: "South Asia", states: ["Punjab", "Sindh", "KPK", "Balochistan", "Gilgit", "Azad Kashmir", "Islamabad"], desc: "Pakistan is a South Asian nation with diverse landscapes." },
+    TURKEY: { flag: "🇹🇷", name: "Turkey", color: 0xe30a17, lightColor: 0xff1a2a, capital: "Ankara", region: "Eurasia", states: ["Istanbul", "Ankara", "Izmir", "Bursa", "Antalya", "Konya", "Adana", "Gaziantep"], desc: "Turkey is a transcontinental country bridging Europe and Asia." },
+    IRAN: { flag: "🇮🇷", name: "Iran", color: 0x239f40, lightColor: 0x3ad060, capital: "Tehran", region: "Middle East", states: ["Tehran", "Isfahan", "Khuzestan", "Fars", "Razavi", "East Azerbaijan", "Mazandaran", "Gilan"], desc: "Iran is a Middle Eastern country with ancient history." },
+    SAUDI: { flag: "🇸🇦", name: "Saudi Arabia", color: 0x165d31, lightColor: 0x229544, capital: "Riyadh", region: "Middle East", states: ["Riyadh", "Makkah", "Madinah", "Eastern", "Asir", "Tabuk", "Jazan", "Najran"], desc: "Saudi Arabia is the largest country in the Middle East." },
+    EGYPT: { flag: "🇪🇬", name: "Egypt", color: 0xce1126, lightColor: 0xff1a33, capital: "Cairo", region: "North Africa", states: ["Cairo", "Alexandria", "Giza", "Luxor", "Aswan", "Port Said", "Suez", "Minya"], desc: "Egypt spans North Africa and the Middle East." },
+    PALESTINE: { flag: "🇵🇸", name: "Palestine", color: 0x007a3d, lightColor: 0x00b85a, capital: "Jerusalem", region: "Middle East", states: ["West Bank", "Gaza Strip", "Jerusalem", "Ramallah", "Hebron", "Nablus"], desc: "Palestine is a historic region in the Middle East." },
+    INDONESIA: { flag: "🇮🇩", name: "Indonesia", color: 0xce1126, lightColor: 0xff1a33, capital: "Jakarta", region: "Southeast Asia", states: ["Java", "Sumatra", "Kalimantan", "Sulawesi", "Papua", "Bali", "Lombok", "Flores"], desc: "Indonesia is the world's largest archipelago nation." },
+    AFGHANISTAN: { flag: "🇦🇫", name: "Afghanistan", color: 0x000000, lightColor: 0x333333, capital: "Kabul", region: "Central Asia", states: ["Kabul", "Kandahar", "Herat", "Mazar", "Nangarhar", "Balkh", "Ghazni", "Helmand"], desc: "Afghanistan is a landlocked country at the crossroads of Central and South Asia." },
+    INDIA: { flag: "🇮🇳", name: "India", color: 0xff9933, lightColor: 0xffbb55, capital: "New Delhi", region: "South Asia", states: ["UP", "Maharashtra", "Tamil Nadu", "Gujarat", "Karnataka", "Rajasthan", "West Bengal", "Punjab"], desc: "India is the world's largest democracy." },
+    USA: { flag: "🇺🇸", name: "United States", color: 0x2a5c8a, lightColor: 0x4a8cc0, capital: "Washington DC", region: "North America", states: ["California", "Texas", "Florida", "New York", "Illinois", "Pennsylvania", "Ohio", "Georgia"], desc: "The United States is a global superpower." },
+    CHINA: { flag: "🇨🇳", name: "China", color: 0xcc2222, lightColor: 0xff3333, capital: "Beijing", region: "East Asia", states: ["Guangdong", "Shandong", "Henan", "Sichuan", "Jiangsu", "Hebei", "Hunan", "Anhui"], desc: "China is the world's most populous country." },
+    RUSSIA: { flag: "🇷🇺", name: "Russia", color: 0x003399, lightColor: 0x0055cc, capital: "Moscow", region: "Eurasia", states: ["Moscow", "St Petersburg", "Novosibirsk", "Yekaterinburg", "Kazan", "Nizhny", "Samara", "Omsk"], desc: "Russia is the world's largest country by area." },
+    UK: { flag: "🇬🇧", name: "United Kingdom", color: 0x8a2a2a, lightColor: 0xcc4040, capital: "London", region: "Europe", states: ["England", "Scotland", "Wales", "Northern Ireland"], desc: "The United Kingdom is a European island nation." },
+    FRANCE: { flag: "🇫🇷", name: "France", color: 0x2a5a8a, lightColor: 0x4a88c0, capital: "Paris", region: "Europe", states: ["Île-de-France", "Provence", "Brittany", "Normandy", "Alsace", "Aquitaine", "Lyon", "Marseille"], desc: "France is a European nation with a rich cultural heritage." },
+    GERMANY: { flag: "🇩🇪", name: "Germany", color: 0x3a3a3a, lightColor: 0x666666, capital: "Berlin", region: "Europe", states: ["Bavaria", "North Rhine", "Baden", "Saxony", "Hesse", "Berlin", "Hamburg", "Munich"], desc: "Germany is Europe's largest economy." }
 };
 
 const countryColors = {};
-Object.keys(nation).forEach(key => {
-    countryColors[key] = nation[key].color;
-});
+Object.keys(nation).forEach(key => { countryColors[key] = nation[key].color; });
 
 const mapColors = {
     MILITARY: 0x596b58, POLITICAL: 0x58667d, TERRAIN: 0x52634d,
     SUPPLY: 0x4e6e5a, RESOURCES: 0x75633c, INTEL: 0x5d4c6b
 };
-
-const diplomacy = {};
-Object.keys(nation).forEach(key => {
-    diplomacy[key] = key === "BANGLADESH" ? 0 : (Math.random() * 60 - 30);
-});
 
 const factories = { civilian: 18, military: 14, naval: 5 };
 
@@ -247,11 +237,7 @@ function setup3D() {
     camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 1000);
     camera.position.set(80, 80, 120);
 
-    renderer = new THREE.WebGLRenderer({
-        canvas,
-        antialias: true,
-        powerPreference: "high-performance"
-    });
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     renderer.setSize(innerWidth, innerHeight);
     renderer.shadowMap.enabled = true;
@@ -414,16 +400,8 @@ function createMountains() {
         );
         const angle = Math.random() * Math.PI * 2;
         const dist = 30 + Math.random() * 170;
-        mountain.position.set(
-            Math.cos(angle) * dist,
-            0.5 + height * 0.4,
-            Math.sin(angle) * dist
-        );
-        mountain.rotation.set(
-            (Math.random() - 0.5) * 0.15,
-            Math.random() * Math.PI * 2,
-            (Math.random() - 0.5) * 0.15
-        );
+        mountain.position.set(Math.cos(angle) * dist, 0.5 + height * 0.4, Math.sin(angle) * dist);
+        mountain.rotation.set((Math.random() - 0.5) * 0.15, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.15);
         mountain.castShadow = true;
         scene.add(mountain);
 
@@ -461,11 +439,7 @@ function createForests() {
         tree.add(trunk, crown);
         const angle = Math.random() * Math.PI * 2;
         const dist = 20 + Math.random() * 180;
-        tree.position.set(
-            Math.cos(angle) * dist + (Math.random() - 0.5) * 25,
-            0,
-            Math.sin(angle) * dist + (Math.random() - 0.5) * 25
-        );
+        tree.position.set(Math.cos(angle) * dist + (Math.random() - 0.5) * 25, 0, Math.sin(angle) * dist + (Math.random() - 0.5) * 25);
         tree.scale.setScalar(0.6 + Math.random() * 0.8);
         scene.add(tree);
     }
@@ -482,16 +456,13 @@ function createRivers() {
     riverPoints.forEach(points => {
         const pts = points.map(p => new THREE.Vector3(p[0], 0.15, p[1]));
         const geometry = new THREE.BufferGeometry().setFromPoints(pts);
-        const line = new THREE.Line(
-            geometry,
-            new THREE.LineBasicMaterial({ color: 0x1a5a7a, transparent: true, opacity: 0.35 })
-        );
+        const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x1a5a7a, transparent: true, opacity: 0.35 }));
         scene.add(line);
     });
 }
 
 /* =========================================================
-   COUNTRY BORDERS
+   COUNTRY BORDERS & STATES
    ========================================================== */
 
 function createCountryBorders() {
@@ -521,10 +492,7 @@ function createCountryBorders() {
         const points = data.points.map(p => new THREE.Vector3(p[0], 0.4, p[1]));
         
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const line = new THREE.Line(
-            geometry,
-            new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8 })
-        );
+        const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8 }));
         borderGroup.add(line);
 
         const shape = new THREE.Shape();
@@ -533,16 +501,9 @@ function createCountryBorders() {
             else shape.lineTo(p.x, p.z);
         });
         const fillGeom = new THREE.ShapeGeometry(shape);
-        const fill = new THREE.Mesh(
-            fillGeom,
-            new THREE.MeshBasicMaterial({
-                color,
-                transparent: true,
-                opacity: 0.15,
-                side: THREE.DoubleSide,
-                depthWrite: false
-            })
-        );
+        const fill = new THREE.Mesh(fillGeom, new THREE.MeshBasicMaterial({
+            color, transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false
+        }));
         fill.rotation.x = -Math.PI / 2;
         fill.position.y = 0.2;
         fill.userData.country = data.name;
@@ -556,18 +517,7 @@ function createCountryBorders() {
         
         const labelDiv = document.createElement('div');
         labelDiv.textContent = `${nation[data.name]?.flag || '🏳️'} ${nation[data.name]?.name || data.name}`;
-        labelDiv.style.color = '#eef4f8';
-        labelDiv.style.fontSize = '12px';
-        labelDiv.style.fontWeight = '700';
-        labelDiv.style.textShadow = '0 2px 16px rgba(0,0,0,0.95)';
-        labelDiv.style.background = 'rgba(0,0,0,0.7)';
-        labelDiv.style.padding = '4px 12px';
-        labelDiv.style.borderRadius = '12px';
-        labelDiv.style.border = '1px solid rgba(255,255,255,0.08)';
-        labelDiv.style.backdropFilter = 'blur(4px)';
-        labelDiv.style.pointerEvents = 'none';
-        labelDiv.style.userSelect = 'none';
-        
+        labelDiv.style.cssText = 'color:#eef4f8;font-size:12px;font-weight:700;text-shadow:0 2px 16px rgba(0,0,0,0.95);background:rgba(0,0,0,0.7);padding:4px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(4px);pointer-events:none;user-select:none;';
         const label = new CSS2DObject(labelDiv);
         label.position.set(center.x, 2.5, center.z);
         labelGroup.add(label);
@@ -607,16 +557,9 @@ function createStates() {
             else shape.lineTo(p.x, p.z);
         });
         const geom = new THREE.ShapeGeometry(shape);
-        const mesh = new THREE.Mesh(
-            geom,
-            new THREE.MeshBasicMaterial({
-                color,
-                transparent: true,
-                opacity: 0.3,
-                side: THREE.DoubleSide,
-                depthWrite: false
-            })
-        );
+        const mesh = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({
+            color, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false
+        }));
         mesh.rotation.x = -Math.PI / 2;
         mesh.position.y = 0.1;
         mesh.userData.country = key;
@@ -629,16 +572,7 @@ function createStates() {
         
         const labelDiv = document.createElement('div');
         labelDiv.textContent = `📍 ${nation[key]?.name || key}`;
-        labelDiv.style.color = '#aabbcc';
-        labelDiv.style.fontSize = '8px';
-        labelDiv.style.fontWeight = '600';
-        labelDiv.style.textShadow = '0 1px 10px rgba(0,0,0,0.95)';
-        labelDiv.style.background = 'rgba(0,0,0,0.5)';
-        labelDiv.style.padding = '2px 8px';
-        labelDiv.style.borderRadius = '8px';
-        labelDiv.style.pointerEvents = 'none';
-        labelDiv.style.userSelect = 'none';
-        
+        labelDiv.style.cssText = 'color:#aabbcc;font-size:8px;font-weight:600;text-shadow:0 1px 10px rgba(0,0,0,0.95);background:rgba(0,0,0,0.5);padding:2px 8px;border-radius:8px;pointer-events:none;user-select:none;';
         const label = new CSS2DObject(labelDiv);
         label.position.set(center.x, 1.0, center.z);
         labelGroup.add(label);
@@ -651,72 +585,22 @@ function createStates() {
 
 function createStateBorderData() {
     stateBorderPoints = {
-        BANGLADESH: {
-            "Dhaka": [[-8,-28],[-4,-24],[0,-22],[4,-18],[2,-14],[-2,-12],[-6,-14],[-10,-18],[-8,-28]],
-            "Chittagong": [[4,-18],[8,-20],[12,-18],[14,-14],[10,-10],[6,-8],[2,-10],[4,-18]],
-            "Rajshahi": [[-10,-18],[-6,-14],[-2,-12],[-4,-8],[-8,-6],[-12,-10],[-14,-14],[-10,-18]]
-        },
-        PAKISTAN: {
-            "Punjab": [[22,18],[26,16],[30,20],[28,24],[24,22],[22,18]],
-            "Sindh": [[28,24],[32,22],[36,26],[34,30],[30,28],[28,24]],
-            "KPK": [[30,20],[34,18],[38,22],[36,26],[32,24],[30,20]]
-        },
-        TURKEY: {
-            "Istanbul": [[-66,44],[-62,42],[-58,46],[-60,50],[-64,48],[-66,44]],
-            "Ankara": [[-58,46],[-54,44],[-50,48],[-52,52],[-56,50],[-58,46]]
-        },
-        IRAN: {
-            "Tehran": [[12,34],[16,32],[20,36],[18,40],[14,38],[12,34]],
-            "Isfahan": [[16,32],[20,30],[24,34],[22,38],[18,36],[16,32]]
-        },
-        SAUDI: {
-            "Riyadh": [[12,14],[16,12],[20,16],[18,20],[14,18],[12,14]],
-            "Makkah": [[16,12],[20,10],[24,14],[22,18],[18,16],[16,12]]
-        },
-        EGYPT: {
-            "Cairo": [[-36,10],[-32,8],[-28,12],[-30,16],[-34,14],[-36,10]],
-            "Alexandria": [[-28,12],[-24,10],[-20,14],[-22,18],[-26,16],[-28,12]]
-        },
-        PALESTINE: {
-            "West Bank": [[-8,26],[-4,24],[0,28],[-2,32],[-6,30],[-8,26]],
-            "Gaza Strip": [[0,28],[4,26],[6,30],[4,34],[0,32],[-2,28]]
-        },
-        INDIA: {
-            "UP": [[2,-6],[6,-8],[10,-4],[8,0],[4,-2],[2,-6]],
-            "Maharashtra": [[8,0],[12,-2],[16,2],[14,6],[10,4],[8,0]]
-        },
-        USA: {
-            "California": [[-142,-42],[-138,-40],[-134,-44],[-136,-48],[-140,-46],[-142,-42]],
-            "Texas": [[-134,-44],[-130,-42],[-126,-46],[-128,-50],[-132,-48],[-134,-44]]
-        },
-        CHINA: {
-            "Guangdong": [[42,-8],[46,-10],[50,-6],[48,-2],[44,-4],[42,-8]],
-            "Shandong": [[46,-10],[50,-12],[54,-8],[52,-4],[48,-6],[46,-10]]
-        },
-        RUSSIA: {
-            "Moscow": [[28,72],[32,70],[36,74],[34,78],[30,76],[28,72]],
-            "St Petersburg": [[36,74],[40,72],[44,76],[42,80],[38,78],[36,74]]
-        },
-        UK: {
-            "England": [[-130,28],[-126,26],[-122,30],[-124,34],[-128,32],[-130,28]],
-            "Scotland": [[-126,26],[-122,24],[-118,28],[-120,32],[-124,30],[-126,26]]
-        },
-        FRANCE: {
-            "Île-de-France": [[-56,32],[-52,30],[-48,34],[-50,38],[-54,36],[-56,32]],
-            "Provence": [[-48,34],[-44,32],[-40,36],[-42,40],[-46,38],[-48,34]]
-        },
-        GERMANY: {
-            "Bavaria": [[-16,8],[-12,6],[-8,10],[-10,14],[-14,12],[-16,8]],
-            "North Rhine": [[-12,6],[-8,4],[-4,8],[-6,12],[-10,10],[-12,6]]
-        },
-        INDONESIA: {
-            "Java": [[82,-18],[86,-20],[90,-16],[88,-12],[84,-14],[82,-18]],
-            "Sumatra": [[86,-20],[90,-22],[94,-18],[92,-14],[88,-16],[86,-20]]
-        },
-        AFGHANISTAN: {
-            "Kabul": [[28,42],[32,40],[36,44],[34,48],[30,46],[28,42]],
-            "Kandahar": [[32,40],[36,38],[40,42],[38,46],[34,44],[32,40]]
-        }
+        BANGLADESH: { "Dhaka": [[-8,-28],[-4,-24],[0,-22],[4,-18],[2,-14],[-2,-12],[-6,-14],[-10,-18],[-8,-28]], "Chittagong": [[4,-18],[8,-20],[12,-18],[14,-14],[10,-10],[6,-8],[2,-10],[4,-18]], "Rajshahi": [[-10,-18],[-6,-14],[-2,-12],[-4,-8],[-8,-6],[-12,-10],[-14,-14],[-10,-18]] },
+        PAKISTAN: { "Punjab": [[22,18],[26,16],[30,20],[28,24],[24,22],[22,18]], "Sindh": [[28,24],[32,22],[36,26],[34,30],[30,28],[28,24]], "KPK": [[30,20],[34,18],[38,22],[36,26],[32,24],[30,20]] },
+        TURKEY: { "Istanbul": [[-66,44],[-62,42],[-58,46],[-60,50],[-64,48],[-66,44]], "Ankara": [[-58,46],[-54,44],[-50,48],[-52,52],[-56,50],[-58,46]] },
+        IRAN: { "Tehran": [[12,34],[16,32],[20,36],[18,40],[14,38],[12,34]], "Isfahan": [[16,32],[20,30],[24,34],[22,38],[18,36],[16,32]] },
+        SAUDI: { "Riyadh": [[12,14],[16,12],[20,16],[18,20],[14,18],[12,14]], "Makkah": [[16,12],[20,10],[24,14],[22,18],[18,16],[16,12]] },
+        EGYPT: { "Cairo": [[-36,10],[-32,8],[-28,12],[-30,16],[-34,14],[-36,10]], "Alexandria": [[-28,12],[-24,10],[-20,14],[-22,18],[-26,16],[-28,12]] },
+        PALESTINE: { "West Bank": [[-8,26],[-4,24],[0,28],[-2,32],[-6,30],[-8,26]], "Gaza Strip": [[0,28],[4,26],[6,30],[4,34],[0,32],[-2,28]] },
+        INDIA: { "UP": [[2,-6],[6,-8],[10,-4],[8,0],[4,-2],[2,-6]], "Maharashtra": [[8,0],[12,-2],[16,2],[14,6],[10,4],[8,0]] },
+        USA: { "California": [[-142,-42],[-138,-40],[-134,-44],[-136,-48],[-140,-46],[-142,-42]], "Texas": [[-134,-44],[-130,-42],[-126,-46],[-128,-50],[-132,-48],[-134,-44]] },
+        CHINA: { "Guangdong": [[42,-8],[46,-10],[50,-6],[48,-2],[44,-4],[42,-8]], "Shandong": [[46,-10],[50,-12],[54,-8],[52,-4],[48,-6],[46,-10]] },
+        RUSSIA: { "Moscow": [[28,72],[32,70],[36,74],[34,78],[30,76],[28,72]], "St Petersburg": [[36,74],[40,72],[44,76],[42,80],[38,78],[36,74]] },
+        UK: { "England": [[-130,28],[-126,26],[-122,30],[-124,34],[-128,32],[-130,28]], "Scotland": [[-126,26],[-122,24],[-118,28],[-120,32],[-124,30],[-126,26]] },
+        FRANCE: { "Île-de-France": [[-56,32],[-52,30],[-48,34],[-50,38],[-54,36],[-56,32]], "Provence": [[-48,34],[-44,32],[-40,36],[-42,40],[-46,38],[-48,34]] },
+        GERMANY: { "Bavaria": [[-16,8],[-12,6],[-8,10],[-10,14],[-14,12],[-16,8]], "North Rhine": [[-12,6],[-8,4],[-4,8],[-6,12],[-10,10],[-12,6]] },
+        INDONESIA: { "Java": [[82,-18],[86,-20],[90,-16],[88,-12],[84,-14],[82,-18]], "Sumatra": [[86,-20],[90,-22],[94,-18],[92,-14],[88,-16],[86,-20]] },
+        AFGHANISTAN: { "Kabul": [[28,42],[32,40],[36,44],[34,48],[30,46],[28,42]], "Kandahar": [[32,40],[36,38],[40,42],[38,46],[34,44],[32,40]] }
     };
 }
 
@@ -730,10 +614,7 @@ function zoomToCountry(countryKey) {
     isZooming = true;
 
     const mesh = countryMeshMap[countryKey];
-    if (!mesh) {
-        isZooming = false;
-        return;
-    }
+    if (!mesh) { isZooming = false; return; }
 
     const positions = mesh.geometry.attributes.position;
     const center = new THREE.Vector3();
@@ -778,7 +659,6 @@ function zoomToCountry(countryKey) {
     const data = nation[countryKey];
     const stateCount = data.states?.length || 0;
     $("selectedCountryDisplay").textContent = `📍 ${data.flag} ${data.name} • ${data.region} • ${stateCount} States`;
-    
     $("countryFlag").textContent = data.flag;
     $("countryName").textContent = data.name;
 
@@ -795,24 +675,9 @@ function showStateBorders(countryKey) {
     Object.keys(countryStates).forEach(stateName => {
         const points = countryStates[stateName].map(p => new THREE.Vector3(p[0], 0.6, p[1]));
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const line = new THREE.Line(
-            geometry,
-            new THREE.LineBasicMaterial({
-                color: 0xffdd44,
-                transparent: true,
-                opacity: 0.9
-            })
-        );
+        const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xffdd44, transparent: true, opacity: 0.9 }));
         stateBorderGroup.add(line);
-
-        const glowLine = new THREE.Line(
-            geometry,
-            new THREE.LineBasicMaterial({
-                color: 0xffaa00,
-                transparent: true,
-                opacity: 0.3
-            })
-        );
+        const glowLine = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.3 }));
         glowLine.position.y = 0.05;
         stateBorderGroup.add(glowLine);
     });
@@ -849,18 +714,7 @@ function showStateLabels(countryKey) {
 
         const labelDiv = document.createElement('div');
         labelDiv.textContent = `🏛️ ${stateName}`;
-        labelDiv.style.color = '#ffdd44';
-        labelDiv.style.fontSize = '11px';
-        labelDiv.style.fontWeight = '700';
-        labelDiv.style.textShadow = '0 2px 20px rgba(0,0,0,0.95)';
-        labelDiv.style.background = 'rgba(0,0,0,0.75)';
-        labelDiv.style.padding = '3px 10px';
-        labelDiv.style.borderRadius = '12px';
-        labelDiv.style.border = '1px solid rgba(255,221,68,0.3)';
-        labelDiv.style.backdropFilter = 'blur(4px)';
-        labelDiv.style.pointerEvents = 'none';
-        labelDiv.style.userSelect = 'none';
-
+        labelDiv.style.cssText = 'color:#ffdd44;font-size:11px;font-weight:700;text-shadow:0 2px 20px rgba(0,0,0,0.95);background:rgba(0,0,0,0.75);padding:3px 10px;border-radius:12px;border:1px solid rgba(255,221,68,0.3);backdrop-filter:blur(4px);pointer-events:none;user-select:none;';
         const label = new CSS2DObject(labelDiv);
         label.position.set(x, 2.0, z);
         label.userData = { isStateLabel: true };
@@ -886,17 +740,12 @@ function highlightCountry(countryKey) {
 
     highlightedCountry = countryKey;
     const data = nation[countryKey];
-    const color = data.color;
 
     const mesh = countryMeshMap[countryKey];
     if (mesh) {
         const highlight = mesh.clone();
         highlight.material = new THREE.MeshBasicMaterial({
-            color: 0xffdd44,
-            transparent: true,
-            opacity: 0.3,
-            side: THREE.DoubleSide,
-            depthWrite: false
+            color: 0xffdd44, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false
         });
         highlight.position.y = 0.3;
         highlightGroup.add(highlight);
@@ -912,13 +761,7 @@ function highlightCountry(countryKey) {
 
         const ring = new THREE.Mesh(
             new THREE.RingGeometry(4, 6, 32),
-            new THREE.MeshBasicMaterial({
-                color: 0xffdd44,
-                transparent: true,
-                opacity: 0.6,
-                side: THREE.DoubleSide,
-                depthWrite: false
-            })
+            new THREE.MeshBasicMaterial({ color: 0xffdd44, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false })
         );
         ring.rotation.x = -Math.PI / 2;
         ring.position.set(center.x, 0.5, center.z);
@@ -1091,10 +934,7 @@ function create3DTank(color) {
     turret.castShadow = true;
     group.add(turret);
 
-    const barrel = new THREE.Mesh(
-        new THREE.BoxGeometry(0.25, 0.25, 2.0),
-        new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.6 })
-    );
+    const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 2.0), new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.6 }));
     barrel.position.set(0, 1.65, 1.4);
     group.add(barrel);
 
@@ -1103,10 +943,7 @@ function create3DTank(color) {
         track.position.set(side * 1.8, 0.3, 0);
         group.add(track);
         for (let i = -0.8; i <= 0.8; i += 0.4) {
-            const wheel = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.2, 0.2, 0.15, 8),
-                new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.8 })
-            );
+            const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.15, 8), new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.8 }));
             wheel.rotation.x = Math.PI / 2;
             wheel.position.set(side * 1.7, 0.4, i);
             group.add(wheel);
@@ -1136,10 +973,7 @@ function create3DInfantry(color) {
     head.castShadow = true;
     group.add(head);
 
-    const helmet = new THREE.Mesh(
-        new THREE.SphereGeometry(0.22, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.5),
-        new THREE.MeshStandardMaterial({ color: 0x445544, roughness: 0.5 })
-    );
+    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), new THREE.MeshStandardMaterial({ color: 0x445544, roughness: 0.5 }));
     helmet.position.y = 1.7;
     group.add(helmet);
 
@@ -1179,10 +1013,7 @@ function create3DArtillery(color) {
     group.add(base);
 
     for (let side of [-1, 1]) {
-        const wheel = new THREE.Mesh(
-            new THREE.TorusGeometry(0.3, 0.08, 8, 12),
-            new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 })
-        );
+        const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 8, 12), new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 }));
         wheel.position.set(side * 0.7, 0.3, 0.5);
         wheel.rotation.y = Math.PI / 2;
         group.add(wheel);
@@ -1192,10 +1023,7 @@ function create3DArtillery(color) {
     carriage.position.y = 0.6;
     group.add(carriage);
 
-    const barrel = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.1, 0.15, 1.8, 8),
-        metalMat
-    );
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 1.8, 8), metalMat);
     barrel.rotation.x = Math.PI / 2 * 0.3;
     barrel.position.set(0, 0.8, 1.2);
     group.add(barrel);
@@ -1239,10 +1067,7 @@ function create3DAircraft(color) {
     group.add(cockpit);
 
     const propGroup = new THREE.Group();
-    const prop = new THREE.Mesh(
-        new THREE.BoxGeometry(0.8, 0.02, 0.1),
-        new THREE.MeshStandardMaterial({ color: 0x222222 })
-    );
+    const prop = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.02, 0.1), new THREE.MeshStandardMaterial({ color: 0x222222 }));
     prop.position.x = 1.4;
     propGroup.add(prop);
     const prop2 = prop.clone();
@@ -1252,10 +1077,7 @@ function create3DAircraft(color) {
     group.userData.propeller = propGroup;
 
     for (let side of [-1, 1]) {
-        const gear = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.02, 0.03, 0.2, 4),
-            new THREE.MeshStandardMaterial({ color: 0x222222 })
-        );
+        const gear = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.2, 4), new THREE.MeshStandardMaterial({ color: 0x222222 }));
         gear.position.set(side * 0.4, -0.2, -0.1);
         group.add(gear);
     }
@@ -1277,16 +1099,10 @@ function create3DUnit(name, type, x, z, friendly = true, country = "BANGLADESH")
     group.add(model);
 
     const hpBar = new THREE.Group();
-    const bg = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.8, 0.15),
-        new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 })
-    );
+    const bg = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.15), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 }));
     bg.position.y = 0;
     hpBar.add(bg);
-    const hpFill = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.7, 0.1),
-        new THREE.MeshBasicMaterial({ color: 0x55dd55 })
-    );
+    const hpFill = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.1), new THREE.MeshBasicMaterial({ color: 0x55dd55 }));
     hpFill.position.y = 0;
     hpBar.add(hpFill);
     hpBar.position.y = type === 'AIR' ? 9.5 : 3.0;
@@ -1297,8 +1113,7 @@ function create3DUnit(name, type, x, z, friendly = true, country = "BANGLADESH")
     const flagDiv = document.createElement('div');
     const countryData = nation[country] || nation["BANGLADESH"];
     flagDiv.textContent = friendly ? countryData.flag : '🔴';
-    flagDiv.style.fontSize = '14px';
-    flagDiv.style.textShadow = '0 0 10px rgba(0,0,0,0.8)';
+    flagDiv.style.cssText = 'font-size:14px;text-shadow:0 0 10px rgba(0,0,0,0.8);';
     const flagLabel = new CSS2DObject(flagDiv);
     flagLabel.position.set(0, type === 'AIR' ? 11 : 4.5, 0);
     group.add(flagLabel);
@@ -1351,7 +1166,6 @@ function deployInitialForces() {
     create3DUnit("Armored Brigade", "TANK", -4, -18, true, "BANGLADESH");
     create3DUnit("Artillery Reg", "ARTILLERY", -10, -24, true, "BANGLADESH");
     create3DUnit("Air Wing", "AIR", -2, -30, true, "BANGLADESH");
-    
     create3DUnit("Pakistani Infantry", "INFANTRY", 28, 16, true, "PAKISTAN");
     create3DUnit("Pakistani Armor", "TANK", 32, 20, true, "PAKISTAN");
     create3DUnit("Turkish Infantry", "INFANTRY", -58, 42, true, "TURKEY");
@@ -1361,7 +1175,6 @@ function deployInitialForces() {
     create3DUnit("Saudi Infantry", "INFANTRY", 16, 16, true, "SAUDI");
     create3DUnit("Egyptian Infantry", "INFANTRY", -28, 10, true, "EGYPT");
     create3DUnit("Palestinian Defense", "INFANTRY", -4, 28, true, "PALESTINE");
-    
     create3DUnit("Indian Infantry", "INFANTRY", 8, -12, false, "INDIA");
     create3DUnit("Indian Armor", "TANK", 14, -8, false, "INDIA");
     create3DUnit("Chinese Infantry", "INFANTRY", 52, 4, false, "CHINA");
@@ -1406,23 +1219,15 @@ function executeAttack(attacker, defender) {
     if (attacker.type === 'ARTILLERY') maxRange = 80;
     if (attacker.type === 'AIR') maxRange = 100;
     
-    if (distance > maxRange) {
-        toast("Target is out of range");
-        return;
-    }
-    if (attacker.supply < 15) {
-        toast("Insufficient supply");
-        return;
-    }
+    if (distance > maxRange) { toast("Target is out of range"); return; }
+    if (attacker.supply < 15) { toast("Insufficient supply"); return; }
 
     attacker.supply = Math.max(0, attacker.supply - 6);
     
     let attackPower = (attacker.attack * (attacker.strength / 100) * (attacker.organization / 100) *
         (attacker.morale / 100) * getTerrainModifier(attacker) * getTechAttackBonus(attacker)) + Math.random() * 8;
     
-    if (attacker.type === 'ARTILLERY' && defender.state === 'DEFENDING') {
-        attackPower *= 1.3;
-    }
+    if (attacker.type === 'ARTILLERY' && defender.state === 'DEFENDING') attackPower *= 1.3;
     
     const defensePower = (defender.defense * (defender.strength / 100) * (defender.organization / 100) *
         (defender.morale / 100) * getTerrainModifier(defender)) + Math.random() * 7;
@@ -1454,10 +1259,7 @@ function executeAttack(attacker, defender) {
 }
 
 function executeAirstrike(aircraft, target) {
-    if (aircraft.supply < 20) {
-        toast("Air unit needs supply");
-        return;
-    }
+    if (aircraft.supply < 20) { toast("Air unit needs supply"); return; }
     aircraft.supply -= 20;
     let damage = 18 + Math.random() * 18;
     damage *= aircraft.readiness / 100;
@@ -1494,15 +1296,8 @@ function createExplosion(position) {
         );
         mesh.position.copy(position);
         mesh.position.y += 0.5 + Math.random() * 1.5;
-        const dir = new THREE.Vector3(
-            (Math.random() - 0.5) * 3,
-            Math.random() * 3,
-            (Math.random() - 0.5) * 3
-        ).normalize();
-        mesh.userData = {
-            life: 0.3 + Math.random() * 0.4,
-            velocity: dir.multiplyScalar(2 + Math.random() * 5)
-        };
+        const dir = new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3).normalize();
+        mesh.userData = { life: 0.3 + Math.random() * 0.4, velocity: dir.multiplyScalar(2 + Math.random() * 5) };
         fxGroup.add(mesh);
     }
 }
@@ -1527,7 +1322,7 @@ function destroyUnit(unit, killer = null) {
 }
 
 /* =========================================================
-   ECONOMY
+   ECONOMY, PRODUCTION, RESEARCH
    ========================================================== */
 
 function updateEconomy(dt) {
@@ -1552,10 +1347,6 @@ function updateEconomy(dt) {
     }
     construction = Math.min(20, construction + factories.civilian * 0.001 * dt * speed);
 }
-
-/* =========================================================
-   PRODUCTION
-   ========================================================== */
 
 function updateProduction(dt) {
     if (paused) return;
@@ -1602,60 +1393,6 @@ function applyProductionOutput(type, amount) {
     }
 }
 
-function assignFactory(type) {
-    const used = Object.values(production).reduce((sum, item) => sum + item.factories, 0);
-    if (used >= factories.military) {
-        toast("No free military factories");
-        return;
-    }
-    production[type].factories++;
-    toast(`${type} factory assigned`);
-    openPanel("production");
-}
-
-function quickBuildFactory() {
-    if (money < 500) {
-        toast("Need $500 to build factory");
-        return;
-    }
-    if (construction < 2) {
-        toast("Need 2 construction points");
-        return;
-    }
-    money -= 500;
-    construction -= 2;
-    factories.military++;
-    toast("🏭 Military factory built!");
-    updateAllUI();
-}
-
-function quickReinforce() {
-    if (money < 300) {
-        toast("Need $300 to reinforce");
-        return;
-    }
-    if (manpower < 1000) {
-        toast("Not enough manpower");
-        return;
-    }
-    money -= 300;
-    manpower -= 1000;
-    for (const unit of units) {
-        if (unit.friendly && unit.state !== "DESTROYED") {
-            unit.hp = Math.min(unit.maxHp, unit.hp + 20);
-            unit.organization = Math.min(unit.maxOrganization, unit.organization + 15);
-            unit.morale = Math.min(100, unit.morale + 10);
-            updateUnitHPBar(unit);
-        }
-    }
-    toast("🪖 Units reinforced!");
-    updateAllUI();
-}
-
-/* =========================================================
-   RESEARCH
-   ========================================================== */
-
 function updateResearch(dt) {
     if (paused) return;
     for (const key of Object.keys(tech)) {
@@ -1674,19 +1411,10 @@ function updateResearch(dt) {
 
 function startResearch(key) {
     const t = tech[key];
-    if (t.completed) {
-        toast("Technology already completed");
-        return;
-    }
+    if (t.completed) { toast("Technology already completed"); return; }
     const active = Object.values(tech).filter(x => x.active).length;
-    if (!t.active && active >= 3) {
-        toast("All research slots are occupied");
-        return;
-    }
-    if (political < 10) {
-        toast("Need 10 political power");
-        return;
-    }
+    if (!t.active && active >= 3) { toast("All research slots are occupied"); return; }
+    if (political < 10) { toast("Need 10 political power"); return; }
     political -= 10;
     t.active = true;
     toast(`Research started: ${t.name}`);
@@ -1704,46 +1432,20 @@ function applyTechnology(key) {
 }
 
 /* =========================================================
-   DIPLOMACY
+   DIPLOMACY, INTEL, MISC FUNCTIONS
    ========================================================== */
 
 function improveDiplomacy(country) {
-    if (political < 15) {
-        toast("Need political power");
-        return;
-    }
+    if (political < 15) { toast("Need political power"); return; }
     political -= 15;
-    diplomacy[country] = Math.min(100, diplomacy[country] + 8);
+    diplomacy[country] = Math.min(100, (diplomacy[country] || 0) + 8);
     addDiplomaticMessage(`Relations improved with ${nation[country]?.name || country}`);
     toast(`Relations improved with ${nation[country]?.name || country}`);
     openPanel("diplomacy");
 }
 
-function diplomaticAction(country) {
-    const value = diplomacy[country] || 0;
-    if (value <= -50) {
-        diplomacy[country] = -100;
-        stability = Math.max(0, stability - 2);
-        addDiplomaticMessage(`War declared on ${nation[country]?.name || country}`);
-        toast(`War declared on ${nation[country]?.name || country}`);
-    } else {
-        diplomacy[country] = Math.min(100, value + 12);
-        political = Math.max(0, political - 8);
-        addDiplomaticMessage(`Pact proposed to ${nation[country]?.name || country}`);
-        toast(`Pact proposed to ${nation[country]?.name || country}`);
-    }
-    openPanel("diplomacy");
-}
-
-/* =========================================================
-   INTELLIGENCE
-   ========================================================== */
-
 function runRecon() {
-    if (money < 250) {
-        toast("Not enough money");
-        return;
-    }
+    if (money < 250) { toast("Not enough money"); return; }
     money -= 250;
     intel = Math.min(100, intel + 10);
     for (const unit of units) {
@@ -1756,10 +1458,7 @@ function runRecon() {
 }
 
 function expandSpyNetwork() {
-    if (money < 400) {
-        toast("Not enough money");
-        return;
-    }
+    if (money < 400) { toast("Not enough money"); return; }
     money -= 400;
     spy = Math.min(100, spy + 12);
     intel = Math.min(100, intel + 4);
@@ -1768,19 +1467,12 @@ function expandSpyNetwork() {
 }
 
 function improveCounterIntel() {
-    if (money < 350) {
-        toast("Not enough money");
-        return;
-    }
+    if (money < 350) { toast("Not enough money"); return; }
     money -= 350;
     counterIntel = Math.min(100, counterIntel + 12);
     toast("Counter-intelligence improved");
     updateAllUI();
 }
-
-/* =========================================================
-   WEATHER / MAP
-   ========================================================== */
 
 function changeWeather() {
     if (weather === "CLEAR") weather = "RAIN";
@@ -1800,10 +1492,6 @@ function setMapLayer(layer) {
     toast(`Map layer: ${layer}`);
 }
 
-/* =========================================================
-   BATTLE LOG & DIPLOMATIC MESSAGES
-   ========================================================== */
-
 function addBattleLog(message) {
     battleLog.unshift({ time: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`, message });
     if (battleLog.length > 20) battleLog.pop();
@@ -1814,8 +1502,68 @@ function addDiplomaticMessage(message) {
     if (diplomaticMessages.length > 10) diplomaticMessages.pop();
 }
 
+function assignFactory(type) {
+    const used = Object.values(production).reduce((sum, item) => sum + item.factories, 0);
+    if (used >= factories.military) { toast("No free military factories"); return; }
+    production[type].factories++;
+    toast(`${type} factory assigned`);
+    openPanel("production");
+}
+
+function quickBuildFactory() {
+    if (money < 500) { toast("Need $500 to build factory"); return; }
+    if (construction < 2) { toast("Need 2 construction points"); return; }
+    money -= 500;
+    construction -= 2;
+    factories.military++;
+    toast("🏭 Military factory built!");
+    updateAllUI();
+}
+
+function quickReinforce() {
+    if (money < 300) { toast("Need $300 to reinforce"); return; }
+    if (manpower < 1000) { toast("Not enough manpower"); return; }
+    money -= 300;
+    manpower -= 1000;
+    for (const unit of units) {
+        if (unit.friendly && unit.state !== "DESTROYED") {
+            unit.hp = Math.min(unit.maxHp, unit.hp + 20);
+            unit.organization = Math.min(unit.maxOrganization, unit.organization + 15);
+            unit.morale = Math.min(100, unit.morale + 10);
+            updateUnitHPBar(unit);
+        }
+    }
+    toast("🪖 Units reinforced!");
+    updateAllUI();
+}
+
+function buildBuilding(buildingId) {
+    const building = BUILDINGS[buildingId];
+    if (!building) return;
+    
+    for (const [resource, amount] of Object.entries(building.cost)) {
+        if (resource === 'money' && money < amount) { toast(`Not enough money`); return; }
+        if (resource === 'steel' && steel < amount) { toast(`Not enough steel`); return; }
+    }
+    
+    for (const [resource, amount] of Object.entries(building.cost)) {
+        if (resource === 'money') money -= amount;
+        else if (resource === 'steel') steel -= amount;
+    }
+    
+    buildingQueue.push({
+        buildingId: buildingId,
+        progress: 0,
+        totalTime: building.buildTime
+    });
+    
+    toast(`🔨 Building ${building.name} started!`);
+    openPanel('buildings');
+    updateAllUI();
+}
+
 /* =========================================================
-   AUTO-SAVE
+   AUTOSAVE
    ========================================================== */
 
 function autosave() {
@@ -1879,7 +1627,7 @@ function loadCampaign() {
 }
 
 /* =========================================================
-   MOVEMENT / AI
+   MOVEMENT & AI
    ========================================================== */
 
 function updateUnitMovement(dt) {
@@ -2029,12 +1777,11 @@ function setupUI() {
             else if (panel === 'diplomacy') openPanel('diplomacy');
             else if (panel === 'intel') openPanel('intel');
             else if (panel === 'settings') openPanel('settings');
+            else if (panel === 'buildings') openPanel('buildings');
         });
     });
 
-    $('closePanel').addEventListener('click', () => {
-        $('mainPanel').classList.remove('open');
-    });
+    $('closePanel').addEventListener('click', () => { $('mainPanel').classList.remove('open'); });
     $('closeUnit').addEventListener('click', () => {
         $('unitPanel').classList.remove('open');
         if (selectedUnit) deselectUnit();
@@ -2086,15 +1833,9 @@ function setupUI() {
     });
 
     $('airstrikeCommand').addEventListener('click', () => {
-        if (!selectedUnit || selectedUnit.type !== 'AIR') {
-            toast('Select an air unit');
-            return;
-        }
+        if (!selectedUnit || selectedUnit.type !== 'AIR') { toast('Select an air unit'); return; }
         const targets = units.filter(u => !u.friendly && u.state !== 'DESTROYED');
-        if (!targets.length) {
-            toast('No enemy targets');
-            return;
-        }
+        if (!targets.length) { toast('No enemy targets'); return; }
         const target = targets[0];
         executeAirstrike(selectedUnit, target);
     });
@@ -2116,14 +1857,8 @@ function setupUI() {
         toast(`Speed: ${speed}×`);
     });
 
-    $('zoomIn').addEventListener('click', () => {
-        camera.position.multiplyScalar(0.85);
-        controls.update();
-    });
-    $('zoomOut').addEventListener('click', () => {
-        camera.position.multiplyScalar(1.15);
-        controls.update();
-    });
+    $('zoomIn').addEventListener('click', () => { camera.position.multiplyScalar(0.85); controls.update(); });
+    $('zoomOut').addEventListener('click', () => { camera.position.multiplyScalar(1.15); controls.update(); });
     $('resetCamera').addEventListener('click', () => {
         camera.position.set(80, 80, 120);
         controls.target.set(0, 0, 0);
@@ -2141,19 +1876,12 @@ function setupUI() {
         toast('Top view');
     });
     $('zoomToCountry').addEventListener('click', () => {
-        if (highlightedCountry) {
-            zoomToCountry(highlightedCountry);
-        } else {
-            toast('Select a country first');
-        }
+        if (highlightedCountry) { zoomToCountry(highlightedCountry); }
+        else { toast('Select a country first'); }
     });
 
-    $('countryDisplay').addEventListener('click', () => {
-        $('countryModal').classList.add('open');
-    });
-    $('closeCountryModal').addEventListener('click', () => {
-        $('countryModal').classList.remove('open');
-    });
+    $('countryDisplay').addEventListener('click', () => { $('countryModal').classList.add('open'); });
+    $('closeCountryModal').addEventListener('click', () => { $('countryModal').classList.remove('open'); });
     document.querySelectorAll('.country-card').forEach(card => {
         card.addEventListener('click', () => {
             const country = card.dataset.country;
@@ -2169,9 +1897,7 @@ function setupUI() {
         });
     });
 
-    $('closeCountryInfo').addEventListener('click', () => {
-        $('countryInfoModal').classList.remove('open');
-    });
+    $('closeCountryInfo').addEventListener('click', () => { $('countryInfoModal').classList.remove('open'); });
 
     let tutorialStep = 0;
     const tutorialTexts = [
@@ -2182,21 +1908,14 @@ function setupUI() {
     ];
     $('tutorialNext').addEventListener('click', () => {
         tutorialStep++;
-        if (tutorialStep >= tutorialTexts.length) {
-            $('tutorial').style.display = 'none';
-            return;
-        }
+        if (tutorialStep >= tutorialTexts.length) { $('tutorial').style.display = 'none'; return; }
         $('tutorialTitle').textContent = tutorialTexts[tutorialStep].title;
         $('tutorialText').textContent = tutorialTexts[tutorialStep].text;
         $('tutorialNext').textContent = tutorialStep === tutorialTexts.length - 1 ? 'START' : 'NEXT';
     });
 
     document.querySelectorAll('.modal').forEach(modal => {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.classList.remove('open');
-            }
-        });
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
     });
 }
 
@@ -2212,15 +1931,13 @@ function openPanel(panel) {
         panelKicker.textContent = 'STRATEGIC COMMAND';
         panelTitle.textContent = 'World Overview';
         panelContent.innerHTML = `
-            <div class="info-card">
-                <h3>🌍 Global Status</h3>
+            <div class="info-card"><h3>🌍 Global Status</h3>
                 <div class="stat-row"><span>Total Countries</span><b>${Object.keys(nation).length}</b></div>
                 <div class="stat-row"><span>Active Units</span><b>${units.filter(u => u.state !== 'DESTROYED').length}</b></div>
                 <div class="stat-row"><span>Total Factories</span><b>${factories.civilian + factories.military}</b></div>
                 <div class="stat-row"><span>Weather</span><b>${weather}</b></div>
             </div>
-            <div class="info-card">
-                <h3>🎯 Selected Country</h3>
+            <div class="info-card"><h3>🎯 Selected Country</h3>
                 ${highlightedCountry ? `
                     <div class="stat-row"><span>Country</span><b>${nation[highlightedCountry].flag} ${nation[highlightedCountry].name}</b></div>
                     <div class="stat-row"><span>Region</span><b>${nation[highlightedCountry].region}</b></div>
@@ -2238,23 +1955,11 @@ function openPanel(panel) {
         const friendlyUnits = units.filter(u => u.friendly && u.state !== 'DESTROYED');
         const enemyUnits = units.filter(u => !u.friendly && u.state !== 'DESTROYED');
         panelContent.innerHTML = `
-            <div class="info-card">
-                <h3>🟢 Allied Forces</h3>
-                ${friendlyUnits.map(u => `
-                    <div class="stat-row">
-                        <span>${u.type} ${u.name}</span>
-                        <b style="color:${u.hp > 50 ? 'var(--green)' : 'var(--red)'}">HP: ${Math.round(u.hp)}%</b>
-                    </div>
-                `).join('') || '<p style="color:var(--muted);font-size:11px;">No friendly units</p>'}
+            <div class="info-card"><h3>🟢 Allied Forces</h3>
+                ${friendlyUnits.map(u => `<div class="stat-row"><span>${u.type} ${u.name}</span><b style="color:${u.hp > 50 ? 'var(--green)' : 'var(--red)'}">HP: ${Math.round(u.hp)}%</b></div>`).join('') || '<p style="color:var(--muted);font-size:11px;">No friendly units</p>'}
             </div>
-            <div class="info-card">
-                <h3>🔴 Enemy Forces</h3>
-                ${enemyUnits.map(u => `
-                    <div class="stat-row">
-                        <span>${u.type} ${u.name}</span>
-                        <b style="color:${u.hp > 50 ? 'var(--green)' : 'var(--red)'}">HP: ${Math.round(u.hp)}%</b>
-                    </div>
-                `).join('') || '<p style="color:var(--muted);font-size:11px;">No enemy units</p>'}
+            <div class="info-card"><h3>🔴 Enemy Forces</h3>
+                ${enemyUnits.map(u => `<div class="stat-row"><span>${u.type} ${u.name}</span><b style="color:${u.hp > 50 ? 'var(--green)' : 'var(--red)'}">HP: ${Math.round(u.hp)}%</b></div>`).join('') || '<p style="color:var(--muted);font-size:11px;">No enemy units</p>'}
             </div>
             <button class="action-btn success" onclick="window.quickReinforce()">🪖 Reinforce All</button>
         `;
@@ -2262,23 +1967,20 @@ function openPanel(panel) {
         panelKicker.textContent = 'ECONOMIC REPORT';
         panelTitle.textContent = 'Economy Overview';
         panelContent.innerHTML = `
-            <div class="info-card">
-                <h3>💰 Resources</h3>
+            <div class="info-card"><h3>💰 Resources</h3>
                 <div class="stat-row"><span>Money</span><b>$${Math.round(money)}</b></div>
                 <div class="stat-row"><span>Oil</span><b>${Math.round(oil)}</b></div>
                 <div class="stat-row"><span>Steel</span><b>${Math.round(steel)}</b></div>
                 <div class="stat-row"><span>Food</span><b>${Math.round(food)}</b></div>
                 <div class="stat-row"><span>Manpower</span><b>${Math.round(manpower)}</b></div>
             </div>
-            <div class="info-card">
-                <h3>🏭 Factories</h3>
+            <div class="info-card"><h3>🏭 Factories</h3>
                 <div class="stat-row"><span>Civilian</span><b>${factories.civilian}</b></div>
                 <div class="stat-row"><span>Military</span><b>${factories.military}</b></div>
                 <div class="stat-row"><span>Naval</span><b>${factories.naval}</b></div>
                 <div class="stat-row"><span>Construction</span><b>${Math.round(construction)}</b></div>
             </div>
-            <div class="info-card">
-                <h3>📊 Stats</h3>
+            <div class="info-card"><h3>📊 Stats</h3>
                 <div class="stat-row"><span>Stability</span><b style="color:${stability > 60 ? 'var(--green)' : 'var(--red)'}">${Math.round(stability)}%</b></div>
                 <div class="stat-row"><span>Political Power</span><b>${Math.round(political)}</b></div>
                 <div class="stat-row"><span>Tax Rate</span><b>${tax}%</b></div>
@@ -2291,20 +1993,14 @@ function openPanel(panel) {
         panelContent.innerHTML = `
             ${Object.keys(production).map(key => {
                 const p = production[key];
-                return `
-                    <div class="info-card">
-                        <h3>${key} (${p.name})</h3>
-                        <div class="stat-row"><span>Progress</span><b>${Math.round(p.progress)}%</b></div>
-                        <div class="stat-row"><span>Factories</span><b>${p.factories}</b></div>
-                        <div class="stat-row"><span>Efficiency</span><b>${Math.round(p.efficiency)}%</b></div>
-                        <button class="action-btn" onclick="window.assignFactory('${key}')">➕ Assign Factory</button>
-                    </div>
-                `;
+                return `<div class="info-card"><h3>${key} (${p.name})</h3>
+                    <div class="stat-row"><span>Progress</span><b>${Math.round(p.progress)}%</b></div>
+                    <div class="stat-row"><span>Factories</span><b>${p.factories}</b></div>
+                    <div class="stat-row"><span>Efficiency</span><b>${Math.round(p.efficiency)}%</b></div>
+                    <button class="action-btn" onclick="window.assignFactory('${key}')">➕ Assign Factory</button>
+                </div>`;
             }).join('')}
-            <div class="info-card">
-                <h3>📦 Production Queue</h3>
-                <p style="color:var(--muted);font-size:11px;">Output is automatically applied to units.</p>
-            </div>
+            <div class="info-card"><h3>📦 Production Queue</h3><p style="color:var(--muted);font-size:11px;">Output is automatically applied to units.</p></div>
         `;
     } else if (panel === 'research') {
         panelKicker.textContent = 'RESEARCH & DEVELOPMENT';
@@ -2312,15 +2008,12 @@ function openPanel(panel) {
         panelContent.innerHTML = `
             ${Object.keys(tech).map(key => {
                 const t = tech[key];
-                return `
-                    <div class="info-card">
-                        <h3>${t.name}</h3>
-                        <div class="stat-row"><span>Progress</span><b>${Math.round(t.progress)}%</b></div>
-                        <div class="stat-row"><span>Status</span><b style="color:${t.completed ? 'var(--green)' : t.active ? 'var(--accent)' : 'var(--muted)'}">${t.completed ? '✅ Completed' : t.active ? '🔄 Researching' : '⏸ Inactive'}</b></div>
-                        <div class="stat-row"><span>Bonus</span><b>${t.bonus}</b></div>
-                        ${!t.completed && !t.active ? `<button class="action-btn" onclick="window.startResearch('${key}')">🔬 Start Research (10 PP)</button>` : ''}
-                    </div>
-                `;
+                return `<div class="info-card"><h3>${t.name}</h3>
+                    <div class="stat-row"><span>Progress</span><b>${Math.round(t.progress)}%</b></div>
+                    <div class="stat-row"><span>Status</span><b style="color:${t.completed ? 'var(--green)' : t.active ? 'var(--accent)' : 'var(--muted)'}">${t.completed ? '✅ Completed' : t.active ? '🔄 Researching' : '⏸ Inactive'}</b></div>
+                    <div class="stat-row"><span>Bonus</span><b>${t.bonus}</b></div>
+                    ${!t.completed && !t.active ? `<button class="action-btn" onclick="window.startResearch('${key}')">🔬 Start Research (10 PP)</button>` : ''}
+                </div>`;
             }).join('')}
         `;
     } else if (panel === 'diplomacy') {
@@ -2329,21 +2022,17 @@ function openPanel(panel) {
         panelContent.innerHTML = `
             ${Object.keys(nation).filter(k => k !== currentCountry).map(k => {
                 const val = diplomacy[k] || 0;
-                return `
-                    <div class="info-card">
-                        <h3>${nation[k].flag} ${nation[k].name}</h3>
-                        <div class="stat-row"><span>Relations</span><b style="color:${val > 0 ? 'var(--green)' : val < -30 ? 'var(--red)' : 'var(--accent)'}">${val}</b></div>
-                        <button class="action-btn ${val < -50 ? 'danger' : 'success'}" onclick="window.improveDiplomacy('${k}')">${val < -50 ? '⚔️ Declare War' : '🤝 Improve Relations'}</button>
-                    </div>
-                `;
+                return `<div class="info-card"><h3>${nation[k].flag} ${nation[k].name}</h3>
+                    <div class="stat-row"><span>Relations</span><b style="color:${val > 0 ? 'var(--green)' : val < -30 ? 'var(--red)' : 'var(--accent)'}">${val}</b></div>
+                    <button class="action-btn ${val < -50 ? 'danger' : 'success'}" onclick="window.improveDiplomacy('${k}')">${val < -50 ? '⚔️ Declare War' : '🤝 Improve Relations'}</button>
+                </div>`;
             }).join('')}
         `;
     } else if (panel === 'intel') {
         panelKicker.textContent = 'INTELLIGENCE REPORT';
         panelTitle.textContent = 'Intelligence';
         panelContent.innerHTML = `
-            <div class="info-card">
-                <h3>🕵️ Intel Status</h3>
+            <div class="info-card"><h3>🕵️ Intel Status</h3>
                 <div class="stat-row"><span>Intel Level</span><b>${Math.round(intel)}%</b></div>
                 <div class="stat-row"><span>Spy Network</span><b>${Math.round(spy)}%</b></div>
                 <div class="stat-row"><span>Counter-Intel</span><b>${Math.round(counterIntel)}%</b></div>
@@ -2351,31 +2040,45 @@ function openPanel(panel) {
             <button class="action-btn" onclick="window.runRecon()">🔭 Run Recon ($250)</button>
             <button class="action-btn" onclick="window.expandSpyNetwork()">🕵️ Expand Spy Network ($400)</button>
             <button class="action-btn" onclick="window.improveCounterIntel()">🛡️ Improve Counter-Intel ($350)</button>
-            <div class="info-card">
-                <h3>📋 Battle Log</h3>
-                ${battleLog.slice(0, 5).map(log => `
-                    <div style="font-size:10px;color:var(--muted);padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
-                        [${log.time}] ${log.message}
-                    </div>
-                `).join('') || '<p style="color:var(--muted);font-size:11px;">No battles yet</p>'}
+            <div class="info-card"><h3>📋 Battle Log</h3>
+                ${battleLog.slice(0, 5).map(log => `<div style="font-size:10px;color:var(--muted);padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05);">[${log.time}] ${log.message}</div>`).join('') || '<p style="color:var(--muted);font-size:11px;">No battles yet</p>'}
             </div>
         `;
     } else if (panel === 'settings') {
         panelKicker.textContent = 'SYSTEM SETTINGS';
         panelTitle.textContent = 'Settings';
         panelContent.innerHTML = `
-            <div class="info-card">
-                <h3>⚙️ Game Settings</h3>
+            <div class="info-card"><h3>⚙️ Game Settings</h3>
                 <div class="stat-row"><span>Current Country</span><b>${nation[currentCountry]?.flag} ${nation[currentCountry]?.name}</b></div>
                 <div class="stat-row"><span>Speed</span><b>${speed}×</b></div>
                 <div class="stat-row"><span>Status</span><b>${paused ? '⏸ Paused' : '▶ Running'}</b></div>
             </div>
             <button class="action-btn" onclick="window.changeWeather()">🌤️ Change Weather</button>
             <button class="action-btn danger" onclick="if(confirm('Reset everything?')){localStorage.removeItem('worldWarSave');location.reload();}">🗑️ Reset Game</button>
-            <div class="info-card">
-                <h3>💾 Save/Load</h3>
+            <div class="info-card"><h3>💾 Save/Load</h3>
                 <button class="action-btn" onclick="window.autosave();toast('Game saved!')">💾 Save Game</button>
                 <button class="action-btn" onclick="window.loadCampaign();toast('Game loaded!');updateAllUI();">📂 Load Game</button>
+            </div>
+        `;
+    } else if (panel === 'buildings') {
+        panelKicker.textContent = 'CONSTRUCTION';
+        panelTitle.textContent = 'Buildings';
+        panelContent.innerHTML = `
+            <div class="info-card"><h3>🏗️ Available Buildings</h3>
+                ${Object.keys(BUILDINGS).map(key => {
+                    const b = BUILDINGS[key];
+                    return `<div class="info-card"><h3>${b.icon} ${b.name}</h3>
+                        <div class="stat-row"><span>Cost</span><b>$${b.cost.money} + ${b.cost.steel} Steel</b></div>
+                        <div class="stat-row"><span>Build Time</span><b>${b.buildTime}s</b></div>
+                        <div class="stat-row"><span>Production</span><b>${Object.entries(b.production).map(([k,v]) => `${v} ${k}`).join(', ')}</b></div>
+                        <button class="action-btn success" onclick="window.buildBuilding('${key}')">🔨 Build ${b.name}</button>
+                    </div>`;
+                }).join('')}
+            </div>
+            <div class="info-card"><h3>📋 Building Queue</h3>
+                ${buildingQueue.length ? buildingQueue.map(item => 
+                    `<div class="stat-row"><span>${BUILDINGS[item.buildingId]?.icon} ${BUILDINGS[item.buildingId]?.name}</span><b>${Math.round(item.progress/item.totalTime * 100)}%</b></div>`
+                ).join('') : '<p style="color:var(--muted);font-size:11px;">No buildings in queue</p>'}
             </div>
         `;
     }
@@ -2392,51 +2095,15 @@ function updateUnitPanel() {
     $('selectedUnitType').textContent = unit.type;
     $('selectedUnitName').textContent = unit.name;
     $('unitStats').innerHTML = `
-        <div class="unit-stat">
-            <span>Health</span>
-            <div class="progress"><i style="width:${(unit.hp/unit.maxHp)*100}%;background:${unit.hp > 50 ? 'var(--green)' : 'var(--red)'}"></i></div>
-            <b>${Math.round(unit.hp)}%</b>
-        </div>
-        <div class="unit-stat">
-            <span>Organization</span>
-            <div class="progress"><i style="width:${(unit.organization/unit.maxOrganization)*100}%"></i></div>
-            <b>${Math.round(unit.organization)}%</b>
-        </div>
-        <div class="unit-stat">
-            <span>Morale</span>
-            <div class="progress"><i style="width:${unit.morale}%"></i></div>
-            <b>${Math.round(unit.morale)}%</b>
-        </div>
-        <div class="unit-stat">
-            <span>Strength</span>
-            <div class="progress"><i style="width:${(unit.strength/unit.maxStrength)*100}%"></i></div>
-            <b>${Math.round(unit.strength)}%</b>
-        </div>
-        <div class="unit-stat">
-            <span>Supply</span>
-            <div class="progress"><i style="width:${unit.supply}%;background:${unit.supply > 40 ? 'var(--green)' : 'var(--red)'}"></i></div>
-            <b>${Math.round(unit.supply)}%</b>
-        </div>
-        <div class="unit-stat">
-            <span>Readiness</span>
-            <div class="progress"><i style="width:${unit.readiness}%"></i></div>
-            <b>${Math.round(unit.readiness)}%</b>
-        </div>
-        <div class="unit-stat">
-            <span>Status</span>
-            <span style="color:var(--accent);font-weight:700;">${unit.state}</span>
-            <span></span>
-        </div>
-        <div class="unit-stat">
-            <span>Kills</span>
-            <span></span>
-            <b>${unit.kills}</b>
-        </div>
-        <div class="unit-stat">
-            <span>Experience</span>
-            <div class="progress"><i style="width:${unit.experience}%;background:var(--gold);"></i></div>
-            <b>${Math.round(unit.experience)}%</b>
-        </div>
+        <div class="unit-stat"><span>Health</span><div class="progress"><i style="width:${(unit.hp/unit.maxHp)*100}%;background:${unit.hp > 50 ? 'var(--green)' : 'var(--red)'}"></i></div><b>${Math.round(unit.hp)}%</b></div>
+        <div class="unit-stat"><span>Organization</span><div class="progress"><i style="width:${(unit.organization/unit.maxOrganization)*100}%"></i></div><b>${Math.round(unit.organization)}%</b></div>
+        <div class="unit-stat"><span>Morale</span><div class="progress"><i style="width:${unit.morale}%"></i></div><b>${Math.round(unit.morale)}%</b></div>
+        <div class="unit-stat"><span>Strength</span><div class="progress"><i style="width:${(unit.strength/unit.maxStrength)*100}%"></i></div><b>${Math.round(unit.strength)}%</b></div>
+        <div class="unit-stat"><span>Supply</span><div class="progress"><i style="width:${unit.supply}%;background:${unit.supply > 40 ? 'var(--green)' : 'var(--red)'}"></i></div><b>${Math.round(unit.supply)}%</b></div>
+        <div class="unit-stat"><span>Readiness</span><div class="progress"><i style="width:${unit.readiness}%"></i></div><b>${Math.round(unit.readiness)}%</b></div>
+        <div class="unit-stat"><span>Status</span><span style="color:var(--accent);font-weight:700;">${unit.state}</span><span></span></div>
+        <div class="unit-stat"><span>Kills</span><span></span><b>${unit.kills}</b></div>
+        <div class="unit-stat"><span>Experience</span><div class="progress"><i style="width:${unit.experience}%;background:var(--gold);"></i></div><b>${Math.round(unit.experience)}%</b></div>
     `;
 }
 
@@ -2447,13 +2114,7 @@ function selectUnit(unit) {
     if (unit.object.children.length > 0) {
         const highlight = new THREE.Mesh(
             new THREE.RingGeometry(1.2, 1.8, 16),
-            new THREE.MeshBasicMaterial({
-                color: 0xffdd44,
-                transparent: true,
-                opacity: 0.7,
-                side: THREE.DoubleSide,
-                depthWrite: false
-            })
+            new THREE.MeshBasicMaterial({ color: 0xffdd44, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false })
         );
         highlight.rotation.x = -Math.PI / 2;
         highlight.position.set(0, 0.1, 0);
@@ -2496,10 +2157,29 @@ function toast(message) {
     toastEl.textContent = message;
     toastEl.classList.add('show');
     clearTimeout(toastEl._timeout);
-    toastEl._timeout = setTimeout(() => {
-        toastEl.classList.remove('show');
-    }, 2500);
+    toastEl._timeout = setTimeout(() => { toastEl.classList.remove('show'); }, 2500);
 }
+
+/* =========================================================
+   EXPOSE FUNCTIONS TO WINDOW
+   ========================================================== */
+
+window.zoomToCountry = zoomToCountry;
+window.highlightCountry = highlightCountry;
+window.changeWeather = changeWeather;
+window.setMapLayer = setMapLayer;
+window.startResearch = startResearch;
+window.assignFactory = assignFactory;
+window.quickBuildFactory = quickBuildFactory;
+window.quickReinforce = quickReinforce;
+window.improveDiplomacy = improveDiplomacy;
+window.runRecon = runRecon;
+window.expandSpyNetwork = expandSpyNetwork;
+window.improveCounterIntel = improveCounterIntel;
+window.autosave = autosave;
+window.loadCampaign = loadCampaign;
+window.toast = toast;
+window.buildBuilding = buildBuilding;
 
 /* =========================================================
    GAME LOOP
@@ -2513,19 +2193,32 @@ function loop(timestamp) {
         if (lastDateTick >= 0.5) {
             lastDateTick = 0;
             day++;
-            if (day > 30) {
-                day = 1;
-                month++;
-                if (month > 12) {
-                    month = 1;
-                    year++;
-                }
+            if (day > 30) { day = 1; month++;
+                if (month > 12) { month = 1; year++; }
             }
             updateAllUI();
             autosaveTimer += 0.5;
-            if (autosaveTimer >= 30) {
-                autosaveTimer = 0;
-                autosave();
+            if (autosaveTimer >= 30) { autosaveTimer = 0; autosave(); }
+        }
+
+        // Process building queue
+        for (let i = buildingQueue.length - 1; i >= 0; i--) {
+            const item = buildingQueue[i];
+            item.progress += dt * speed;
+            if (item.progress >= item.totalTime) {
+                const building = BUILDINGS[item.buildingId];
+                if (building) {
+                    for (const [resource, amount] of Object.entries(building.production)) {
+                        if (resource === 'money') money += amount * 10;
+                        else if (resource === 'oil') oil += amount * 5;
+                        else if (resource === 'steel') steel += amount * 5;
+                        else if (resource === 'food') food += amount * 5;
+                        else if (resource === 'manpower') manpower += amount * 10;
+                    }
+                    toast(`✅ ${building.name} completed!`);
+                }
+                buildingQueue.splice(i, 1);
+                updateAllUI();
             }
         }
 
@@ -2542,9 +2235,7 @@ function loop(timestamp) {
             fx.userData.life -= dt;
             fx.position.add(fx.userData.velocity.clone().multiplyScalar(dt));
             fx.material.opacity = Math.max(0, fx.userData.life * 2);
-            if (fx.userData.life <= 0) {
-                fxGroup.remove(fx);
-            }
+            if (fx.userData.life <= 0) { fxGroup.remove(fx); }
         }
 
         for (const unit of units) {
@@ -2564,20 +2255,16 @@ function loop(timestamp) {
    START
    ========================================================== */
 
-init();
+init().catch(error => {
+    console.error('Failed to initialize game:', error);
+    const status = $("loadingStatus");
+    if (status) {
+        status.textContent = '❌ Error: ' + error.message;
+        status.style.color = 'var(--red)';
+    }
+});
 
-window.zoomToCountry = zoomToCountry;
-window.highlightCountry = highlightCountry;
-window.changeWeather = changeWeather;
-window.setMapLayer = setMapLayer;
-window.startResearch = startResearch;
-window.assignFactory = assignFactory;
-window.quickBuildFactory = quickBuildFactory;
-window.quickReinforce = quickReinforce;
-window.improveDiplomacy = improveDiplomacy;
-window.runRecon = runRecon;
-window.expandSpyNetwork = expandSpyNetwork;
-window.improveCounterIntel = improveCounterIntel;
-window.autosave = autosave;
-window.loadCampaign = loadCampaign;
-window.toast = toast;
+console.log('🌍 WORLD WAR — Modular Version Loaded!');
+console.log('📦 Version: V11 (All Folders Working)');
+console.log('📁 Folders: data/, systems/, utils/');
+console.log('🎮 Click a country to zoom and view states!');
