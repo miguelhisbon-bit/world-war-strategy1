@@ -52,7 +52,7 @@ import {
 import { getArmyStats, processArmy, issueArmyOrder, reinforceUnit } from './systems/army.js';
 import { updateFrontlines, frontlines } from './systems/frontline.js';
 import { initializeTerritories, processTerritoryControl, getTerritoryStats, territoryState } from './systems/territory.js';
-import { processWorldEvents, activeEvents } from './systems/events.js';
+import { processWorldEvents, activeEvents } from './systems/event.js';
 
 // =========================================================
 // GAME STATE
@@ -208,7 +208,8 @@ async function init() {
         loading(60, "Deploying forces...");
         deployInitialForces();
         loading(70, "Connecting economy...");
-        loadCampaign();
+        const saveResult = loadCampaign();
+        if (saveResult?.recovered) console.warn('⚠️ Corrupt save quarantined; starting with fresh campaign.');
         loading(80, "Initializing AI...");
         setAIDifficulty('MEDIUM');
         loading(85, "Setting up UI...");
@@ -236,10 +237,22 @@ async function init() {
     } catch (error) {
         console.error('❌ Init error:', error);
         const status = $("loadingStatus");
-        if (status) { 
-            status.textContent = '❌ Error: ' + error.message; 
-            status.style.color = '#e45d5d'; 
+        const tip = $("loadingTip");
+        const bar = $("loadingProgress");
+        if (bar) bar.style.width = '100%';
+        if (status) {
+            status.textContent = '❌ Startup failed: ' + (error?.message || 'Unknown error');
+            status.style.color = '#e45d5d';
         }
+        if (tip) {
+            tip.innerHTML = 'The game could not initialize. <button id="startupRetry" style="margin-left:8px;padding:6px 12px;border-radius:5px;border:1px solid #777;background:#222;color:#fff;cursor:pointer;">RETRY</button> <button id="startupFresh" style="margin-left:6px;padding:6px 12px;border-radius:5px;border:1px solid #777;background:#222;color:#fff;cursor:pointer;">START FRESH</button>';
+            $("startupRetry")?.addEventListener("click", () => location.reload());
+            $("startupFresh")?.addEventListener("click", () => {
+                try { localStorage.removeItem(SAVE_KEY); } catch {}
+                location.reload();
+            });
+        }
+        $("loadingScreen")?.classList.remove("hidden");
     }
 }
 
@@ -1515,49 +1528,72 @@ function autosave() {
             wars,
             activeEvents
         };
-        localStorage.setItem('worldWarSaveV3', JSON.stringify(saveData));
+        saveGame(saveData);
     } catch (e) { /* silent fail */ }
 }
 
 function loadCampaign() {
+    const key = SAVE_KEY;
     try {
-        const raw = localStorage.getItem('worldWarSaveV3');
-        if (!raw) return;
+        const raw = localStorage.getItem(key);
+        if (!raw) return { ok: true, loaded: false };
+
         const data = JSON.parse(raw);
-        money = data.money || money;
-        oil = data.oil || oil;
-        steel = data.steel || steel;
-        food = data.food || food;
-        manpower = data.manpower || manpower;
-        political = data.political || political;
-        stability = data.stability || stability;
-        tax = data.tax || tax;
-        construction = data.construction || construction;
-        intel = data.intel || intel;
-        spy = data.spy || spy;
-        counterIntel = data.counterIntel || counterIntel;
+        const valid =
+            data &&
+            typeof data === 'object' &&
+            (!data.version || data.version === '3.0.0') &&
+            Number.isFinite(data.savedAt || Date.now()) &&
+            (!data.units || Array.isArray(data.units)) &&
+            (!data.cityManager || typeof data.cityManager === 'object') &&
+            (!data.territoryState || typeof data.territoryState === 'object');
+
+        if (!valid) throw new Error('Invalid or incompatible save structure');
+
+        money = Number.isFinite(data.money) ? data.money : money;
+        oil = Number.isFinite(data.oil) ? data.oil : oil;
+        steel = Number.isFinite(data.steel) ? data.steel : steel;
+        food = Number.isFinite(data.food) ? data.food : food;
+        manpower = Number.isFinite(data.manpower) ? data.manpower : manpower;
+        political = Number.isFinite(data.political) ? data.political : political;
+        stability = Number.isFinite(data.stability) ? data.stability : stability;
+        tax = Number.isFinite(data.tax) ? data.tax : tax;
+        construction = Number.isFinite(data.construction) ? data.construction : construction;
+        intel = Number.isFinite(data.intel) ? data.intel : intel;
+        spy = Number.isFinite(data.spy) ? data.spy : spy;
+        counterIntel = Number.isFinite(data.counterIntel) ? data.counterIntel : counterIntel;
         if (data.factories) Object.assign(factories, data.factories);
         if (data.diplomacy) Object.assign(diplomacy, data.diplomacy);
         if (data.production) Object.assign(production, data.production);
         if (data.tech) Object.assign(tech, data.tech);
-        if (data.year) year = data.year;
-        if (data.month) month = data.month;
-        if (data.day) day = data.day;
-        if (data.currentCountry) currentCountry = data.currentCountry;
+        if (Number.isFinite(data.year)) year = data.year;
+        if (Number.isFinite(data.month)) month = data.month;
+        if (Number.isFinite(data.day)) day = data.day;
+        if (data.currentCountry && nation[data.currentCountry]) currentCountry = data.currentCountry;
         if (data.cityManager) Object.assign(cityManager, data.cityManager);
         if (data.territoryState) Object.assign(territoryState, data.territoryState);
-        if (data.supplyLines) supplyLines.push(...data.supplyLines);
-        if (data.wars) wars.push(...data.wars);
-        if (data.units) {
+        if (Array.isArray(data.supplyLines)) supplyLines.push(...data.supplyLines);
+        if (Array.isArray(data.wars)) wars.push(...data.wars);
+
+        if (Array.isArray(data.units)) {
             for (let i = 0; i < data.units.length && i < units.length; i++) {
                 const d = data.units[i];
                 const u = units[i];
-                if (u && d.pos) {
+                if (u && Array.isArray(d?.pos) && d.pos.length === 3 && d.pos.every(Number.isFinite)) {
                     u.object.position.fromArray(d.pos);
                 }
             }
         }
-    } catch (e) { /* silent fail */ }
+        return { ok: true, loaded: true };
+    } catch (e) {
+        console.warn('⚠️ Save recovery: invalid save ignored.', e);
+        try {
+            const corruptRaw = localStorage.getItem(key) || '';
+            if (corruptRaw) localStorage.setItem(key + ':corruptBackup:' + Date.now(), corruptRaw);
+            localStorage.removeItem(key);
+        } catch {}
+        return { ok: false, recovered: true };
+    }
 }
 
 // =========================================================
@@ -2153,9 +2189,16 @@ window.camera = camera;
 window.controls = controls;
 
 init().catch(error => {
-    console.error('❌ Init error:', error);
+    console.error('❌ Fatal startup error:', error);
+    const screen = $('loadingScreen');
     const status = $('loadingStatus');
-    if (status) { status.textContent = '❌ Error: ' + error.message; status.style.color = '#e45d5d'; }
+    const tip = $('loadingTip');
+    if (screen) screen.classList.remove('hidden');
+    if (status) {
+        status.textContent = '❌ Startup failed: ' + (error?.message || 'Unknown error');
+        status.style.color = '#e45d5d';
+    }
+    if (tip) tip.textContent = 'Please reload the page. If the problem continues, use START FRESH from the recovery screen.';
 });
 
 console.log('🌍 WORLD WAR V3 — Complete Globe Version!');
