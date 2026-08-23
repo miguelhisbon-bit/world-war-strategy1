@@ -1,5 +1,5 @@
 // =========================================================
-// ECONOMY SYSTEM (Enhanced for V2)
+// ECONOMY SYSTEM
 // =========================================================
 
 import { BUILDINGS } from '../data/buildings.js';
@@ -16,9 +16,7 @@ export const economyState = {
     tax: 22,
     construction: 6,
     debt: 0,
-    inflation: 0,
-    gdp: 50000,
-    tradeBalance: 0
+    inflation: 0
 };
 
 export const productionMultipliers = {
@@ -26,9 +24,7 @@ export const productionMultipliers = {
     steel: 1.0,
     oil: 1.0,
     money: 1.0,
-    manpower: 1.0,
-    naval: 1.0,
-    air: 1.0
+    manpower: 1.0
 };
 
 export const buildingQueue = [];
@@ -151,12 +147,6 @@ function completeResearch(item) {
             economyState.intel = Math.min(100, (economyState.intel || 0) + value);
         } else if (bonusType === 'counterIntel') {
             economyState.counterIntel = Math.min(100, (economyState.counterIntel || 0) + value);
-        } else if (bonusType === 'supply') {
-            productionMultipliers.supply = 1 + value / 100;
-        } else if (bonusType === 'naval') {
-            productionMultipliers.naval += value / 100;
-        } else if (bonusType === 'sabotage') {
-            economyState.sabotage = Math.min(100, (economyState.sabotage || 0) + value);
         }
     }
 }
@@ -175,16 +165,12 @@ export function processEconomy(dt) {
         const interest = economyState.debt * 0.05 * dt;
         economyState.money -= interest;
     }
-    
-    // Update GDP
-    economyState.gdp += economyState.money * 0.001 * dt;
 }
 
 export function tradeResource(resource, amount, price) {
     if (economyState[resource] < amount) return false;
     economyState[resource] -= amount;
     economyState.money += amount * price;
-    economyState.tradeBalance += amount * price;
     return true;
 }
 
@@ -192,23 +178,4 @@ export function takeLoan(amount) {
     economyState.money += amount;
     economyState.debt += amount;
     return true;
-}
-
-export function payDebt(amount) {
-    if (economyState.money < amount) return false;
-    economyState.money -= amount;
-    economyState.debt = Math.max(0, economyState.debt - amount);
-    return true;
-}
-
-export function getEconomicSummary() {
-    return {
-        money: economyState.money,
-        gdp: economyState.gdp,
-        debt: economyState.debt,
-        taxRate: economyState.tax,
-        stability: economyState.stability,
-        tradeBalance: economyState.tradeBalance,
-        inflation: economyState.inflation
-    };
 }
