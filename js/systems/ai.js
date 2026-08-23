@@ -33,7 +33,7 @@ export function processAI(dt, units, nation, diplomacy) {
     const difficulty = AI_DIFFICULTIES[aiDifficulty] || AI_DIFFICULTIES.MEDIUM;
     
     if (Math.random() < 0.01 * dt * difficulty.aggression) {
-        buildAIUnit(aiUnits, playerUnits, difficulty);
+        buildAIUnit(aiUnits, playerUnits, difficulty, units);
     }
     
     for (const unit of aiUnits) {
@@ -76,7 +76,7 @@ export function processAI(dt, units, nation, diplomacy) {
     }
 }
 
-function buildAIUnit(aiUnits, playerUnits, difficulty) {
+function buildAIUnit(aiUnits, playerUnits, difficulty, units) {
     const unitTypes = ['INFANTRY', 'TANK', 'ARTILLERY', 'AIR'];
     const weights = [0.4, 0.25, 0.2, 0.15];
     
@@ -97,18 +97,19 @@ function buildAIUnit(aiUnits, playerUnits, difficulty) {
         }
     }
     
+    // Use globally exposed create3DUnit
     const spawnUnit = window.create3DUnit;
     if (spawnUnit) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 50 + Math.random() * 100;
-        const x = Math.cos(angle) * dist;
-        const z = Math.sin(angle) * dist;
+        const pos = new THREE.Vector3(
+            (Math.random() - 0.5) * 2,
+            0,
+            (Math.random() - 0.5) * 2
+        );
         
         const unit = spawnUnit(
             `AI ${selectedType} ${Math.floor(Math.random() * 100)}`,
             selectedType,
-            x,
-            z,
+            pos,
             false,
             'ENEMY'
         );
@@ -119,6 +120,7 @@ function buildAIUnit(aiUnits, playerUnits, difficulty) {
             unit.hp *= difficulty.defenseBonus;
             unit.maxHp = unit.hp;
             if (window.updateUnitHPBar) window.updateUnitHPBar(unit);
+            units.push(unit);
         }
     }
 }
@@ -129,6 +131,9 @@ function executeAIAttack(attacker, defender, difficulty) {
     
     defender.hp = Math.max(0, defender.hp - damage);
     defender.organization = Math.max(0, defender.organization - damage * 0.3);
+    
+    if (window.updateUnitHPBar) window.updateUnitHPBar(defender);
+    if (window.updateUnitHPBar) window.updateUnitHPBar(attacker);
     
     if (defender.hp <= 0 || defender.organization <= 0) {
         if (window.destroyUnit) window.destroyUnit(defender, attacker);
