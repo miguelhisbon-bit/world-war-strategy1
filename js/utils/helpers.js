@@ -2,7 +2,6 @@
 // HELPER FUNCTIONS
 // =========================================================
 
-// Math helpers
 export function random(min, max) {
     return Math.random() * (max - min) + min;
 }
@@ -25,7 +24,6 @@ export function lerpColor(color1, color2, t) {
     return c1.lerp(c2, t);
 }
 
-// Distance helpers
 export function distance(pos1, pos2) {
     const dx = pos1.x - pos2.x;
     const dy = pos1.y - pos2.y;
@@ -39,7 +37,6 @@ export function distance2D(pos1, pos2) {
     return Math.sqrt(dx*dx + dz*dz);
 }
 
-// Array helpers
 export function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -60,7 +57,6 @@ export function chunkArray(array, size) {
     return chunks;
 }
 
-// String helpers
 export function capitalize(string) {
     return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
 }
@@ -76,7 +72,6 @@ export function formatNumber(number) {
     return number.toString();
 }
 
-// Date helpers
 export function formatDate(date) {
     const d = new Date(date);
     return d.toLocaleDateString('en-US', {
@@ -92,7 +87,6 @@ export function getTimeString(seconds) {
     return `${minutes}m ${remainingSeconds}s`;
 }
 
-// Color helpers
 export function hexToRGB(hex) {
     const r = (hex >> 16) & 255;
     const g = (hex >> 8) & 255;
@@ -109,7 +103,6 @@ export function hexToCSS(hex) {
     return `rgb(${r}, ${g}, ${b})`;
 }
 
-// Debug helpers
 export function log(message, type = 'info') {
     const styles = {
         info: 'color: #58a6ff',
@@ -124,7 +117,6 @@ export function debugObject(obj) {
     console.log(JSON.stringify(obj, null, 2));
 }
 
-// Performance helpers
 export function throttle(func, limit) {
     let inThrottle;
     return function(...args) {
