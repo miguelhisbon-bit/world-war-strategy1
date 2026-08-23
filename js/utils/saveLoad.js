@@ -1,5 +1,5 @@
 // =========================================================
-// SAVE / LOAD SYSTEM — V2
+// SAVE / LOAD SYSTEM
 // =========================================================
 
 export const SAVE_KEY = 'worldWarSaveV2';
@@ -103,16 +103,4 @@ export function importSave(file) {
         }
     };
     reader.readAsText(file);
-}
-
-export function compareSaves(save1, save2) {
-    // Compare two save files
-    const s1 = JSON.parse(save1);
-    const s2 = JSON.parse(save2);
-    return {
-        sameVersion: s1.version === s2.version,
-        sameCountry: s1.currentCountry === s2.currentCountry,
-        unitsDiff: (s1.units?.length || 0) - (s2.units?.length || 0),
-        moneyDiff: (s1.money || 0) - (s2.money || 0)
-    };
 }
