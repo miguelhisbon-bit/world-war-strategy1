@@ -3,6 +3,7 @@
 // =========================================================
 
 import * as THREE from "three";
+window.THREE = THREE;
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 
@@ -20,7 +21,7 @@ import {
     createSupplyLine, updateSupplyLines, getSupplyStatus, supplyLines 
 } from './systems/supply.js';
 import { 
-    getCity, updateCity, trainUnitInCity, buildInCity,
+    getCity, updateCity, trainUnitInCity,
     getCityProduction, getCityGarrison, cityManager 
 } from './systems/cityManager.js';
 import { 
@@ -36,7 +37,6 @@ import {
     victoryConditions 
 } from './systems/victory.js';
 import { processAI, getAIDifficulty, setAIDifficulty } from './systems/ai.js';
-import { initMinimap, updateMinimap, handleMinimapClick } from './ui/minimap.js';
 import { initShortcuts, handleKeyPress, SHORTCUTS } from './ui/shortcuts.js';
 import { showTooltip, hideTooltip, initTooltips } from './ui/tooltips.js';
 import { 
