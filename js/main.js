@@ -311,7 +311,6 @@ function setupScene() {
     labelRenderer.domElement.style.zIndex = "10";
     document.getElementById("game").appendChild(labelRenderer.domElement);
 
-    // Lights
     const ambient = new THREE.AmbientLight(0x404060, 0.5);
     scene.add(ambient);
 
@@ -324,7 +323,6 @@ function setupScene() {
     fill.position.set(-5, 0, 5);
     scene.add(fill);
 
-    // Stars background
     const starsGeometry = new THREE.BufferGeometry();
     const starsCount = 3000;
     const starPositions = new Float32Array(starsCount * 3);
@@ -617,7 +615,6 @@ function create3DUnit(name, type, position, friendly = true, country = "BANGLADE
     }
     group.add(model);
 
-    // HP bar
     const hpBar = new THREE.Group();
     const bg = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.02), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 }));
     hpBar.add(bg);
@@ -628,7 +625,6 @@ function create3DUnit(name, type, position, friendly = true, country = "BANGLADE
     group.add(hpBar);
     group.userData.hpFill = hpFill;
 
-    // Flag - FIXED: flagDiv properly declared
     const flagDiv = document.createElement('div');
     const countryData = nation[country] || nation["BANGLADESH"];
     flagDiv.textContent = friendly ? countryData.flag : '🔴';
@@ -752,7 +748,6 @@ function handleTap(mouse) {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
 
-    // Check country markers
     const markers = [];
     scene.children.forEach(child => {
         if (child.userData && child.userData.isCountry) {
@@ -768,7 +763,6 @@ function handleTap(mouse) {
         }
     }
 
-    // Check units
     const unitMeshes = [];
     unitGroup.children.forEach(child => {
         child.children.forEach(mesh => {
@@ -787,7 +781,6 @@ function handleTap(mouse) {
         }
     }
 
-    // Ground click for move/attack
     if (selectedUnit) {
         const globeIntersects = raycaster.intersectObject(globe);
         if (globeIntersects.length > 0) {
@@ -1491,7 +1484,6 @@ function loadCampaign() {
 // =========================================================
 
 function setupUI() {
-    // Panel buttons
     document.querySelectorAll('.panel-button').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.panel-button').forEach(b => b.classList.remove('active'));
@@ -1509,7 +1501,6 @@ function setupUI() {
     $('closeCountryInfo')?.addEventListener('click', () => $('countryInfoModal')?.classList.remove('open'));
     $('closeCityInfo')?.addEventListener('click', () => $('cityInfoModal')?.classList.remove('open'));
 
-    // Unit commands
     $('moveCommand')?.addEventListener('click', () => {
         if (!selectedUnit) return;
         moveMode = !moveMode;
@@ -1571,11 +1562,9 @@ function setupUI() {
         updateAllUI();
     });
 
-    // Quick actions
     $('quickFactory')?.addEventListener('click', quickBuildFactory);
     $('quickReinforce')?.addEventListener('click', quickReinforce);
 
-    // Pause & Speed
     $('pauseBtn')?.addEventListener('click', () => {
         paused = !paused;
         $('pauseBtn').textContent = paused ? '▶' : '⏸';
@@ -1590,7 +1579,6 @@ function setupUI() {
         toast(`Speed: ${speed}×`);
     });
 
-    // Camera controls
     $('zoomIn')?.addEventListener('click', () => {
         camera.position.multiplyScalar(0.85);
         controls.update();
@@ -1612,7 +1600,6 @@ function setupUI() {
         toast('Top view');
     });
 
-    // Tutorial
     let tutorialStep = 0;
     $('tutorialNext')?.addEventListener('click', () => {
         tutorialStep++;
@@ -1627,7 +1614,6 @@ function setupUI() {
         $('tutorialNext').textContent = tutorialStep >= 3 ? 'START' : 'NEXT';
     });
 
-    // Close modals on outside click
     document.querySelectorAll('.modal').forEach(modal => {
         modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
     });
@@ -1913,7 +1899,6 @@ function loop(timestamp) {
             if (autosaveTimer >= 30) { autosaveTimer = 0; autosave(); }
         }
 
-        // Process building queue
         for (let i = buildingQueue.length - 1; i >= 0; i--) {
             const item = buildingQueue[i];
             item.progress += dt * speed;
@@ -1939,7 +1924,6 @@ function loop(timestamp) {
         updateProduction(dt);
         updateResearch(dt);
 
-        // Unit movement on globe
         for (const unit of units) {
             if (unit.state === 'DESTROYED' || !unit.destination) continue;
             const pos = unit.object.position;
@@ -1965,15 +1949,12 @@ function loop(timestamp) {
             }
         }
 
-        // AI
         processAISystem(dt);
 
-        // Update war score
         wars.forEach((war, index) => {
             updateWarScore(index, units);
         });
 
-        // Check victory
         const victory = checkVictoryConditions(units, nation, diplomacy, wars);
         if (victory) {
             const victoryScreen = $('victoryScreen');
@@ -1987,7 +1968,6 @@ function loop(timestamp) {
             addNotification(`🎉 ${victory.title}`, NOTIFICATION_TYPES.SUCCESS);
         }
 
-        // FX particles
         for (let i = fxGroup.children.length - 1; i >= 0; i--) {
             const fx = fxGroup.children[i];
             fx.userData.life -= dt;
@@ -1996,7 +1976,6 @@ function loop(timestamp) {
             if (fx.userData.life <= 0) fxGroup.remove(fx);
         }
 
-        // Update minimap
         updateMinimap(units, nation);
     }
 
