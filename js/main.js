@@ -1,5 +1,5 @@
 // =========================================================
-// WORLD WAR V3 — GLOBE MAP + ALL SYSTEMS WORKABLE
+// WORLD WAR V3 — GLOBE MAP + ALL SYSTEMS WORKABLE (FIXED)
 // =========================================================
 
 import * as THREE from "three";
@@ -216,16 +216,29 @@ async function init() {
         loading(100, "Ready!");
         autosave();
 
+        // FIXED: Loading screen hide with proper delay
         setTimeout(() => {
             const loadingScreen = $("loadingScreen");
-            if (loadingScreen) loadingScreen.classList.add("hidden");
+            if (loadingScreen) {
+                loadingScreen.classList.add("hidden");
+                console.log('✅ Loading screen hidden');
+            }
         }, 650);
 
-        requestAnimationFrame(loop);
+        // FIXED: Start game loop
+        console.log('🚀 Starting game loop...');
+        loop(0);
+        
     } catch (error) {
         console.error('❌ Init error:', error);
+        console.error('❌ Stack:', error.stack);
         const status = $("loadingStatus");
-        if (status) { status.textContent = '❌ Error: ' + error.message; status.style.color = '#e45d5d'; }
+        if (status) { 
+            status.textContent = '❌ Error: ' + error.message; 
+            status.style.color = '#e45d5d'; 
+        }
+        const bar = $("loadingProgress");
+        if (bar) bar.style.background = '#e45d5d';
     }
 }
 
@@ -289,7 +302,10 @@ function initCities() {
 
 function setupScene() {
     const canvas = $("gameCanvas");
-    if (!canvas) return;
+    if (!canvas) {
+        console.error('❌ gameCanvas not found!');
+        return;
+    }
 
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a1218);
@@ -311,6 +327,7 @@ function setupScene() {
     labelRenderer.domElement.style.zIndex = "10";
     document.getElementById("game").appendChild(labelRenderer.domElement);
 
+    // Lights
     const ambient = new THREE.AmbientLight(0x404060, 0.5);
     scene.add(ambient);
 
@@ -323,6 +340,7 @@ function setupScene() {
     fill.position.set(-5, 0, 5);
     scene.add(fill);
 
+    // Stars background
     const starsGeometry = new THREE.BufferGeometry();
     const starsCount = 3000;
     const starPositions = new Float32Array(starsCount * 3);
@@ -345,6 +363,7 @@ function setupScene() {
     controls.update();
 
     clock = new THREE.Clock();
+    
     unitGroup = new THREE.Group();
     fxGroup = new THREE.Group();
     labelGroup = new THREE.Group();
@@ -365,6 +384,8 @@ function setupScene() {
         renderer.setSize(innerWidth, innerHeight);
         if (labelRenderer) labelRenderer.setSize(innerWidth, innerHeight);
     });
+
+    console.log('✅ Scene setup complete');
 }
 
 // =========================================================
@@ -615,6 +636,7 @@ function create3DUnit(name, type, position, friendly = true, country = "BANGLADE
     }
     group.add(model);
 
+    // HP bar
     const hpBar = new THREE.Group();
     const bg = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.02), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 }));
     hpBar.add(bg);
@@ -625,6 +647,7 @@ function create3DUnit(name, type, position, friendly = true, country = "BANGLADE
     group.add(hpBar);
     group.userData.hpFill = hpFill;
 
+    // Flag
     const flagDiv = document.createElement('div');
     const countryData = nation[country] || nation["BANGLADESH"];
     flagDiv.textContent = friendly ? countryData.flag : '🔴';
@@ -748,6 +771,7 @@ function handleTap(mouse) {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
 
+    // Check country markers
     const markers = [];
     scene.children.forEach(child => {
         if (child.userData && child.userData.isCountry) {
@@ -763,6 +787,7 @@ function handleTap(mouse) {
         }
     }
 
+    // Check units
     const unitMeshes = [];
     unitGroup.children.forEach(child => {
         child.children.forEach(mesh => {
@@ -781,6 +806,7 @@ function handleTap(mouse) {
         }
     }
 
+    // Ground click for move/attack
     if (selectedUnit) {
         const globeIntersects = raycaster.intersectObject(globe);
         if (globeIntersects.length > 0) {
@@ -1880,11 +1906,11 @@ function handleMinimapClick(event) {
 }
 
 // =========================================================
-// GAME LOOP
+// GAME LOOP — FIXED
 // =========================================================
 
 function loop(timestamp) {
-    const dt = Math.min(clock.getDelta(), 0.05);
+    const dt = Math.min(clock ? clock.getDelta() : 0.016, 0.05);
 
     if (!paused) {
         lastDateTick += dt * speed;
@@ -1899,6 +1925,7 @@ function loop(timestamp) {
             if (autosaveTimer >= 30) { autosaveTimer = 0; autosave(); }
         }
 
+        // Process building queue
         for (let i = buildingQueue.length - 1; i >= 0; i--) {
             const item = buildingQueue[i];
             item.progress += dt * speed;
@@ -1924,6 +1951,7 @@ function loop(timestamp) {
         updateProduction(dt);
         updateResearch(dt);
 
+        // Unit movement on globe
         for (const unit of units) {
             if (unit.state === 'DESTROYED' || !unit.destination) continue;
             const pos = unit.object.position;
@@ -1949,12 +1977,15 @@ function loop(timestamp) {
             }
         }
 
+        // AI
         processAISystem(dt);
 
+        // Update war score
         wars.forEach((war, index) => {
             updateWarScore(index, units);
         });
 
+        // Check victory
         const victory = checkVictoryConditions(units, nation, diplomacy, wars);
         if (victory) {
             const victoryScreen = $('victoryScreen');
@@ -1968,6 +1999,7 @@ function loop(timestamp) {
             addNotification(`🎉 ${victory.title}`, NOTIFICATION_TYPES.SUCCESS);
         }
 
+        // FX particles
         for (let i = fxGroup.children.length - 1; i >= 0; i--) {
             const fx = fxGroup.children[i];
             fx.userData.life -= dt;
@@ -1976,6 +2008,7 @@ function loop(timestamp) {
             if (fx.userData.life <= 0) fxGroup.remove(fx);
         }
 
+        // Update minimap
         updateMinimap(units, nation);
     }
 
@@ -2012,6 +2045,10 @@ window.openPanel = openPanel;
 window.addNotification = addNotification;
 window.updateAllUI = updateAllUI;
 window.populateCountryGrid = populateCountryGrid;
+
+// Expose camera for minimap
+window.camera = camera;
+window.controls = controls;
 
 init().catch(error => {
     console.error('❌ Init error:', error);
