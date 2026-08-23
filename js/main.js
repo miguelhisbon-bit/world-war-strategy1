@@ -18,7 +18,8 @@ import {
 import { getDiplomacyState, formAlliance, breakAlliance, isAllied, declareWar, proposePeace } from './systems/diplomacy.js';
 import { processEconomy, tradeResource, takeLoan, economyState } from './systems/economy.js';
 import { 
-    createSupplyLine, updateSupplyLines, getSupplyStatus, supplyLines 
+    createSupplyLine, updateSupplyLines, getSupplyStatus, 
+    supplyLines 
 } from './systems/supply.js';
 import { 
     getCity, updateCity, trainUnitInCity,
@@ -41,13 +42,17 @@ import { initShortcuts, handleKeyPress, SHORTCUTS } from './ui/shortcuts.js';
 import { showTooltip, hideTooltip, initTooltips } from './ui/tooltips.js';
 import { 
     addNotification, clearNotifications, 
-    NOTIFICATION_TYPES, notifications 
+    NOTIFICATION_TYPES, notifications, initNotifications 
 } from './ui/notifications.js';
 import { saveGame, loadGame, deleteSave, hasSave, getSaveInfo, SAVE_KEY } from './utils/saveLoad.js';
 import { 
     random, randomInt, clamp, lerp, distance, formatNumber, 
     capitalize, truncate, log, debounce, throttle 
 } from './utils/helpers.js';
+import { getArmyStats, processArmy, issueArmyOrder, reinforceUnit } from './systems/army.js';
+import { updateFrontlines, frontlines } from './systems/frontline.js';
+import { initializeTerritories, processTerritoryControl, getTerritoryStats, territoryState } from './systems/territory.js';
+import { processWorldEvents, activeEvents } from './systems/events.js';
 
 // =========================================================
 // GAME STATE
@@ -199,6 +204,7 @@ async function init() {
         addStatesToGlobe();
         loading(55, "Initializing cities...");
         initCities();
+        initializeTerritories(cityManager);
         loading(60, "Deploying forces...");
         deployInitialForces();
         loading(70, "Connecting economy...");
@@ -207,6 +213,7 @@ async function init() {
         setAIDifficulty('MEDIUM');
         loading(85, "Setting up UI...");
         setupUI();
+        initNotifications();
         loading(90, "Initializing minimap...");
         initMinimap();
         loading(95, "Preparing...");
@@ -1099,6 +1106,24 @@ function destroyUnit(unit, killer = null) {
 // ECONOMY & PRODUCTION
 // =========================================================
 
+function processCityEconomy(dt) {
+    const owned = Object.values(cityManager).filter(c => c.country === currentCountry);
+    if (!owned.length) return;
+    let income = 0, foodGain = 0;
+    for (const city of owned) {
+        const industry = Math.max(0, city.industry || 0);
+        const agriculture = Math.max(0, city.agriculture || 0);
+        const buildingBonus = (city.buildings || []).length * 0.8;
+        income += (industry * 0.7 + buildingBonus) * dt;
+        foodGain += agriculture * 0.35 * dt;
+        city.supply = clamp((city.supply || 0) + (agriculture * 0.15 - industry * 0.03) * dt, 0, 100);
+        const populationPressure = (city.population || 0) / 1000000;
+        city.happiness = clamp((city.happiness || 80) + (city.supply > 40 ? 0.02 : -0.05) * dt - populationPressure * 0.005 * dt, 0, 100);
+    }
+    money += income;
+    food += foodGain;
+}
+
 function updateEconomy(dt) {
     if (paused) return;
     const civilianIncome = factories.civilian * 0.22 * dt * speed;
@@ -1400,33 +1425,62 @@ function buildInCity(cityId, buildingId) {
     showCityInfo(cityId);
 }
 
+function getCountryOverview(countryId) {
+    const cities = Object.entries(cityManager).filter(([, c]) => c.country === countryId);
+    const army = units.filter(u => u.country === countryId && u.state !== 'DESTROYED');
+    const stats = getArmyStats(units, countryId);
+    const territory = getTerritoryStats(cityManager, countryId);
+    const totalPop = cities.reduce((sum, [, c]) => sum + (c.population || 0), 0);
+    const industry = cities.reduce((sum, [, c]) => sum + (c.industry || 0), 0);
+    const morale = cities.length ? cities.reduce((sum, [, c]) => sum + (c.happiness || 0), 0) / cities.length : 0;
+    return { cities, army, stats, territory, totalPop, industry, morale };
+}
+
+function setCommandCountry(countryId) {
+    if (!nation[countryId]) return;
+    currentCountry = countryId;
+    toast(`🇺🇳 Commanding ${nation[countryId].name}`);
+    addNotification(`🇺🇳 Command country changed to ${nation[countryId].name}`, NOTIFICATION_TYPES.INFO);
+    manageCountry(countryId);
+    updateAllUI();
+}
+
 function manageCountry(countryId) {
     const data = nation[countryId];
     if (!data) return;
     highlightedCountry = countryId;
-    $('countryInfoModal').classList.remove('open');
+    $('countryInfoModal')?.classList.remove('open');
     openPanel('city');
     const content = $('panelContent');
-    if (content) {
-        content.innerHTML = `
-            <div class="info-card">
-                <h3>🏙️ Cities of ${data.flag} ${data.name}</h3>
-                ${data.states.map(s => {
-                    const city = cityManager[s.toUpperCase()];
-                    return `<div class="stat-row">
-                        <span>${s}</span>
-                        <span style="color:var(--muted);font-size:9px;">Pop: ${formatNumber(city?.population || 0)}</span>
-                        <button class="action-btn info" style="padding:2px 8px;font-size:8px;width:auto;margin:0;" onclick="window.showCityInfo('${s.toUpperCase()}')">View</button>
-                    </div>`;
-                }).join('')}
-            </div>
-        `;
-    }
+    if (!content) return;
+    const o = getCountryOverview(countryId);
+    const rows = Object.entries(o.stats.byType).map(([type, count]) => `${UNITS_DATA[type]?.icon || '🪖'} ${type}: ${count}`).join(' • ') || 'No active army';
+    content.innerHTML = `
+      <div class="info-card">
+        <h3>🌍 ${data.flag} ${data.name} Command Center</h3>
+        <div class="stat-row"><span>Capital</span><b>${data.capital}</b></div>
+        <div class="stat-row"><span>Population</span><b>${formatNumber(o.totalPop)}</b></div>
+        <div class="stat-row"><span>Industry</span><b>${o.industry}</b></div>
+        <div class="stat-row"><span>Cities</span><b>${o.territory.total}</b></div>
+        <div class="stat-row"><span>Controlled</span><b>${o.territory.controlled}</b></div>
+        <div class="stat-row"><span>Army</span><b>${o.stats.count} units</b></div>
+        <div class="stat-row"><span>Army Morale</span><b>${Math.round(o.stats.morale)}%</b></div>
+        <div class="stat-row"><span>Supply</span><b>${Math.round(o.stats.supply)}%</b></div>
+        <p style="font-size:10px;color:var(--muted);margin:8px 0;">${rows}</p>
+        <button class="action-btn success" onclick="window.setCommandCountry('${countryId}')">🎖️ Take Command</button>
+      </div>
+      <div class="info-card">
+        <h3>🏙️ Cities</h3>
+        ${o.cities.map(([id, city]) => `<div class="stat-row"><span>${city.name}</span><span style="font-size:9px;color:var(--muted);">Pop ${formatNumber(city.population)} • Fort ${city.fortification}%</span><button class="action-btn info" style="padding:2px 8px;font-size:8px;width:auto;margin:0;" onclick="window.showCityInfo('${id}')">View</button></div>`).join('')}
+      </div>
+      <div class="info-card">
+        <h3>🪖 Training</h3>
+        <button class="action-btn success" onclick="window.trainUnitFromCity('${data.states[0].toUpperCase()}','INFANTRY')">🚶 Infantry</button>
+        <button class="action-btn" onclick="window.trainUnitFromCity('${data.states[0].toUpperCase()}','TANK')">🔩 Tank</button>
+        <button class="action-btn" onclick="window.trainUnitFromCity('${data.states[0].toUpperCase()}','ARTILLERY')">💥 Artillery</button>
+        <button class="action-btn" onclick="window.trainUnitFromCity('${data.states[0].toUpperCase()}','AIR')">✈️ Aircraft</button>
+      </div>`;
 }
-
-// =========================================================
-// AI
-// =========================================================
 
 function processAISystem(dt) {
     if (paused) return;
@@ -1456,8 +1510,10 @@ function autosave() {
                 pos: u.object.position.toArray()
             })),
             cityManager,
+            territoryState,
             supplyLines,
-            wars
+            wars,
+            activeEvents
         };
         localStorage.setItem('worldWarSaveV3', JSON.stringify(saveData));
     } catch (e) { /* silent fail */ }
@@ -1489,6 +1545,7 @@ function loadCampaign() {
         if (data.day) day = data.day;
         if (data.currentCountry) currentCountry = data.currentCountry;
         if (data.cityManager) Object.assign(cityManager, data.cityManager);
+        if (data.territoryState) Object.assign(territoryState, data.territoryState);
         if (data.supplyLines) supplyLines.push(...data.supplyLines);
         if (data.wars) wars.push(...data.wars);
         if (data.units) {
@@ -1827,6 +1884,13 @@ function updateAllUI() {
 
     const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
     $('gameDate').textContent = `${year} • ${monthNames[month-1]} ${String(day).padStart(2,'0')}`;
+    const army = getArmyStats(units, currentCountry);
+    const country = nation[currentCountry];
+    if ($('countryName') && country) $('countryName').textContent = country.name;
+    if ($('countryFlag') && country) $('countryFlag').textContent = country.flag;
+    if ($('battleStatus')) $('battleStatus').textContent = frontlines.length ? `${frontlines.length} ACTIVE FRONTLINE${frontlines.length > 1 ? 'S' : ''}` : 'NO ACTIVE BATTLE';
+    if ($('supplyStatus')) $('supplyStatus').textContent = `ARMY SUPPLY ${Math.round(army.supply)}%`;
+    if ($('warStatus')) $('warStatus').textContent = `${army.count} UNITS • ${Math.round(army.morale)}% MORALE`;
 }
 
 function toast(message) {
@@ -1946,6 +2010,7 @@ function gameLoop() {
         }
 
         updateEconomy(dt);
+        processCityEconomy(dt);
         updateProduction(dt);
         updateResearch(dt);
 
@@ -1973,6 +2038,38 @@ function gameLoop() {
             if (unit.state === 'HOLDING' || unit.state === 'DEFENDING') {
                 unit.organization = Math.min(100, unit.organization + 0.5 * dt * speed);
             }
+        }
+
+        // Advanced army layer: readiness, supply attrition and entrenchment
+        processArmy(units, dt, speed);
+
+        // Dynamic frontlines and territory control
+        updateFrontlines(units, dt);
+        const captures = processTerritoryControl(cityManager, units, nation);
+        if (captures.length) {
+            for (const capture of captures) {
+                addBattleLog(`🏳️ ${capture.cityName}: ${capture.oldOwner} → ${capture.newOwner}`);
+                addNotification(`🏳️ ${capture.cityName} captured by ${nation[capture.newOwner]?.name || capture.newOwner}`, NOTIFICATION_TYPES.SUCCESS);
+                toast(`🏳️ ${capture.cityName} captured!`);
+            }
+            updateAllUI();
+        }
+
+        // Random world events
+        const worldEvent = processWorldEvents(dt, { speed, paused });
+        if (worldEvent) {
+            for (const [key, value] of Object.entries(worldEvent.effects || {})) {
+                if (key === 'money') money = Math.max(0, money + value);
+                else if (key === 'oil') oil = Math.max(0, oil + value);
+                else if (key === 'steel') steel = Math.max(0, steel + value);
+                else if (key === 'food') food = Math.max(0, food + value);
+                else if (key === 'manpower') manpower = Math.max(0, manpower + value);
+                else if (key === 'stability') stability = clamp(stability + value, 0, 100);
+                else if (key === 'political') political += value;
+            }
+            addNotification(`${worldEvent.title}: ${worldEvent.text}`, NOTIFICATION_TYPES.INFO, 7000);
+            toast(worldEvent.title);
+            updateAllUI();
         }
 
         // AI
@@ -2039,6 +2136,13 @@ window.trainUnitFromCity = trainUnitFromCity;
 window.buildInCity = buildInCity;
 window.showCityInfo = showCityInfo;
 window.manageCountry = manageCountry;
+window.setCommandCountry = setCommandCountry;
+window.getArmyStats = getArmyStats;
+window.issueArmyOrder = issueArmyOrder;
+window.reinforceUnit = reinforceUnit;
+window.frontlines = frontlines;
+window.territoryState = territoryState;
+window.activeEvents = activeEvents;
 window.openPanel = openPanel;
 window.addNotification = addNotification;
 window.updateAllUI = updateAllUI;
