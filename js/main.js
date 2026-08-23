@@ -211,6 +211,7 @@ async function init() {
         loading(90, "Initializing minimap...");
         initMinimap();
         loading(95, "Preparing...");
+        populateCountryGrid();
         updateAllUI();
         loading(100, "Ready!");
         autosave();
@@ -233,6 +234,28 @@ function loading(progress, text) {
     const status = $("loadingStatus");
     if (bar) bar.style.width = progress + '%';
     if (status) status.textContent = text;
+}
+
+function populateCountryGrid() {
+    const grid = $('countryGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    Object.keys(nation).forEach(key => {
+        const data = nation[key];
+        const card = document.createElement('div');
+        card.className = 'country-card';
+        card.innerHTML = `
+            <span>${data.flag}</span>
+            <b>${data.name}</b>
+            <small>${data.region}</small>
+        `;
+        card.onclick = () => { 
+            const modal = $('countryModal');
+            if (modal) modal.classList.remove('open');
+            zoomToCountry(key);
+        };
+        grid.appendChild(card);
+    });
 }
 
 function initCities() {
@@ -344,14 +367,6 @@ function setupScene() {
         renderer.setSize(innerWidth, innerHeight);
         if (labelRenderer) labelRenderer.setSize(innerWidth, innerHeight);
     });
-
-    // Auto-rotate toggle
-    $('autoRotate')?.addEventListener('click', () => {
-        autoRotate = !autoRotate;
-        controls.autoRotate = autoRotate;
-        $('autoRotate').style.borderColor = autoRotate ? 'var(--accent)' : 'var(--line)';
-        toast(autoRotate ? '🔄 Auto-rotate ON' : '🔄 Auto-rotate OFF');
-    });
 }
 
 // =========================================================
@@ -362,7 +377,6 @@ function createGlobe() {
     const radius = 5;
     const segments = 64;
 
-    // Earth sphere
     const geometry = new THREE.SphereGeometry(radius, segments, segments);
     const material = new THREE.MeshPhongMaterial({
         color: 0x1a3a5a,
@@ -376,7 +390,6 @@ function createGlobe() {
     globe.castShadow = true;
     scene.add(globe);
 
-    // Atmosphere glow
     const glowGeometry = new THREE.SphereGeometry(radius * 1.02, segments, segments);
     const glowMaterial = new THREE.MeshPhongMaterial({
         color: 0x4488ff,
@@ -387,10 +400,8 @@ function createGlobe() {
     const glow = new THREE.Mesh(glowGeometry, glowMaterial);
     scene.add(glow);
 
-    // Grid lines (latitude/longitude)
     const gridMaterial = new THREE.LineBasicMaterial({ color: 0x2a4a6a, transparent: true, opacity: 0.15 });
 
-    // Latitudes
     for (let lat = -80; lat <= 80; lat += 20) {
         const phi = (90 - lat) * Math.PI / 180;
         const points = [];
@@ -406,7 +417,6 @@ function createGlobe() {
         scene.add(line);
     }
 
-    // Longitudes
     for (let lon = 0; lon < 360; lon += 20) {
         const theta = lon * Math.PI / 180;
         const points = [];
@@ -448,7 +458,6 @@ function addCountriesToGlobe() {
 
         const pos = latLonToPosition(lat, lon, radius * 1.01);
 
-        // Country marker
         const markerMat = new THREE.MeshPhongMaterial({
             color: color,
             emissive: color,
@@ -462,7 +471,6 @@ function addCountriesToGlobe() {
         marker.userData.isCountry = true;
         scene.add(marker);
 
-        // Glow ring
         const ringMat = new THREE.MeshBasicMaterial({
             color: color,
             transparent: true,
@@ -474,7 +482,6 @@ function addCountriesToGlobe() {
         ring.lookAt(0, 0, 0);
         scene.add(ring);
 
-        // Country label
         const labelDiv = document.createElement('div');
         labelDiv.textContent = `${data.flag} ${data.name}`;
         labelDiv.style.cssText = `font-size:10px;font-weight:700;color:#eef4f8;text-shadow:0 0 20px rgba(0,0,0,0.9);background:rgba(0,0,0,0.6);padding:2px 6px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);pointer-events:none;user-select:none;`;
@@ -483,7 +490,6 @@ function addCountriesToGlobe() {
         label.userData.countryId = key;
         labelGroup.add(label);
 
-        // Store position
         data._position = pos;
         data._color = color;
     });
@@ -491,7 +497,6 @@ function addCountriesToGlobe() {
 
 function addStatesToGlobe() {
     const radius = 5.05;
-    // State borders represented as small dots around country
     Object.keys(nation).forEach(key => {
         const data = nation[key];
         const pos = data._position;
@@ -623,7 +628,8 @@ function create3DUnit(name, type, position, friendly = true, country = "BANGLADE
     group.add(hpBar);
     group.userData.hpFill = hpFill;
 
-    // Flag    const flagDiv = document.createElement('div');
+    // Flag - FIXED: flagDiv properly declared
+    const flagDiv = document.createElement('div');
     const countryData = nation[country] || nation["BANGLADESH"];
     flagDiv.textContent = friendly ? countryData.flag : '🔴';
     flagDiv.style.cssText = 'font-size:8px;text-shadow:0 0 10px rgba(0,0,0,0.8);';
@@ -664,6 +670,12 @@ function create3DUnit(name, type, position, friendly = true, country = "BANGLADE
     updateUnitHPBar(unit);
     return unit;
 }
+
+// Expose create3DUnit globally for AI
+window.create3DUnit = create3DUnit;
+window.updateUnitHPBar = updateUnitHPBar;
+window.destroyUnit = destroyUnit;
+window.toast = toast;
 
 function updateUnitHPBar(unit) {
     if (!unit || !unit.object.userData.hpFill) return;
@@ -829,7 +841,6 @@ function zoomToCountry(countryId) {
     highlightedCountry = countryId;
     const target = pos.clone().multiplyScalar(1.5);
 
-    // Smooth camera move
     const startPos = camera.position.clone();
     const endPos = target.clone().add(new THREE.Vector3(0, 1, 2));
     const startTarget = controls.target.clone();
@@ -855,7 +866,6 @@ function zoomToCountry(countryId) {
     }
     animateZoom();
 
-    // Update top bar
     const flag = $("countryFlag");
     if (flag) flag.textContent = data.flag;
     const name = $("countryName");
@@ -874,9 +884,9 @@ function showCountryInfo(countryId) {
 
     highlightedCountry = countryId;
     const modal = $("countryInfoModal");
-    const title = $("infoTitle");
-    const kicker = $("infoKicker");
-    const content = $("infoContent");
+    const title = $("infoCountryTitle");
+    const kicker = $("infoCountryKicker");
+    const content = $("infoCountryContent");
 
     if (title) title.textContent = `${data.flag} ${data.name}`;
     if (kicker) kicker.textContent = `${data.region} • Capital: ${data.capital}`;
@@ -907,9 +917,9 @@ function showCityInfo(cityId) {
     if (!city) { toast("City not found"); return; }
 
     const modal = $("cityInfoModal");
-    const title = $("cityInfoTitle");
-    const kicker = $("cityInfoKicker");
-    const content = $("cityInfoContent");
+    const title = $("infoCityTitle");
+    const kicker = $("infoCityKicker");
+    const content = $("infoCityContent");
 
     if (title) title.textContent = `🏙️ ${city.name}`;
     if (kicker) kicker.textContent = `Country: ${city.country}`;
@@ -1338,16 +1348,6 @@ function trainUnitFromCity(cityId, unitType) {
         addNotification(`🪖 ${unitType} trained in ${city?.name || cityId}`, NOTIFICATION_TYPES.SUCCESS);
     }
     updateAllUI();
-}
-
-function getUnitTrainingCost(unitType) {
-    const costs = {
-        INFANTRY: { money: 350, steel: 35, manpower: 100 },
-        TANK: { money: 800, steel: 80, manpower: 50 },
-        ARTILLERY: { money: 600, steel: 65, manpower: 75 },
-        AIR: { money: 1100, steel: 90, manpower: 25 }
-    };
-    return costs[unitType] || null;
 }
 
 function buildInCity(cityId, buildingId) {
@@ -1828,18 +1828,6 @@ function toast(message) {
     toastEl._timeout = setTimeout(() => toastEl.classList.remove('show'), 2500);
 }
 
-function formatNumber(num) {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-    return num.toString();
-}
-
-function addNotification(message, type = 'info') {
-    // Simple console notification
-    console.log(`[${type}] ${message}`);
-    toast(message);
-}
-
 // =========================================================
 // MINIMAP
 // =========================================================
@@ -1888,7 +1876,6 @@ function drawMinimap(ctx, canvas) {
     ctx.lineWidth = 0.5;
     ctx.strokeRect(0, 0, w, h);
 
-    // Viewport indicator
     const cx = w/2, cy = h/2;
     ctx.strokeStyle = 'rgba(255,255,255,0.2)';
     ctx.lineWidth = 1;
@@ -1903,7 +1890,6 @@ function updateMinimap(units, nation) {
 }
 
 function handleMinimapClick(event) {
-    // Minimap click navigation
     toast('📍 Minimap navigation');
 }
 
@@ -1967,16 +1953,13 @@ function loop(timestamp) {
             const movement = unit.speed * dt * speed * 0.5;
             const dir = new THREE.Vector3().subVectors(target, pos).normalize();
             pos.addScaledVector(dir, movement);
-            // Keep on globe surface
             if (unit.type !== 'AIR') {
                 pos.copy(pos.clone().normalize().multiplyScalar(5.1));
             }
-            // Update supply
             unit.supply = Math.max(0, unit.supply - 0.1 * dt * speed);
             if (unit.supply < 20) {
                 unit.morale = Math.max(20, unit.morale - 0.5 * dt * speed);
             }
-            // Recover organization
             if (unit.state === 'HOLDING' || unit.state === 'DEFENDING') {
                 unit.organization = Math.min(100, unit.organization + 0.5 * dt * speed);
             }
@@ -2048,6 +2031,8 @@ window.showCityInfo = showCityInfo;
 window.manageCountry = manageCountry;
 window.openPanel = openPanel;
 window.addNotification = addNotification;
+window.updateAllUI = updateAllUI;
+window.populateCountryGrid = populateCountryGrid;
 
 init().catch(error => {
     console.error('❌ Init error:', error);
@@ -2057,4 +2042,3 @@ init().catch(error => {
 
 console.log('🌍 WORLD WAR V3 — Complete Globe Version!');
 console.log('✅ All systems workable!');
-console.log('📁 All files modular!');
