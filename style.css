@@ -495,7 +495,7 @@ button { border: 0; color: inherit; font: inherit; cursor: pointer; transition: 
     position: absolute;
     z-index: 40;
     right: 15px;
-    bottom: 65px;
+    bottom: 75px;
     width: 330px;
     display: none;
     background: var(--panel);
