@@ -1,8 +1,8 @@
 // =========================================================
-// SAVE / LOAD SYSTEM
+// SAVE / LOAD SYSTEM — V2
 // =========================================================
 
-export const SAVE_KEY = 'worldWarSave';
+export const SAVE_KEY = 'worldWarSaveV2';
 export const AUTOSAVE_INTERVAL = 30000;
 
 export function saveGame(gameData) {
@@ -10,7 +10,7 @@ export function saveGame(gameData) {
         const saveData = {
             ...gameData,
             savedAt: Date.now(),
-            version: '1.0'
+            version: '2.0.0'
         };
         localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
         return true;
@@ -26,8 +26,8 @@ export function loadGame() {
         if (!raw) return null;
         
         const data = JSON.parse(raw);
-        if (data.version !== '1.0') {
-            console.warn('Save version mismatch');
+        if (data.version !== '2.0.0') {
+            console.warn('Save version mismatch. Expected 2.0.0, got', data.version);
         }
         
         return data;
@@ -39,7 +39,7 @@ export function loadGame() {
 
 export function deleteSave() {
     localStorage.removeItem(SAVE_KEY);
-    console.log('🗑️ Save deleted');
+    console.log('🗑️ V2 Save deleted');
 }
 
 export function hasSave() {
@@ -56,7 +56,8 @@ export function getSaveInfo() {
             savedAt: new Date(data.savedAt).toLocaleString(),
             version: data.version,
             units: data.units?.length || 0,
-            country: data.currentCountry || 'Unknown'
+            country: data.currentCountry || 'Unknown',
+            year: data.year || 1940
         };
     } catch {
         return null;
@@ -66,7 +67,7 @@ export function getSaveInfo() {
 export function autoSaveLoop(dt, saveFunction) {
     let timer = 0;
     timer += dt;
-    if (timer >= AUTOSAVE_INTERVAL) {
+    if (timer >= AUTOSAVE_INTERVAL / 1000) {
         timer = 0;
         saveFunction();
     }
@@ -82,7 +83,7 @@ export function exportSave() {
     
     const a = document.createElement('a');
     a.href = url;
-    a.download = `worldWarSave_${Date.now()}.json`;
+    a.download = `worldWarSaveV2_${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -94,7 +95,7 @@ export function importSave(file) {
             const data = e.target.result;
             JSON.parse(data);
             localStorage.setItem(SAVE_KEY, data);
-            console.log('✅ Save imported successfully!');
+            console.log('✅ V2 Save imported successfully!');
             return true;
         } catch (error) {
             console.error('Import failed:', error);
@@ -102,4 +103,16 @@ export function importSave(file) {
         }
     };
     reader.readAsText(file);
+}
+
+export function compareSaves(save1, save2) {
+    // Compare two save files
+    const s1 = JSON.parse(save1);
+    const s2 = JSON.parse(save2);
+    return {
+        sameVersion: s1.version === s2.version,
+        sameCountry: s1.currentCountry === s2.currentCountry,
+        unitsDiff: (s1.units?.length || 0) - (s2.units?.length || 0),
+        moneyDiff: (s1.money || 0) - (s2.money || 0)
+    };
 }
