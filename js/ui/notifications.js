@@ -1,5 +1,5 @@
 // =========================================================
-// NOTIFICATION SYSTEM — V2
+// NOTIFICATIONS
 // =========================================================
 
 export const NOTIFICATION_TYPES = {
@@ -58,7 +58,6 @@ export function addNotification(message, type = NOTIFICATION_TYPES.INFO, duratio
     notifications.push(notification);
     renderNotification(notification);
     
-    // Auto remove
     setTimeout(() => {
         removeNotification(notification.id);
     }, duration);
@@ -96,7 +95,6 @@ function renderNotification(notification) {
     
     notificationContainer.appendChild(div);
     
-    // Limit to 5 notifications
     while (notificationContainer.children.length > 5) {
         notificationContainer.removeChild(notificationContainer.firstChild);
     }
@@ -116,12 +114,4 @@ export function clearNotifications() {
         notificationContainer.innerHTML = '';
     }
     notifications.length = 0;
-}
-
-export function getNotifications() {
-    return notifications;
-}
-
-export function getUnreadCount() {
-    return notifications.length;
 }
