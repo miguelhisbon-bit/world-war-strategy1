@@ -1,84 +1,54 @@
 // =========================================================
-// MAIN.JS — Complete Game Engine
+// WORLD WAR V2 — Complete Game Engine
 // =========================================================
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 
-// Import from data folder
-import { BUILDINGS } from './data/buildings.js';
+// ================= IMPORTS =================
+import { WORLD_DATA, getCountryById, getStateById, getCityById, getCitiesByState } from './data/worldData.js';
+import { BUILDINGS, getBuildingCost, getBuildingProduction } from './data/buildings.js';
 import { TECH_TREE, getAllTechs, isTechAvailable } from './data/techTree.js';
 import { UNITS_DATA, getUnitStats, getUnitCost, getUpgradeCost } from './data/units.js';
-
-// Import from systems folder
 import { 
-    calculateBattleDamage, 
-    executeBattle, 
-    generateBattleReport,
-    findNearestEnemy,
-    TERRAIN_EFFECTS,
-    WEATHER_EFFECTS 
+    calculateBattleDamage, executeBattle, generateBattleReport, findNearestEnemy,
+    TERRAIN_EFFECTS, WEATHER_EFFECTS 
 } from './systems/battle.js';
-import {
-    getDiplomacyState,
-    formAlliance,
-    breakAlliance,
-    isAllied,
-    declareWar,
-    proposePeace,
-    establishTradeRoute,
-    generateIncident,
-    diplomacy,
-    alliances,
-    wars
-} from './systems/diplomacy.js';
-import {
-    economyState,
-    productionMultipliers,
-    buildingQueue,
-    researchQueue,
-    addBuildingToQueue,
-    processBuildingQueue,
-    addResearchToQueue,
-    processResearchQueue,
-    processEconomy,
-    tradeResource,
-    takeLoan
-} from './systems/economy.js';
-
-// Import from utils folder
-import {
-    saveGame,
-    loadGame,
-    deleteSave,
-    hasSave,
-    getSaveInfo,
-    autoSaveLoop,
-    SAVE_KEY
-} from './utils/saveLoad.js';
-import {
-    random,
-    randomInt,
-    clamp,
-    lerp,
-    distance,
-    distance2D,
-    shuffleArray,
-    randomItem,
-    chunkArray,
-    capitalize,
-    truncate,
-    formatNumber,
-    formatDate,
-    getTimeString,
-    hexToRGB,
-    rgbToHex,
-    hexToCSS,
-    log,
-    debugObject,
-    throttle,
-    debounce
+import { getDiplomacyState, formAlliance, breakAlliance, isAllied, declareWar, proposePeace } from './systems/diplomacy.js';
+import { processEconomy, tradeResource, takeLoan, economyState } from './systems/economy.js';
+import { 
+    createSupplyLine, updateSupplyLines, getSupplyStatus, 
+    getUnitsInSupply, supplyLines 
+} from './systems/supply.js';
+import { 
+    getCity, updateCity, trainUnitInCity, buildInCity,
+    getCityProduction, getCityGarrison, cityManager 
+} from './systems/cityManager.js';
+import { 
+    trainUnit, getTrainingQueue, processTraining, 
+    getUnitTrainingCost, trainingQueue 
+} from './systems/training.js';
+import { 
+    calculateWarScore, getWarStatus, updateWarScore, 
+    wars as warList 
+} from './systems/warScore.js';
+import { 
+    checkVictoryConditions, getVictoryStatus, 
+    victoryConditions 
+} from './systems/victory.js';
+import { processAI, getAIDifficulty, setAIDifficulty } from './systems/ai.js';
+import { initMinimap, updateMinimap, handleMinimapClick } from './ui/minimap.js';
+import { initShortcuts, handleKeyPress, SHORTCUTS } from './ui/shortcuts.js';
+import { showTooltip, hideTooltip, initTooltips } from './ui/tooltips.js';
+import { 
+    addNotification, clearNotifications, 
+    NOTIFICATION_TYPES, notifications 
+} from './ui/notifications.js';
+import { saveGame, loadGame, deleteSave, hasSave, getSaveInfo, SAVE_KEY } from './utils/saveLoad.js';
+import { 
+    random, randomInt, clamp, lerp, distance, formatNumber, 
+    capitalize, truncate, log, debounce, throttle 
 } from './utils/helpers.js';
 
 // =========================================================
@@ -134,28 +104,34 @@ const countryMeshMap = {};
 const stateMeshMap = {};
 let stateBorderPoints = {};
 
-// ================= NATIONS DATA =================
-const nation = {
-    BANGLADESH: { flag: "🇧🇩", name: "Bangladesh", color: 0x006a4e, lightColor: 0x00a87a, capital: "Dhaka", region: "South Asia", states: ["Dhaka", "Chittagong", "Rajshahi", "Khulna", "Sylhet", "Barisal", "Rangpur", "Mymensingh"], desc: "Bangladesh is a South Asian country with a rich history." },
-    PAKISTAN: { flag: "🇵🇰", name: "Pakistan", color: 0x01411c, lightColor: 0x027a35, capital: "Islamabad", region: "South Asia", states: ["Punjab", "Sindh", "KPK", "Balochistan", "Gilgit", "Azad Kashmir", "Islamabad"], desc: "Pakistan is a South Asian nation with diverse landscapes." },
-    TURKEY: { flag: "🇹🇷", name: "Turkey", color: 0xe30a17, lightColor: 0xff1a2a, capital: "Ankara", region: "Eurasia", states: ["Istanbul", "Ankara", "Izmir", "Bursa", "Antalya", "Konya", "Adana", "Gaziantep"], desc: "Turkey is a transcontinental country bridging Europe and Asia." },
-    IRAN: { flag: "🇮🇷", name: "Iran", color: 0x239f40, lightColor: 0x3ad060, capital: "Tehran", region: "Middle East", states: ["Tehran", "Isfahan", "Khuzestan", "Fars", "Razavi", "East Azerbaijan", "Mazandaran", "Gilan"], desc: "Iran is a Middle Eastern country with ancient history." },
-    SAUDI: { flag: "🇸🇦", name: "Saudi Arabia", color: 0x165d31, lightColor: 0x229544, capital: "Riyadh", region: "Middle East", states: ["Riyadh", "Makkah", "Madinah", "Eastern", "Asir", "Tabuk", "Jazan", "Najran"], desc: "Saudi Arabia is the largest country in the Middle East." },
-    EGYPT: { flag: "🇪🇬", name: "Egypt", color: 0xce1126, lightColor: 0xff1a33, capital: "Cairo", region: "North Africa", states: ["Cairo", "Alexandria", "Giza", "Luxor", "Aswan", "Port Said", "Suez", "Minya"], desc: "Egypt spans North Africa and the Middle East." },
-    PALESTINE: { flag: "🇵🇸", name: "Palestine", color: 0x007a3d, lightColor: 0x00b85a, capital: "Jerusalem", region: "Middle East", states: ["West Bank", "Gaza Strip", "Jerusalem", "Ramallah", "Hebron", "Nablus"], desc: "Palestine is a historic region in the Middle East." },
-    INDONESIA: { flag: "🇮🇩", name: "Indonesia", color: 0xce1126, lightColor: 0xff1a33, capital: "Jakarta", region: "Southeast Asia", states: ["Java", "Sumatra", "Kalimantan", "Sulawesi", "Papua", "Bali", "Lombok", "Flores"], desc: "Indonesia is the world's largest archipelago nation." },
-    AFGHANISTAN: { flag: "🇦🇫", name: "Afghanistan", color: 0x000000, lightColor: 0x333333, capital: "Kabul", region: "Central Asia", states: ["Kabul", "Kandahar", "Herat", "Mazar", "Nangarhar", "Balkh", "Ghazni", "Helmand"], desc: "Afghanistan is a landlocked country at the crossroads of Central and South Asia." },
-    INDIA: { flag: "🇮🇳", name: "India", color: 0xff9933, lightColor: 0xffbb55, capital: "New Delhi", region: "South Asia", states: ["UP", "Maharashtra", "Tamil Nadu", "Gujarat", "Karnataka", "Rajasthan", "West Bengal", "Punjab"], desc: "India is the world's largest democracy." },
-    USA: { flag: "🇺🇸", name: "United States", color: 0x2a5c8a, lightColor: 0x4a8cc0, capital: "Washington DC", region: "North America", states: ["California", "Texas", "Florida", "New York", "Illinois", "Pennsylvania", "Ohio", "Georgia"], desc: "The United States is a global superpower." },
-    CHINA: { flag: "🇨🇳", name: "China", color: 0xcc2222, lightColor: 0xff3333, capital: "Beijing", region: "East Asia", states: ["Guangdong", "Shandong", "Henan", "Sichuan", "Jiangsu", "Hebei", "Hunan", "Anhui"], desc: "China is the world's most populous country." },
-    RUSSIA: { flag: "🇷🇺", name: "Russia", color: 0x003399, lightColor: 0x0055cc, capital: "Moscow", region: "Eurasia", states: ["Moscow", "St Petersburg", "Novosibirsk", "Yekaterinburg", "Kazan", "Nizhny", "Samara", "Omsk"], desc: "Russia is the world's largest country by area." },
-    UK: { flag: "🇬🇧", name: "United Kingdom", color: 0x8a2a2a, lightColor: 0xcc4040, capital: "London", region: "Europe", states: ["England", "Scotland", "Wales", "Northern Ireland"], desc: "The United Kingdom is a European island nation." },
-    FRANCE: { flag: "🇫🇷", name: "France", color: 0x2a5a8a, lightColor: 0x4a88c0, capital: "Paris", region: "Europe", states: ["Île-de-France", "Provence", "Brittany", "Normandy", "Alsace", "Aquitaine", "Lyon", "Marseille"], desc: "France is a European nation with a rich cultural heritage." },
-    GERMANY: { flag: "🇩🇪", name: "Germany", color: 0x3a3a3a, lightColor: 0x666666, capital: "Berlin", region: "Europe", states: ["Bavaria", "North Rhine", "Baden", "Saxony", "Hesse", "Berlin", "Hamburg", "Munich"], desc: "Germany is Europe's largest economy." }
-};
+// ================= DIPLOMACY =================
+const diplomacy = {};
+const alliances = {};
+const wars = [];
 
+// ================= NATIONS DATA (from WORLD_DATA) =================
+const nation = {};
 const countryColors = {};
-Object.keys(nation).forEach(key => { countryColors[key] = nation[key].color; });
+
+// Build nation data from WORLD_DATA
+Object.keys(WORLD_DATA.continents).forEach(continentKey => {
+    const continent = WORLD_DATA.continents[continentKey];
+    continent.countries.forEach(country => {
+        nation[country.id] = {
+            flag: country.flag,
+            name: country.name,
+            color: country.color,
+            lightColor: country.lightColor || country.color,
+            capital: country.capital,
+            region: continent.name,
+            states: country.states.map(s => s.name),
+            desc: country.description || `${country.name} is a nation in ${continent.name}.`,
+            continent: continentKey,
+            cities: country.states
+        };
+        countryColors[country.id] = country.color;
+    });
+});
 
 const mapColors = {
     MILITARY: 0x596b58, POLITICAL: 0x58667d, TERRAIN: 0x52634d,
@@ -181,6 +157,8 @@ const tech = {
     ELECTRONICS: { name: "Electronics", progress: 18, active: false, bonus: "+10 intel", completed: false }
 };
 
+const buildingQueue = [];
+
 /* =========================================================
    INITIALIZATION
    ========================================================== */
@@ -188,20 +166,28 @@ const tech = {
 async function init() {
     loading(10, "Initializing global command system...");
     setup3D();
-    loading(25, "Generating world terrain...");
+    loading(20, "Generating world terrain...");
     createTerrain();
-    loading(35, "Drawing country borders...");
+    loading(30, "Drawing country borders...");
     createCountryBorders();
-    loading(45, "Adding states/provinces...");
+    loading(40, "Adding states/provinces...");
     createStates();
-    loading(50, "Creating state borders...");
+    loading(45, "Creating state borders...");
     createStateBorderData();
-    loading(55, "Deploying military forces...");
+    loading(50, "Deploying military forces...");
     deployInitialForces();
+    loading(55, "Initializing cities...");
+    initCities();
+    loading(60, "Setting up supply lines...");
+    initSupplyLines();
     loading(70, "Connecting economy...");
     loadCampaign();
-    loading(85, "Initializing intelligence...");
+    loading(80, "Initializing AI...");
+    setAIDifficulty('MEDIUM');
+    loading(85, "Initializing UI...");
     setupUI();
+    loading(90, "Initializing minimap...");
+    initMinimap();
     loading(95, "Preparing battlefield...");
     updateAllUI();
     loading(100, "Battlefield ready.");
@@ -220,6 +206,49 @@ function loading(progress, text) {
     const status = $("loadingStatus");
     if (bar) bar.style.width = `${progress}%`;
     if (status) status.textContent = text;
+}
+
+function initCities() {
+    // Initialize city data for all countries
+    Object.keys(WORLD_DATA.continents).forEach(continentKey => {
+        const continent = WORLD_DATA.continents[continentKey];
+        continent.countries.forEach(country => {
+            country.states.forEach(state => {
+                const cityData = getCity(state.id);
+                if (!cityData) {
+                    // Initialize city
+                    cityManager[state.id] = {
+                        name: state.name,
+                        country: country.id,
+                        population: state.population || 1000000,
+                        industry: state.industry || 3,
+                        agriculture: state.agriculture || 2,
+                        buildings: [],
+                        garrison: null,
+                        fortification: 0,
+                        supply: 100,
+                        production: { money: 10, food: 5 }
+                    };
+                }
+            });
+        });
+    });
+}
+
+function initSupplyLines() {
+    // Create supply lines between capital and other cities
+    Object.keys(WORLD_DATA.continents).forEach(continentKey => {
+        const continent = WORLD_DATA.continents[continentKey];
+        continent.countries.forEach(country => {
+            const states = country.states;
+            if (states.length > 1) {
+                const capital = states[0];
+                for (let i = 1; i < states.length; i++) {
+                    createSupplyLine(capital.id, states[i].id, 50);
+                }
+            }
+        });
+    });
 }
 
 /* =========================================================
@@ -651,6 +680,7 @@ function zoomToCountry(countryKey) {
             isZooming = false;
             showStateBorders(countryKey);
             showStateLabels(countryKey);
+            showCities(countryKey);
         }
     }
     animateZoom();
@@ -658,12 +688,53 @@ function zoomToCountry(countryKey) {
     highlightedCountry = countryKey;
     const data = nation[countryKey];
     const stateCount = data.states?.length || 0;
-    $("selectedCountryDisplay").textContent = `📍 ${data.flag} ${data.name} • ${data.region} • ${stateCount} States`;
+    const cityCount = data.cities?.length || 0;
+    $("selectedCountryDisplay").textContent = `📍 ${data.flag} ${data.name} • ${data.region} • ${stateCount} States • ${cityCount} Cities`;
     $("countryFlag").textContent = data.flag;
     $("countryName").textContent = data.name;
 
     showCountryInfo(countryKey);
     toast(`📍 Zooming to ${data.name}`);
+}
+
+function showCities(countryKey) {
+    // Remove old city labels
+    const oldCityLabels = labelGroup.children.filter(child => child.userData && child.userData.isCityLabel);
+    oldCityLabels.forEach(label => labelGroup.remove(label));
+
+    const data = nation[countryKey];
+    if (!data || !data.cities) return;
+
+    const mesh = countryMeshMap[countryKey];
+    if (!mesh) return;
+
+    const positions = mesh.geometry.attributes.position;
+    const center = new THREE.Vector3();
+    let count = 0;
+    for (let i = 0; i < positions.count; i++) {
+        center.x += positions.getX(i);
+        center.z += positions.getY(i);
+        count++;
+    }
+    center.x /= count;
+    center.z /= count;
+
+    const radius = 10;
+    const angleStep = (Math.PI * 2) / Math.min(data.cities.length, 6);
+
+    data.cities.forEach((city, index) => {
+        const angle = index * angleStep + 0.3;
+        const x = center.x + Math.cos(angle) * radius * (0.6 + Math.random() * 0.4);
+        const z = center.z + Math.sin(angle) * radius * (0.6 + Math.random() * 0.4);
+
+        const labelDiv = document.createElement('div');
+        labelDiv.textContent = `🏙️ ${city.name}`;
+        labelDiv.style.cssText = 'color:#58a6ff;font-size:10px;font-weight:600;text-shadow:0 2px 20px rgba(0,0,0,0.95);background:rgba(0,0,0,0.75);padding:2px 8px;border-radius:10px;border:1px solid rgba(88,166,255,0.3);backdrop-filter:blur(4px);pointer-events:none;user-select:none;';
+        const label = new CSS2DObject(labelDiv);
+        label.position.set(x, 1.5, z);
+        label.userData = { isCityLabel: true };
+        labelGroup.add(label);
+    });
 }
 
 function showStateBorders(countryKey) {
@@ -726,6 +797,8 @@ function clearStateHighlights() {
     while(stateBorderGroup.children.length) stateBorderGroup.remove(stateBorderGroup.children[0]);
     const oldLabels = labelGroup.children.filter(child => child.userData && child.userData.isStateLabel);
     oldLabels.forEach(label => labelGroup.remove(label));
+    const oldCityLabels = labelGroup.children.filter(child => child.userData && child.userData.isCityLabel);
+    oldCityLabels.forEach(label => labelGroup.remove(label));
 }
 
 function highlightCountry(countryKey) {
@@ -768,7 +841,8 @@ function highlightCountry(countryKey) {
         highlightGroup.add(ring);
 
         const stateCount = data.states?.length || 0;
-        $("selectedCountryDisplay").textContent = `📍 ${data.flag} ${data.name} • ${data.region} • ${stateCount} States`;
+        const cityCount = data.cities?.length || 0;
+        $("selectedCountryDisplay").textContent = `📍 ${data.flag} ${data.name} • ${data.region} • ${stateCount} States • ${cityCount} Cities`;
     }
 }
 
@@ -789,31 +863,29 @@ function showCountryInfo(countryKey) {
             <div class="country-detail-card">
                 <h4>📍 Territory Information</h4>
                 <div class="stat-row"><span>Country</span><b>${data.name}</b></div>
-                <div class="stat-row"><span>Region</span><b>${data.region}</b></div>
+                <div class="stat-row"><span>Continent</span><b>${data.continent}</b></div>
                 <div class="stat-row"><span>Capital</span><b>${data.capital}</b></div>
-                <div class="stat-row"><span>States/Provinces</span><b>${data.states?.length || 0}</b></div>
+                <div class="stat-row"><span>States</span><b>${data.states?.length || 0}</b></div>
+                <div class="stat-row"><span>Cities</span><b>${data.cities?.length || 0}</b></div>
                 <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
                     ${data.states?.map(s => `<span class="state-tag">${s}</span>`).join('') || ''}
                 </div>
             </div>
             <div class="country-detail-card">
+                <h4>🏙️ Cities</h4>
+                ${data.cities?.map(c => `
+                    <div class="stat-row">
+                        <span>${c.name}</span>
+                        <b>Population: ${formatNumber(c.population)}</b>
+                    </div>
+                `).join('') || '<p style="color:var(--muted);font-size:11px;">No cities</p>'}
+            </div>
+            <div class="country-detail-card">
                 <h4>📖 Description</h4>
                 <p style="font-size:11px;color:var(--muted);line-height:1.6;">${data.desc || 'No description available.'}</p>
             </div>
-            <div class="country-detail-card">
-                <h4>⚔️ Military Forces</h4>
-                ${units.filter(u => u.country === countryKey && u.state !== "DESTROYED").map(u => 
-                    `<div class="stat-row"><span>${u.type}</span><b>${u.name} (${u.state})</b></div>`
-                ).join('') || '<p style="font-size:10px;color:var(--muted);">No active units</p>'}
-            </div>
-            <div class="country-detail-card">
-                <h4>🤝 Diplomatic Relations</h4>
-                ${Object.keys(nation).filter(k => k !== countryKey).map(k => {
-                    const val = diplomacy[k] || 0;
-                    return `<div class="stat-row"><span>${nation[k].flag} ${nation[k].name}</span><b style="color:${val > 0 ? 'var(--green)' : val < -30 ? 'var(--red)' : 'var(--accent)'}">${val}</b></div>`;
-                }).join('')}
-            </div>
             <button class="action-btn success" onclick="window.zoomToCountry('${countryKey}')">🎯 Zoom to ${data.name}</button>
+            <button class="action-btn info" onclick="window.openCityPanel('${countryKey}')">🏙️ Manage Cities</button>
         `;
     }
 
@@ -916,7 +988,7 @@ function handleWorldClick(event) {
 }
 
 /* =========================================================
-   UNIT CREATION
+   UNIT CREATION (Same as V1)
    ========================================================== */
 
 function create3DTank(color) {
@@ -1142,7 +1214,9 @@ function create3DUnit(name, type, x, z, friendly = true, country = "BANGLADESH")
         kills: 0,
         experience: 0,
         entrenchment: 0,
-        selected: false
+        selected: false,
+        city: null,
+        supplyLine: null
     };
 
     group.userData.unit = unit;
@@ -1253,6 +1327,7 @@ function executeAttack(attacker, defender) {
         attacker.state = "ATTACKING";
         createExplosion(defender.object.position);
         toast(`${attacker.name} dealt ${Math.round(damage)} damage`);
+        addNotification(`⚔️ ${attacker.name} attacked ${defender.name}`, NOTIFICATION_TYPES.WARNING);
     }
     updateUnitPanel();
     updateAllUI();
@@ -1275,6 +1350,7 @@ function executeAirstrike(aircraft, target) {
     updateUnitHPBar(target);
     addBattleLog(`Airstrike hit ${target.name} for ${Math.round(damage)} damage`);
     toast(`Airstrike hit ${target.name}`);
+    addNotification(`✈️ Airstrike hit ${target.name}`, NOTIFICATION_TYPES.DANGER);
 
     if (target.hp <= 0 || target.organization <= 0) {
         destroyUnit(target, aircraft);
@@ -1314,6 +1390,7 @@ function destroyUnit(unit, killer = null) {
     createExplosion(unit.object.position);
     addBattleLog(`${unit.name} destroyed`);
     toast(`${unit.name} destroyed`);
+    addNotification(`💀 ${unit.name} destroyed!`, NOTIFICATION_TYPES.DANGER);
     if (selectedUnit === unit) {
         selectedUnit = null;
         const panel = $("unitPanel");
@@ -1405,6 +1482,7 @@ function updateResearch(dt) {
             t.active = false;
             applyTechnology(key);
             toast(`${t.name} completed`);
+            addNotification(`🔬 ${t.name} researched!`, NOTIFICATION_TYPES.SUCCESS);
         }
     }
 }
@@ -1454,6 +1532,7 @@ function runRecon() {
         }
     }
     toast("Recon completed");
+    addNotification(`🕵️ Recon completed!`, NOTIFICATION_TYPES.INFO);
     updateAllUI();
 }
 
@@ -1482,6 +1561,7 @@ function changeWeather() {
         ground.material.color.setHex(weather === "SNOW" ? 0x8a9a9a : 0x52634d);
     }
     toast(`Weather: ${weather}`);
+    addNotification(`🌤️ Weather changed to ${weather}`, NOTIFICATION_TYPES.INFO);
 }
 
 function setMapLayer(layer) {
@@ -1517,6 +1597,7 @@ function quickBuildFactory() {
     construction -= 2;
     factories.military++;
     toast("🏭 Military factory built!");
+    addNotification(`🏭 Factory built!`, NOTIFICATION_TYPES.SUCCESS);
     updateAllUI();
 }
 
@@ -1534,6 +1615,7 @@ function quickReinforce() {
         }
     }
     toast("🪖 Units reinforced!");
+    addNotification(`🪖 Units reinforced!`, NOTIFICATION_TYPES.SUCCESS);
     updateAllUI();
 }
 
@@ -1558,7 +1640,30 @@ function buildBuilding(buildingId) {
     });
     
     toast(`🔨 Building ${building.name} started!`);
+    addNotification(`🔨 Building ${building.name} started!`, NOTIFICATION_TYPES.INFO);
     openPanel('buildings');
+    updateAllUI();
+}
+
+function trainUnitFromCity(cityId, unitType) {
+    const cost = getUnitTrainingCost(unitType);
+    if (!cost) { toast("Invalid unit type"); return; }
+    
+    for (const [resource, amount] of Object.entries(cost)) {
+        if (resource === 'money' && money < amount) { toast(`Not enough money`); return; }
+        if (resource === 'steel' && steel < amount) { toast(`Not enough steel`); return; }
+        if (resource === 'manpower' && manpower < amount) { toast(`Not enough manpower`); return; }
+    }
+    
+    for (const [resource, amount] of Object.entries(cost)) {
+        if (resource === 'money') money -= amount;
+        else if (resource === 'steel') steel -= amount;
+        else if (resource === 'manpower') manpower -= amount;
+    }
+    
+    trainUnit(cityId, unitType);
+    toast(`🪖 Training ${unitType} in ${cityId}`);
+    addNotification(`🪖 Training ${unitType} in ${cityId}`, NOTIFICATION_TYPES.INFO);
     updateAllUI();
 }
 
@@ -1575,6 +1680,7 @@ function autosave() {
             factories, diplomacy,
             production, tech,
             year, month, day, currentCountry,
+            buildingQueue,
             units: units.map(u => ({
                 id: u.id, name: u.name, type: u.type, friendly: u.friendly, country: u.country,
                 hp: u.hp, organization: u.organization, morale: u.morale,
@@ -1583,15 +1689,18 @@ function autosave() {
                 state: u.state, kills: u.kills, experience: u.experience,
                 entrenchment: u.entrenchment,
                 pos: u.object.position.toArray()
-            }))
+            })),
+            cityManager,
+            supplyLines,
+            wars
         };
-        localStorage.setItem('worldWarSave', JSON.stringify(saveData));
+        localStorage.setItem('worldWarSaveV2', JSON.stringify(saveData));
     } catch (e) { /* silent fail */ }
 }
 
 function loadCampaign() {
     try {
-        const raw = localStorage.getItem('worldWarSave');
+        const raw = localStorage.getItem('worldWarSaveV2');
         if (!raw) return;
         const data = JSON.parse(raw);
         money = data.money || money;
@@ -1614,6 +1723,10 @@ function loadCampaign() {
         if (data.month) month = data.month;
         if (data.day) day = data.day;
         if (data.currentCountry) currentCountry = data.currentCountry;
+        if (data.buildingQueue) buildingQueue.push(...data.buildingQueue);
+        if (data.cityManager) Object.assign(cityManager, data.cityManager);
+        if (data.supplyLines) supplyLines.push(...data.supplyLines);
+        if (data.wars) wars.push(...data.wars);
         if (data.units) {
             for (let i = 0; i < data.units.length && i < units.length; i++) {
                 const d = data.units[i];
@@ -1669,6 +1782,9 @@ function updateSupply(dt) {
             unit.readiness = Math.min(100, unit.readiness + dt * 0.12);
         }
     }
+    
+    // Update supply lines
+    updateSupplyLines(dt);
 }
 
 function updateRecovery(dt) {
@@ -1684,79 +1800,7 @@ function updateRecovery(dt) {
 
 function enemyAI(dt) {
     if (paused) return;
-    const enemies = units.filter(u => !u.friendly && u.state !== "DESTROYED");
-    const friends = units.filter(u => u.friendly && u.state !== "DESTROYED");
-    if (!friends.length) return;
-
-    for (const enemy of enemies) {
-        if (enemy.type === "AIR") {
-            enemyAirAI(enemy);
-            continue;
-        }
-        let closest = null;
-        let distance = Infinity;
-        for (const friend of friends) {
-            const d = enemy.object.position.distanceTo(friend.object.position);
-            if (d < distance) { distance = d; closest = friend; }
-        }
-        if (!closest) continue;
-        let attackRange = 28;
-        if (enemy.type === "ARTILLERY") attackRange = 60;
-        
-        if (distance <= attackRange) {
-            enemy.state = "ATTACKING";
-            enemyAICombat(enemy, closest);
-        } else {
-            enemy.destination = closest.object.position.clone();
-            enemy.state = "MOVING";
-        }
-    }
-}
-
-function enemyAirAI(enemy) {
-    const targets = units.filter(u => u.friendly && u.state !== "DESTROYED");
-    if (!targets.length) return;
-    const target = targets.sort((a, b) =>
-        enemy.object.position.distanceTo(a.object.position) -
-        enemy.object.position.distanceTo(b.object.position)
-    )[0];
-    if (enemy.object.position.distanceTo(target.object.position) < 80) {
-        if (Math.random() < 0.03 * speed) {
-            enemyAirstrike(enemy, target);
-        }
-    } else {
-        enemy.destination = new THREE.Vector3(target.object.position.x, 8, target.object.position.z);
-        enemy.state = "MOVING";
-    }
-}
-
-function enemyAICombat(attacker, defender) {
-    if (Math.random() > 0.025 * speed) return;
-    if (attacker.strength <= 0 || attacker.organization <= 0) return;
-
-    let attack = attacker.attack * (attacker.strength / 100) * (attacker.organization / 100) * getTerrainModifier(attacker) + Math.random() * 6;
-    let defense = defender.defense * (defender.strength / 100) * (defender.organization / 100) * getTerrainModifier(defender) + Math.random() * 5;
-    
-    let damage = Math.max(2, attack - defense * 0.5);
-    defender.hp = Math.max(0, defender.hp - damage);
-    defender.organization = Math.max(0, defender.organization - damage * 0.4);
-    updateUnitHPBar(defender);
-    
-    if (defender.hp <= 0 || defender.organization <= 0) {
-        destroyUnit(defender, attacker);
-    }
-}
-
-function enemyAirstrike(aircraft, target) {
-    let damage = 12 + Math.random() * 14;
-    target.hp = Math.max(0, target.hp - damage);
-    target.organization = Math.max(0, target.organization - damage * 0.6);
-    updateUnitHPBar(target);
-    createExplosion(target.object.position);
-    addBattleLog(`Enemy airstrike hit ${target.name}`);
-    if (target.hp <= 0 || target.organization <= 0) {
-        destroyUnit(target, aircraft);
-    }
+    processAI(dt, units, nation, diplomacy);
 }
 
 /* =========================================================
@@ -1764,6 +1808,7 @@ function enemyAirstrike(aircraft, target) {
    ========================================================== */
 
 function setupUI() {
+    // Panel buttons
     document.querySelectorAll('.panel-button').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.panel-button').forEach(b => b.classList.remove('active'));
@@ -1776,17 +1821,20 @@ function setupUI() {
             else if (panel === 'research') openPanel('research');
             else if (panel === 'diplomacy') openPanel('diplomacy');
             else if (panel === 'intel') openPanel('intel');
+            else if (panel === 'city') openPanel('city');
+            else if (panel === 'supply') openPanel('supply');
             else if (panel === 'settings') openPanel('settings');
-            else if (panel === 'buildings') openPanel('buildings');
         });
     });
 
+    // Close panel
     $('closePanel').addEventListener('click', () => { $('mainPanel').classList.remove('open'); });
     $('closeUnit').addEventListener('click', () => {
         $('unitPanel').classList.remove('open');
         if (selectedUnit) deselectUnit();
     });
 
+    // Unit commands
     $('moveCommand').addEventListener('click', () => {
         if (!selectedUnit) return;
         moveMode = !moveMode;
@@ -1840,9 +1888,11 @@ function setupUI() {
         executeAirstrike(selectedUnit, target);
     });
 
+    // Quick actions
     $('quickFactory').addEventListener('click', quickBuildFactory);
     $('quickReinforce').addEventListener('click', quickReinforce);
 
+    // Date controls
     $('pauseBtn').addEventListener('click', () => {
         paused = !paused;
         $('pauseBtn').textContent = paused ? '▶' : '⏸';
@@ -1857,6 +1907,7 @@ function setupUI() {
         toast(`Speed: ${speed}×`);
     });
 
+    // Camera controls
     $('zoomIn').addEventListener('click', () => { camera.position.multiplyScalar(0.85); controls.update(); });
     $('zoomOut').addEventListener('click', () => { camera.position.multiplyScalar(1.15); controls.update(); });
     $('resetCamera').addEventListener('click', () => {
@@ -1880,31 +1931,24 @@ function setupUI() {
         else { toast('Select a country first'); }
     });
 
-    $('countryDisplay').addEventListener('click', () => { $('countryModal').classList.add('open'); });
-    $('closeCountryModal').addEventListener('click', () => { $('countryModal').classList.remove('open'); });
-    document.querySelectorAll('.country-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const country = card.dataset.country;
-            if (country && nation[country]) {
-                currentCountry = country;
-                $('countryModal').classList.remove('open');
-                $('countryFlag').textContent = nation[country].flag;
-                $('countryName').textContent = nation[country].name;
-                zoomToCountry(country);
-                highlightCountry(country);
-                toast(`Selected ${nation[country].name}`);
-            }
-        });
+    // Country modal
+    $('countryDisplay').addEventListener('click', () => { 
+        populateCountryGrid();
+        $('countryModal').classList.add('open'); 
     });
+    $('closeCountryModal').addEventListener('click', () => { $('countryModal').classList.remove('open'); });
 
+    // Country info modal
     $('closeCountryInfo').addEventListener('click', () => { $('countryInfoModal').classList.remove('open'); });
+    $('closeCityInfo').addEventListener('click', () => { $('cityInfoModal').classList.remove('open'); });
 
+    // Tutorial
     let tutorialStep = 0;
     const tutorialTexts = [
-        { title: 'Welcome, Commander', text: 'Click any country to zoom in and view its states. Select a military unit and command it across the battlefield.' },
-        { title: 'Select a Country', text: 'Click on any country on the map or use the country selector in the top bar. The map will zoom in and show state borders.' },
-        { title: 'Command Units', text: 'Click on a unit to select it. Use the command buttons (Move, Attack, Defend, etc.) to give orders.' },
-        { title: 'Manage Resources', text: 'Keep an eye on your resources at the top. Build factories, research technologies, and expand your army.' }
+        { title: 'Welcome to V2, Commander', text: 'Click any country to zoom in and manage cities. Train units, build supply lines, and conquer the world!' },
+        { title: 'Manage Cities', text: 'Click on a city to view its details. You can train units, build buildings, and manage production.' },
+        { title: 'Supply Lines', text: 'Supply lines connect your cities to your units. Make sure your units are always in supply!' },
+        { title: 'Victory Conditions', text: 'Conquer territories, build your economy, research technology, or form alliances to achieve victory!' }
     ];
     $('tutorialNext').addEventListener('click', () => {
         tutorialStep++;
@@ -1914,8 +1958,42 @@ function setupUI() {
         $('tutorialNext').textContent = tutorialStep === tutorialTexts.length - 1 ? 'START' : 'NEXT';
     });
 
+    // Minimap click
+    document.getElementById('miniMapCanvas').addEventListener('click', handleMinimapClick);
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', handleKeyPress);
+
+    // Close modals on outside click
     document.querySelectorAll('.modal').forEach(modal => {
         modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+    });
+}
+
+function populateCountryGrid() {
+    const grid = $('countryGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    Object.keys(nation).forEach(key => {
+        const data = nation[key];
+        const card = document.createElement('button');
+        card.className = 'country-card';
+        card.dataset.country = key;
+        card.innerHTML = `
+            <span>${data.flag}</span>
+            <b>${data.name}</b>
+            <small>${data.region} • ${data.states?.length || 0} States</small>
+        `;
+        card.addEventListener('click', () => {
+            currentCountry = key;
+            $('countryModal').classList.remove('open');
+            $('countryFlag').textContent = data.flag;
+            $('countryName').textContent = data.name;
+            zoomToCountry(key);
+            highlightCountry(key);
+            toast(`Selected ${data.name}`);
+        });
+        grid.appendChild(card);
     });
 }
 
@@ -1928,26 +2006,33 @@ function openPanel(panel) {
     mainPanel.classList.add('open');
 
     if (panel === 'overview') {
-        panelKicker.textContent = 'STRATEGIC COMMAND';
+        panelKicker.textContent = 'STRATEGIC COMMAND V2';
         panelTitle.textContent = 'World Overview';
+        const totalUnits = units.filter(u => u.state !== 'DESTROYED').length;
+        const totalCities = Object.keys(cityManager).length;
+        const totalSupplyLines = supplyLines.length;
         panelContent.innerHTML = `
             <div class="info-card"><h3>🌍 Global Status</h3>
-                <div class="stat-row"><span>Total Countries</span><b>${Object.keys(nation).length}</b></div>
-                <div class="stat-row"><span>Active Units</span><b>${units.filter(u => u.state !== 'DESTROYED').length}</b></div>
-                <div class="stat-row"><span>Total Factories</span><b>${factories.civilian + factories.military}</b></div>
+                <div class="stat-row"><span>Countries</span><b>${Object.keys(nation).length}</b></div>
+                <div class="stat-row"><span>Active Units</span><b>${totalUnits}</b></div>
+                <div class="stat-row"><span>Total Cities</span><b>${totalCities}</b></div>
+                <div class="stat-row"><span>Supply Lines</span><b>${totalSupplyLines}</b></div>
                 <div class="stat-row"><span>Weather</span><b>${weather}</b></div>
+                <div class="stat-row"><span>War Status</span><b style="color:${wars.length > 0 ? 'var(--red)' : 'var(--green)'}">${wars.length > 0 ? '⚔️ AT WAR' : '☮️ PEACE'}</b></div>
             </div>
             <div class="info-card"><h3>🎯 Selected Country</h3>
                 ${highlightedCountry ? `
                     <div class="stat-row"><span>Country</span><b>${nation[highlightedCountry].flag} ${nation[highlightedCountry].name}</b></div>
-                    <div class="stat-row"><span>Region</span><b>${nation[highlightedCountry].region}</b></div>
+                    <div class="stat-row"><span>Continent</span><b>${nation[highlightedCountry].continent}</b></div>
                     <div class="stat-row"><span>Capital</span><b>${nation[highlightedCountry].capital}</b></div>
                     <div class="stat-row"><span>States</span><b>${nation[highlightedCountry].states?.length || 0}</b></div>
+                    <div class="stat-row"><span>Cities</span><b>${nation[highlightedCountry].cities?.length || 0}</b></div>
                 ` : '<p style="color:var(--muted);font-size:11px;">No country selected. Click a country on the map.</p>'}
             </div>
             <button class="action-btn" onclick="window.changeWeather()">🌤️ Change Weather</button>
             <button class="action-btn info" onclick="window.setMapLayer('MILITARY')">🗺️ Military Map</button>
             <button class="action-btn" onclick="window.setMapLayer('TERRAIN')">⛰️ Terrain Map</button>
+            <button class="action-btn success" onclick="window.openCityPanel('${highlightedCountry || currentCountry}')">🏙️ Manage Cities</button>
         `;
     } else if (panel === 'army') {
         panelKicker.textContent = 'MILITARY FORCES';
@@ -1955,13 +2040,26 @@ function openPanel(panel) {
         const friendlyUnits = units.filter(u => u.friendly && u.state !== 'DESTROYED');
         const enemyUnits = units.filter(u => !u.friendly && u.state !== 'DESTROYED');
         panelContent.innerHTML = `
-            <div class="info-card"><h3>🟢 Allied Forces</h3>
-                ${friendlyUnits.map(u => `<div class="stat-row"><span>${u.type} ${u.name}</span><b style="color:${u.hp > 50 ? 'var(--green)' : 'var(--red)'}">HP: ${Math.round(u.hp)}%</b></div>`).join('') || '<p style="color:var(--muted);font-size:11px;">No friendly units</p>'}
+            <div class="info-card"><h3>🟢 Allied Forces (${friendlyUnits.length})</h3>
+                ${friendlyUnits.map(u => `
+                    <div class="stat-row">
+                        <span>${u.type} ${u.name}</span>
+                        <b style="color:${u.hp > 50 ? 'var(--green)' : 'var(--red)'}">HP: ${Math.round(u.hp)}%</b>
+                        <span style="color:var(--muted);font-size:9px;">${u.state}</span>
+                    </div>
+                `).join('') || '<p style="color:var(--muted);font-size:11px;">No friendly units</p>'}
             </div>
-            <div class="info-card"><h3>🔴 Enemy Forces</h3>
-                ${enemyUnits.map(u => `<div class="stat-row"><span>${u.type} ${u.name}</span><b style="color:${u.hp > 50 ? 'var(--green)' : 'var(--red)'}">HP: ${Math.round(u.hp)}%</b></div>`).join('') || '<p style="color:var(--muted);font-size:11px;">No enemy units</p>'}
+            <div class="info-card"><h3>🔴 Enemy Forces (${enemyUnits.length})</h3>
+                ${enemyUnits.map(u => `
+                    <div class="stat-row">
+                        <span>${u.type} ${u.name}</span>
+                        <b style="color:${u.hp > 50 ? 'var(--green)' : 'var(--red)'}">HP: ${Math.round(u.hp)}%</b>
+                        <span style="color:var(--muted);font-size:9px;">${u.state}</span>
+                    </div>
+                `).join('') || '<p style="color:var(--muted);font-size:11px;">No enemy units</p>'}
             </div>
             <button class="action-btn success" onclick="window.quickReinforce()">🪖 Reinforce All</button>
+            <button class="action-btn info" onclick="window.openTrainingPanel()">🪖 Train Units</button>
         `;
     } else if (panel === 'economy') {
         panelKicker.textContent = 'ECONOMIC REPORT';
@@ -2022,9 +2120,11 @@ function openPanel(panel) {
         panelContent.innerHTML = `
             ${Object.keys(nation).filter(k => k !== currentCountry).map(k => {
                 const val = diplomacy[k] || 0;
+                const state = getDiplomacyState(val);
                 return `<div class="info-card"><h3>${nation[k].flag} ${nation[k].name}</h3>
-                    <div class="stat-row"><span>Relations</span><b style="color:${val > 0 ? 'var(--green)' : val < -30 ? 'var(--red)' : 'var(--accent)'}">${val}</b></div>
+                    <div class="stat-row"><span>Relations</span><b style="color:${state.color}">${state.name} (${val})</b></div>
                     <button class="action-btn ${val < -50 ? 'danger' : 'success'}" onclick="window.improveDiplomacy('${k}')">${val < -50 ? '⚔️ Declare War' : '🤝 Improve Relations'}</button>
+                    ${val > 50 ? `<button class="action-btn info" onclick="window.formAlliance('${currentCountry}','${k}')">🤝 Form Alliance</button>` : ''}
                 </div>`;
             }).join('')}
         `;
@@ -2044,44 +2144,125 @@ function openPanel(panel) {
                 ${battleLog.slice(0, 5).map(log => `<div style="font-size:10px;color:var(--muted);padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05);">[${log.time}] ${log.message}</div>`).join('') || '<p style="color:var(--muted);font-size:11px;">No battles yet</p>'}
             </div>
         `;
+    } else if (panel === 'city') {
+        panelKicker.textContent = 'CITY MANAGEMENT';
+        panelTitle.textContent = 'Manage Cities';
+        const countryKey = highlightedCountry || currentCountry;
+        const data = nation[countryKey];
+        if (!data || !data.cities) {
+            panelContent.innerHTML = `<p style="color:var(--muted);font-size:11px;">Select a country first.</p>`;
+        } else {
+            panelContent.innerHTML = `
+                <div class="info-card"><h3>🏙️ Cities of ${data.flag} ${data.name}</h3>
+                    ${data.cities.map(city => {
+                        const cityData = getCity(city.id);
+                        return `<div class="city-detail-card">
+                            <h4>${city.name}</h4>
+                            <div class="stat-row"><span>Population</span><b>${formatNumber(city.population)}</b></div>
+                            <div class="stat-row"><span>Industry</span><b>${cityData?.industry || 0}</b></div>
+                            <div class="stat-row"><span>Agriculture</span><b>${cityData?.agriculture || 0}</b></div>
+                            <div class="stat-row"><span>Fortification</span><b>${cityData?.fortification || 0}%</b></div>
+                            <div class="stat-row"><span>Supply</span><b style="color:${cityData?.supply > 50 ? 'var(--green)' : 'var(--red)'}">${cityData?.supply || 0}%</b></div>
+                            <button class="action-btn info" onclick="window.openCityDetails('${city.id}')">📋 View Details</button>
+                            <button class="action-btn success" onclick="window.trainUnitFromCity('${city.id}','INFANTRY')">🪖 Train Infantry</button>
+                            <button class="action-btn" onclick="window.trainUnitFromCity('${city.id}','TANK')">🔩 Train Tank</button>
+                        </div>`;
+                    }).join('')}
+                </div>
+            `;
+        }
+    } else if (panel === 'supply') {
+        panelKicker.textContent = 'SUPPLY LINES';
+        panelTitle.textContent = 'Logistics Overview';
+        const totalSupplyLines = supplyLines.length;
+        const activeLines = supplyLines.filter(s => s.status === 'ACTIVE').length;
+        panelContent.innerHTML = `
+            <div class="info-card"><h3>📦 Supply Network</h3>
+                <div class="stat-row"><span>Total Supply Lines</span><b>${totalSupplyLines}</b></div>
+                <div class="stat-row"><span>Active Lines</span><b style="color:var(--green)">${activeLines}</b></div>
+                <div class="stat-row"><span>Inactive Lines</span><b style="color:var(--red)">${totalSupplyLines - activeLines}</b></div>
+            </div>
+            ${supplyLines.map(line => {
+                const status = line.status;
+                const statusColor = status === 'ACTIVE' ? 'var(--green)' : 'var(--red)';
+                return `<div class="info-card">
+                    <h4>${line.from} → ${line.to}</h4>
+                    <div class="stat-row"><span>Status</span><b style="color:${statusColor}">${status}</b></div>
+                    <div class="stat-row"><span>Capacity</span><b>${line.amount || 50}</b></div>
+                </div>`;
+            }).join('') || '<p style="color:var(--muted);font-size:11px;">No supply lines established.</p>'}
+        `;
     } else if (panel === 'settings') {
-        panelKicker.textContent = 'SYSTEM SETTINGS';
+        panelKicker.textContent = 'SYSTEM SETTINGS V2';
         panelTitle.textContent = 'Settings';
         panelContent.innerHTML = `
             <div class="info-card"><h3>⚙️ Game Settings</h3>
                 <div class="stat-row"><span>Current Country</span><b>${nation[currentCountry]?.flag} ${nation[currentCountry]?.name}</b></div>
                 <div class="stat-row"><span>Speed</span><b>${speed}×</b></div>
                 <div class="stat-row"><span>Status</span><b>${paused ? '⏸ Paused' : '▶ Running'}</b></div>
+                <div class="stat-row"><span>AI Difficulty</span><b>${getAIDifficulty()}</b></div>
             </div>
             <button class="action-btn" onclick="window.changeWeather()">🌤️ Change Weather</button>
-            <button class="action-btn danger" onclick="if(confirm('Reset everything?')){localStorage.removeItem('worldWarSave');location.reload();}">🗑️ Reset Game</button>
+            <button class="action-btn danger" onclick="if(confirm('Reset everything?')){localStorage.removeItem('worldWarSaveV2');location.reload();}">🗑️ Reset Game</button>
             <div class="info-card"><h3>💾 Save/Load</h3>
                 <button class="action-btn" onclick="window.autosave();toast('Game saved!')">💾 Save Game</button>
                 <button class="action-btn" onclick="window.loadCampaign();toast('Game loaded!');updateAllUI();">📂 Load Game</button>
             </div>
-        `;
-    } else if (panel === 'buildings') {
-        panelKicker.textContent = 'CONSTRUCTION';
-        panelTitle.textContent = 'Buildings';
-        panelContent.innerHTML = `
-            <div class="info-card"><h3>🏗️ Available Buildings</h3>
-                ${Object.keys(BUILDINGS).map(key => {
-                    const b = BUILDINGS[key];
-                    return `<div class="info-card"><h3>${b.icon} ${b.name}</h3>
-                        <div class="stat-row"><span>Cost</span><b>$${b.cost.money} + ${b.cost.steel} Steel</b></div>
-                        <div class="stat-row"><span>Build Time</span><b>${b.buildTime}s</b></div>
-                        <div class="stat-row"><span>Production</span><b>${Object.entries(b.production).map(([k,v]) => `${v} ${k}`).join(', ')}</b></div>
-                        <button class="action-btn success" onclick="window.buildBuilding('${key}')">🔨 Build ${b.name}</button>
-                    </div>`;
-                }).join('')}
-            </div>
-            <div class="info-card"><h3>📋 Building Queue</h3>
-                ${buildingQueue.length ? buildingQueue.map(item => 
-                    `<div class="stat-row"><span>${BUILDINGS[item.buildingId]?.icon} ${BUILDINGS[item.buildingId]?.name}</span><b>${Math.round(item.progress/item.totalTime * 100)}%</b></div>`
-                ).join('') : '<p style="color:var(--muted);font-size:11px;">No buildings in queue</p>'}
+            <div class="info-card"><h3>🎮 Keyboard Shortcuts</h3>
+                <div class="stat-row"><span>M</span><b>Move</b></div>
+                <div class="stat-row"><span>A</span><b>Attack</b></div>
+                <div class="stat-row"><span>D</span><b>Defend</b></div>
+                <div class="stat-row"><span>H</span><b>Hold</b></div>
+                <div class="stat-row"><span>R</span><b>Retreat</b></div>
+                <div class="stat-row"><span>Space</span><b>Pause</b></div>
             </div>
         `;
     }
+}
+
+function openCityDetails(cityId) {
+    const cityData = getCity(cityId);
+    if (!cityData) { toast("City not found"); return; }
+    
+    const modal = $("cityInfoModal");
+    const title = $("infoCityTitle");
+    const kicker = $("infoCityKicker");
+    const content = $("infoCityContent");
+
+    if (title) title.textContent = `🏙️ ${cityData.name}`;
+    if (kicker) kicker.textContent = `Country: ${cityData.country}`;
+    
+    if (content) {
+        content.innerHTML = `
+            <div class="city-detail-card">
+                <h4>📊 City Statistics</h4>
+                <div class="stat-row"><span>Population</span><b>${formatNumber(cityData.population)}</b></div>
+                <div class="stat-row"><span>Industry Level</span><b>${cityData.industry}</b></div>
+                <div class="stat-row"><span>Agriculture Level</span><b>${cityData.agriculture}</b></div>
+                <div class="stat-row"><span>Fortification</span><b>${cityData.fortification}%</b></div>
+                <div class="stat-row"><span>Supply Status</span><b style="color:${cityData.supply > 50 ? 'var(--green)' : 'var(--red)'}">${cityData.supply}%</b></div>
+            </div>
+            <div class="city-detail-card">
+                <h4>🏗️ Buildings</h4>
+                ${cityData.buildings?.length ? cityData.buildings.map(b => 
+                    `<span class="city-tag">${b}</span>`
+                ).join('') : '<p style="color:var(--muted);font-size:11px;">No buildings</p>'}
+            </div>
+            <div class="city-detail-card">
+                <h4>🪖 Garrison</h4>
+                ${cityData.garrison ? 
+                    `<div class="stat-row"><span>Unit</span><b>${cityData.garrison}</b></div>` :
+                    '<p style="color:var(--muted);font-size:11px;">No garrison</p>'
+                }
+            </div>
+            <button class="action-btn success" onclick="window.trainUnitFromCity('${cityId}','INFANTRY')">🪖 Train Infantry</button>
+            <button class="action-btn" onclick="window.trainUnitFromCity('${cityId}','TANK')">🔩 Train Tank</button>
+            <button class="action-btn info" onclick="window.trainUnitFromCity('${cityId}','ARTILLERY')">💥 Train Artillery</button>
+            <button class="action-btn" onclick="window.trainUnitFromCity('${cityId}','AIR')">✈️ Train Aircraft</button>
+        `;
+    }
+
+    modal.classList.add('open');
 }
 
 function updateUnitPanel() {
@@ -2094,6 +2275,7 @@ function updateUnitPanel() {
     const unit = selectedUnit;
     $('selectedUnitType').textContent = unit.type;
     $('selectedUnitName').textContent = unit.name;
+    $('unitLocation').textContent = `📍 Position: (${Math.round(unit.object.position.x)}, ${Math.round(unit.object.position.z)})`;
     $('unitStats').innerHTML = `
         <div class="unit-stat"><span>Health</span><div class="progress"><i style="width:${(unit.hp/unit.maxHp)*100}%;background:${unit.hp > 50 ? 'var(--green)' : 'var(--red)'}"></i></div><b>${Math.round(unit.hp)}%</b></div>
         <div class="unit-stat"><span>Organization</span><div class="progress"><i style="width:${(unit.organization/unit.maxOrganization)*100}%"></i></div><b>${Math.round(unit.organization)}%</b></div>
@@ -2149,6 +2331,22 @@ function updateAllUI() {
     const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
     $('gameDate').textContent = `${year} • ${monthNames[month-1]} ${String(day).padStart(2,'0')}`;
     
+    // Update war status
+    const warStatus = $('warStatus');
+    if (wars.length > 0) {
+        warStatus.style.display = 'inline-block';
+        warStatus.textContent = `⚔️ WAR (${wars.length})`;
+    } else {
+        warStatus.style.display = 'none';
+    }
+    
+    // Update supply status
+    const supplyStatus = $('supplyStatus');
+    const avgSupply = units.filter(u => u.state !== 'DESTROYED').reduce((sum, u) => sum + u.supply, 0) / 
+                      Math.max(1, units.filter(u => u.state !== 'DESTROYED').length);
+    supplyStatus.textContent = `📦 Supply: ${Math.round(avgSupply)}%`;
+    supplyStatus.style.color = avgSupply > 50 ? 'var(--green)' : 'var(--red)';
+    
     if (selectedUnit) updateUnitPanel();
 }
 
@@ -2180,6 +2378,22 @@ window.autosave = autosave;
 window.loadCampaign = loadCampaign;
 window.toast = toast;
 window.buildBuilding = buildBuilding;
+window.trainUnitFromCity = trainUnitFromCity;
+window.openCityDetails = openCityDetails;
+window.openCityPanel = (country) => {
+    highlightedCountry = country;
+    openPanel('city');
+};
+window.openTrainingPanel = () => openPanel('army');
+window.formAlliance = (c1, c2) => {
+    if (formAlliance(c1, c2)) {
+        toast(`🤝 Alliance formed between ${nation[c1].name} and ${nation[c2].name}`);
+        addNotification(`🤝 Alliance formed!`, NOTIFICATION_TYPES.SUCCESS);
+        openPanel('diplomacy');
+    } else {
+        toast("Failed to form alliance");
+    }
+};
 
 /* =========================================================
    GAME LOOP
@@ -2216,11 +2430,15 @@ function loop(timestamp) {
                         else if (resource === 'manpower') manpower += amount * 10;
                     }
                     toast(`✅ ${building.name} completed!`);
+                    addNotification(`✅ ${building.name} completed!`, NOTIFICATION_TYPES.SUCCESS);
                 }
                 buildingQueue.splice(i, 1);
                 updateAllUI();
             }
         }
+
+        // Process training queue
+        processTraining(dt, units, nation);
 
         updateEconomy(dt);
         updateProduction(dt);
@@ -2230,6 +2448,24 @@ function loop(timestamp) {
         updateRecovery(dt);
         enemyAI(dt);
 
+        // Update war scores
+        wars.forEach((war, index) => {
+            updateWarScore(index, units);
+        });
+
+        // Check victory conditions
+        const victory = checkVictoryConditions(units, nation, diplomacy, wars);
+        if (victory) {
+            const victoryScreen = $('victoryScreen');
+            victoryScreen.style.display = 'grid';
+            $('victoryIcon').textContent = victory.icon || '🏆';
+            $('victoryTitle').textContent = victory.title || 'VICTORY!';
+            $('victoryMessage').textContent = victory.message || 'You have conquered the world!';
+            paused = true;
+            addNotification(`🎉 ${victory.title}`, NOTIFICATION_TYPES.SUCCESS);
+        }
+
+        // Update FX particles
         for (let i = fxGroup.children.length - 1; i >= 0; i--) {
             const fx = fxGroup.children[i];
             fx.userData.life -= dt;
@@ -2238,11 +2474,15 @@ function loop(timestamp) {
             if (fx.userData.life <= 0) { fxGroup.remove(fx); }
         }
 
+        // Propeller animation
         for (const unit of units) {
             if (unit.type === 'AIR' && unit.object.userData.propeller) {
                 unit.object.userData.propeller.rotation.z += dt * 30 * speed;
             }
         }
+
+        // Update minimap
+        updateMinimap(units, nation);
     }
 
     controls.update();
@@ -2264,7 +2504,7 @@ init().catch(error => {
     }
 });
 
-console.log('🌍 WORLD WAR — Modular Version Loaded!');
-console.log('📦 Version: V11 (All Folders Working)');
-console.log('📁 Folders: data/, systems/, utils/');
-console.log('🎮 Click a country to zoom and view states!');
+console.log('🌍 WORLD WAR V2 — Complete!');
+console.log('📦 Version: V2.0.0');
+console.log('📁 All systems loaded');
+console.log('🎮 Click a country to zoom and manage cities!');
