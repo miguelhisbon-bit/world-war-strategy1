@@ -1,11 +1,10 @@
 // =========================================================
-// SUPPLY SYSTEM — V2
+// SUPPLY SYSTEM
 // =========================================================
 
 export const supplyLines = [];
 
 export function createSupplyLine(from, to, amount = 50) {
-    // Check if supply line already exists
     const existing = supplyLines.find(s => 
         (s.from === from && s.to === to) || 
         (s.from === to && s.to === from)
@@ -29,9 +28,6 @@ export function updateSupplyLines(dt) {
     for (const line of supplyLines) {
         if (line.status === 'DESTROYED') continue;
         
-        // Check if supply line is still valid
-        // In real implementation, would check if cities are connected
-        // For now, random degradation
         if (Math.random() < 0.001 * dt) {
             line.efficiency = Math.max(50, line.efficiency - Math.random() * 5);
         }
@@ -59,20 +55,6 @@ export function getSupplyStatus(from, to) {
         efficiency: line.efficiency,
         amount: line.amount
     };
-}
-
-export function getUnitsInSupply(cityId) {
-    // Find all units connected to this city via supply lines
-    const connectedUnits = [];
-    for (const unit of window.units || []) {
-        if (unit.state === 'DESTROYED') continue;
-        // Check if unit is near supply line
-        // Simplified: check if unit's city matches
-        if (unit.city === cityId) {
-            connectedUnits.push(unit);
-        }
-    }
-    return connectedUnits;
 }
 
 export function destroySupplyLine(lineId) {
@@ -103,21 +85,4 @@ export function getSupplyNetworkStats() {
         destroyed,
         efficiency: active / total * 100 || 0
     };
-}
-
-export function getSupplyForUnit(unit) {
-    if (!unit || !unit.city) return 0;
-    // Get all supply lines connected to this unit's city
-    const lines = supplyLines.filter(s => 
-        s.from === unit.city || s.to === unit.city
-    );
-    if (lines.length === 0) return 0;
-    
-    let totalSupply = 0;
-    for (const line of lines) {
-        if (line.status === 'ACTIVE') {
-            totalSupply += line.amount * (line.efficiency / 100);
-        }
-    }
-    return Math.min(100, totalSupply);
 }
