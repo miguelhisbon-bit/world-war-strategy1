@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WORLD WAR — Real-Time Global Strategy</title>
+    <title>WORLD WAR V2 — Global Strategy</title>
     <link rel="stylesheet" href="style.css">
     <script type="importmap">
     {
@@ -30,11 +30,11 @@
     </div>
     <div class="loading-content">
         <div class="loading-eyebrow">GLOBAL COMMAND SYSTEM</div>
-        <h1>WORLD WAR</h1>
+        <h1>WORLD WAR <span style="font-size:18px;color:var(--gold);">V2</span></h1>
         <div class="loading-subtitle">REAL-TIME STRATEGY</div>
-        <div class="loading-status" id="loadingStatus">Loading global map...</div>
+        <div class="loading-status" id="loadingStatus">Loading world map...</div>
         <div class="loading-bar"><div id="loadingProgress"></div></div>
-        <div class="loading-tip" id="loadingTip">TIP: Click any country to zoom & view states</div>
+        <div class="loading-tip" id="loadingTip">TIP: Click any country to zoom & manage cities</div>
     </div>
 </div>
 
@@ -48,7 +48,7 @@
             <div class="brand-mark">W</div>
             <div>
                 <div class="brand-title">WORLD WAR</div>
-                <div class="brand-subtitle">COMMAND</div>
+                <div class="brand-subtitle">V2 • COMMAND</div>
             </div>
         </div>
         <div class="country-display" id="countryDisplay">
@@ -67,6 +67,7 @@
             <button id="pauseBtn" title="Pause">⏸</button>
             <button id="speedBtn" title="Speed">1×</button>
         </div>
+        <div class="war-status" id="warStatus" style="display:none;color:var(--red);font-weight:700;">⚔️ WAR</div>
     </header>
 
     <!-- LEFT SIDE -->
@@ -78,8 +79,9 @@
         <button class="panel-button" data-panel="research"><span>🔬</span><small>Research</small></button>
         <button class="panel-button" data-panel="diplomacy"><span>🤝</span><small>Diplomacy</small></button>
         <button class="panel-button" data-panel="intel"><span>🕵️</span><small>Intel</small></button>
+        <button class="panel-button" data-panel="city"><span>🏙️</span><small>Cities</small></button>
+        <button class="panel-button" data-panel="supply"><span>📦</span><small>Supply</small></button>
         <button class="panel-button" data-panel="settings"><span>⚙️</span><small>Settings</small></button>
-        <button class="panel-button" data-panel="buildings"><span>🏗️</span><small>Build</small></button>
     </aside>
 
     <!-- MAIN INFORMATION PANEL -->
@@ -89,6 +91,7 @@
                 <div class="panel-kicker" id="panelKicker">STRATEGIC COMMAND</div>
                 <h2 id="panelTitle">World Overview</h2>
                 <div id="selectedCountryDisplay" style="font-size:11px;color:var(--accent);margin-top:4px;"></div>
+                <div id="selectedCityDisplay" style="font-size:10px;color:var(--muted);margin-top:2px;"></div>
             </div>
             <button id="closePanel">×</button>
         </div>
@@ -101,6 +104,7 @@
             <div>
                 <div class="unit-type" id="selectedUnitType">NO UNIT SELECTED</div>
                 <h2 id="selectedUnitName">Select an army</h2>
+                <div id="unitLocation" style="font-size:10px;color:var(--muted);"></div>
             </div>
             <button id="closeUnit">×</button>
         </div>
@@ -121,7 +125,7 @@
     </section>
 
     <!-- BOTTOM TOUCH COMMAND -->
-    <div id="touchHint"><span>👆</span>Tap a unit to select • Tap terrain to move • Click country to zoom</div>
+    <div id="touchHint"><span>👆</span>Tap unit to select • Tap terrain to move • Click country to zoom</div>
 
     <!-- CAMERA CONTROLS -->
     <div id="cameraControls">
@@ -147,10 +151,14 @@
             <span id="statusText">All systems operational</span>
         </div>
         <div id="battleStatus">NO ACTIVE BATTLE</div>
+        <div id="supplyStatus" style="color:var(--green);">📦 Supply: 100%</div>
     </div>
 
     <!-- TOAST -->
     <div id="toast"></div>
+
+    <!-- NOTIFICATION CENTER -->
+    <div id="notificationCenter"></div>
 
     <!-- COUNTRY SELECT -->
     <div id="countryModal" class="modal">
@@ -158,24 +166,7 @@
             <button class="modal-close" id="closeCountryModal">×</button>
             <div class="panel-kicker">SELECT NATION</div>
             <h2>Choose Your Country</h2>
-            <div class="country-grid">
-                <button class="country-card" data-country="BANGLADESH"><span>🇧🇩</span><b>Bangladesh</b><small>South Asia • 8 States</small></button>
-                <button class="country-card" data-country="PAKISTAN"><span>🇵🇰</span><b>Pakistan</b><small>South Asia • 7 States</small></button>
-                <button class="country-card" data-country="TURKEY"><span>🇹🇷</span><b>Turkey</b><small>Eurasia • 8 States</small></button>
-                <button class="country-card" data-country="IRAN"><span>🇮🇷</span><b>Iran</b><small>Middle East • 8 States</small></button>
-                <button class="country-card" data-country="SAUDI"><span>🇸🇦</span><b>Saudi Arabia</b><small>Middle East • 8 States</small></button>
-                <button class="country-card" data-country="EGYPT"><span>🇪🇬</span><b>Egypt</b><small>North Africa • 8 States</small></button>
-                <button class="country-card" data-country="PALESTINE"><span>🇵🇸</span><b>Palestine</b><small>Middle East • 6 States</small></button>
-                <button class="country-card" data-country="INDONESIA"><span>🇮🇩</span><b>Indonesia</b><small>SE Asia • 8 States</small></button>
-                <button class="country-card" data-country="AFGHANISTAN"><span>🇦🇫</span><b>Afghanistan</b><small>Central Asia • 8 States</small></button>
-                <button class="country-card" data-country="INDIA"><span>🇮🇳</span><b>India</b><small>South Asia • 8 States</small></button>
-                <button class="country-card" data-country="USA"><span>🇺🇸</span><b>United States</b><small>North America • 8 States</small></button>
-                <button class="country-card" data-country="CHINA"><span>🇨🇳</span><b>China</b><small>East Asia • 8 States</small></button>
-                <button class="country-card" data-country="RUSSIA"><span>🇷🇺</span><b>Russia</b><small>Eurasia • 8 States</small></button>
-                <button class="country-card" data-country="UK"><span>🇬🇧</span><b>United Kingdom</b><small>Europe • 4 States</small></button>
-                <button class="country-card" data-country="FRANCE"><span>🇫🇷</span><b>France</b><small>Europe • 8 States</small></button>
-                <button class="country-card" data-country="GERMANY"><span>🇩🇪</span><b>Germany</b><small>Europe • 8 States</small></button>
-            </div>
+            <div class="country-grid" id="countryGrid"></div>
         </div>
     </div>
 
@@ -189,16 +180,36 @@
         </div>
     </div>
 
+    <!-- CITY INFO MODAL -->
+    <div id="cityInfoModal" class="modal">
+        <div class="modal-box">
+            <button class="modal-close" id="closeCityInfo">×</button>
+            <div class="panel-kicker" id="infoCityKicker">CITY DETAILS</div>
+            <h2 id="infoCityTitle">City Name</h2>
+            <div id="infoCityContent"></div>
+        </div>
+    </div>
+
     <!-- TUTORIAL -->
     <div id="tutorial">
         <div class="tutorial-box">
             <div class="tutorial-icon">🎖️</div>
             <div>
-                <div class="panel-kicker">FIELD MANUAL</div>
+                <div class="panel-kicker">FIELD MANUAL V2</div>
                 <h2 id="tutorialTitle">Welcome, Commander</h2>
-                <p id="tutorialText">Click any country to zoom in and view its states. Select a military unit and command it across the battlefield.</p>
+                <p id="tutorialText">Click any country to zoom in and manage cities. Train units, build supply lines, and conquer the world!</p>
             </div>
             <button id="tutorialNext">NEXT</button>
+        </div>
+    </div>
+
+    <!-- VICTORY SCREEN -->
+    <div id="victoryScreen" class="modal" style="display:none;">
+        <div class="modal-box" style="text-align:center;">
+            <div style="font-size:60px;margin-bottom:20px;" id="victoryIcon">🏆</div>
+            <h2 id="victoryTitle">VICTORY!</h2>
+            <p id="victoryMessage">You have conquered the world!</p>
+            <button class="action-btn success" onclick="location.reload()">Play Again</button>
         </div>
     </div>
 </div>
