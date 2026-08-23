@@ -1,5 +1,5 @@
 // =========================================================
-// CITY MANAGER — V2
+// CITY MANAGER
 // =========================================================
 
 import { BUILDINGS } from '../data/buildings.js';
@@ -31,7 +31,7 @@ export function initializeCity(cityId, data) {
         production: { money: 10, food: 5 },
         happiness: 80,
         unemployment: 10,
-        constructionQueue: []
+        trainingQueue: []
     };
     return true;
 }
@@ -43,7 +43,6 @@ export function buildInCity(cityId, buildingId) {
     const building = BUILDINGS[buildingId];
     if (!building) return false;
     
-    // Check if building already exists
     if (city.buildings.includes(buildingId)) {
         return false;
     }
@@ -59,12 +58,11 @@ export function trainUnitInCity(cityId, unitType) {
     const city = cityManager[cityId];
     if (!city) return false;
     
-    // Add to training queue
     if (!city.trainingQueue) city.trainingQueue = [];
     city.trainingQueue.push({
         type: unitType,
         progress: 0,
-        timeRemaining: 10 // Will be calculated from unit data
+        timeRemaining: 10
     });
     
     return true;
@@ -79,9 +77,7 @@ export function processCityTraining(dt) {
         item.timeRemaining -= dt;
         
         if (item.timeRemaining <= 0) {
-            // Unit trained!
             city.trainingQueue.shift();
-            // Spawn unit at city location
             if (window.spawnUnitAtCity) {
                 window.spawnUnitAtCity(cityId, item.type);
             }
