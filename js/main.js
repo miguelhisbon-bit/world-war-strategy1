@@ -1,5 +1,5 @@
 // =========================================================
-// WORLD WAR V2 — Complete Game Engine
+// WORLD WAR V2 — MAIN ENGINE (FIXED)
 // =========================================================
 
 import * as THREE from "three";
@@ -109,29 +109,33 @@ const diplomacy = {};
 const alliances = {};
 const wars = [];
 
-// ================= NATIONS DATA (from WORLD_DATA) =================
+// ================= NATIONS DATA =================
 const nation = {};
 const countryColors = {};
 
 // Build nation data from WORLD_DATA
-Object.keys(WORLD_DATA.continents).forEach(continentKey => {
-    const continent = WORLD_DATA.continents[continentKey];
-    continent.countries.forEach(country => {
-        nation[country.id] = {
-            flag: country.flag,
-            name: country.name,
-            color: country.color,
-            lightColor: country.lightColor || country.color,
-            capital: country.capital,
-            region: continent.name,
-            states: country.states.map(s => s.name),
-            desc: country.description || `${country.name} is a nation in ${continent.name}.`,
-            continent: continentKey,
-            cities: country.states
-        };
-        countryColors[country.id] = country.color;
+if (WORLD_DATA && WORLD_DATA.continents) {
+    Object.keys(WORLD_DATA.continents).forEach(continentKey => {
+        const continent = WORLD_DATA.continents[continentKey];
+        if (continent && continent.countries) {
+            continent.countries.forEach(country => {
+                nation[country.id] = {
+                    flag: country.flag,
+                    name: country.name,
+                    color: country.color,
+                    lightColor: country.lightColor || country.color,
+                    capital: country.capital,
+                    region: continent.name,
+                    states: country.states ? country.states.map(s => s.name) : [],
+                    desc: country.description || `${country.name} is a nation in ${continent.name}.`,
+                    continent: continentKey,
+                    cities: country.states || []
+                };
+                countryColors[country.id] = country.color;
+            });
+        }
     });
-});
+}
 
 const mapColors = {
     MILITARY: 0x596b58, POLITICAL: 0x58667d, TERRAIN: 0x52634d,
@@ -159,46 +163,55 @@ const tech = {
 
 const buildingQueue = [];
 
-/* =========================================================
-   INITIALIZATION
-   ========================================================== */
+// =========================================================
+// INITIALIZATION
+// =========================================================
 
 async function init() {
-    loading(10, "Initializing global command system...");
-    setup3D();
-    loading(20, "Generating world terrain...");
-    createTerrain();
-    loading(30, "Drawing country borders...");
-    createCountryBorders();
-    loading(40, "Adding states/provinces...");
-    createStates();
-    loading(45, "Creating state borders...");
-    createStateBorderData();
-    loading(50, "Deploying military forces...");
-    deployInitialForces();
-    loading(55, "Initializing cities...");
-    initCities();
-    loading(60, "Setting up supply lines...");
-    initSupplyLines();
-    loading(70, "Connecting economy...");
-    loadCampaign();
-    loading(80, "Initializing AI...");
-    setAIDifficulty('MEDIUM');
-    loading(85, "Initializing UI...");
-    setupUI();
-    loading(90, "Initializing minimap...");
-    initMinimap();
-    loading(95, "Preparing battlefield...");
-    updateAllUI();
-    loading(100, "Battlefield ready.");
-    autosave();
+    try {
+        loading(10, "Initializing global command system...");
+        setup3D();
+        loading(20, "Generating world terrain...");
+        createTerrain();
+        loading(30, "Drawing country borders...");
+        createCountryBorders();
+        loading(40, "Adding states/provinces...");
+        createStates();
+        loading(45, "Creating state borders...");
+        createStateBorderData();
+        loading(50, "Deploying military forces...");
+        deployInitialForces();
+        loading(55, "Initializing cities...");
+        initCities();
+        loading(60, "Setting up supply lines...");
+        initSupplyLines();
+        loading(70, "Connecting economy...");
+        loadCampaign();
+        loading(80, "Initializing AI...");
+        setAIDifficulty('MEDIUM');
+        loading(85, "Initializing UI...");
+        setupUI();
+        loading(90, "Initializing minimap...");
+        initMinimap();
+        loading(95, "Preparing battlefield...");
+        updateAllUI();
+        loading(100, "Battlefield ready.");
+        autosave();
 
-    setTimeout(() => {
-        const loadingScreen = $("loadingScreen");
-        if (loadingScreen) loadingScreen.classList.add("hidden");
-    }, 650);
+        setTimeout(() => {
+            const loadingScreen = $("loadingScreen");
+            if (loadingScreen) loadingScreen.classList.add("hidden");
+        }, 650);
 
-    requestAnimationFrame(loop);
+        requestAnimationFrame(loop);
+    } catch (error) {
+        console.error('Init error:', error);
+        const status = $("loadingStatus");
+        if (status) {
+            status.textContent = '❌ Error: ' + error.message;
+            status.style.color = 'var(--red)';
+        }
+    }
 }
 
 function loading(progress, text) {
@@ -209,51 +222,58 @@ function loading(progress, text) {
 }
 
 function initCities() {
-    // Initialize city data for all countries
+    if (!WORLD_DATA || !WORLD_DATA.continents) return;
     Object.keys(WORLD_DATA.continents).forEach(continentKey => {
         const continent = WORLD_DATA.continents[continentKey];
-        continent.countries.forEach(country => {
-            country.states.forEach(state => {
-                const cityData = getCity(state.id);
-                if (!cityData) {
-                    // Initialize city
-                    cityManager[state.id] = {
-                        name: state.name,
-                        country: country.id,
-                        population: state.population || 1000000,
-                        industry: state.industry || 3,
-                        agriculture: state.agriculture || 2,
-                        buildings: [],
-                        garrison: null,
-                        fortification: 0,
-                        supply: 100,
-                        production: { money: 10, food: 5 }
-                    };
+        if (continent && continent.countries) {
+            continent.countries.forEach(country => {
+                if (country.states) {
+                    country.states.forEach(state => {
+                        if (!cityManager[state.id]) {
+                            cityManager[state.id] = {
+                                name: state.name,
+                                country: country.id,
+                                population: state.population || 1000000,
+                                industry: state.industry || 3,
+                                agriculture: state.agriculture || 2,
+                                buildings: [],
+                                garrison: null,
+                                fortification: 0,
+                                supply: 100,
+                                production: { money: 10, food: 5 },
+                                happiness: 80,
+                                unemployment: 10,
+                                trainingQueue: []
+                            };
+                        }
+                    });
                 }
             });
-        });
+        }
     });
 }
 
 function initSupplyLines() {
-    // Create supply lines between capital and other cities
+    if (!WORLD_DATA || !WORLD_DATA.continents) return;
     Object.keys(WORLD_DATA.continents).forEach(continentKey => {
         const continent = WORLD_DATA.continents[continentKey];
-        continent.countries.forEach(country => {
-            const states = country.states;
-            if (states.length > 1) {
-                const capital = states[0];
-                for (let i = 1; i < states.length; i++) {
-                    createSupplyLine(capital.id, states[i].id, 50);
+        if (continent && continent.countries) {
+            continent.countries.forEach(country => {
+                const states = country.states || [];
+                if (states.length > 1) {
+                    const capital = states[0];
+                    for (let i = 1; i < states.length; i++) {
+                        createSupplyLine(capital.id, states[i].id, 50);
+                    }
                 }
-            }
-        });
+            });
+        }
     });
 }
 
-/* =========================================================
-   3D SETUP
-   ========================================================== */
+// =========================================================
+// 3D SETUP
+// =========================================================
 
 function setup3D() {
     const canvas = $("gameCanvas");
@@ -340,9 +360,9 @@ function resizeRenderer() {
     if (labelRenderer) labelRenderer.setSize(innerWidth, innerHeight);
 }
 
-/* =========================================================
-   TERRAIN
-   ========================================================== */
+// =========================================================
+// TERRAIN
+// =========================================================
 
 function createTerrain() {
     const geometry = new THREE.PlaneGeometry(420, 420, 200, 200);
@@ -490,9 +510,9 @@ function createRivers() {
     });
 }
 
-/* =========================================================
-   COUNTRY BORDERS & STATES
-   ========================================================== */
+// =========================================================
+// COUNTRY BORDERS & STATES
+// =========================================================
 
 function createCountryBorders() {
     const countryData = [
@@ -608,9 +628,9 @@ function createStates() {
     });
 }
 
-/* =========================================================
-   STATE BORDER DATA
-   ========================================================== */
+// =========================================================
+// STATE BORDER DATA
+// =========================================================
 
 function createStateBorderData() {
     stateBorderPoints = {
@@ -633,9 +653,9 @@ function createStateBorderData() {
     };
 }
 
-/* =========================================================
-   ZOOM & HIGHLIGHT
-   ========================================================== */
+// =========================================================
+// ZOOM & HIGHLIGHT FUNCTIONS
+// =========================================================
 
 function zoomToCountry(countryKey) {
     if (!countryKey || !nation[countryKey]) return;
@@ -698,7 +718,6 @@ function zoomToCountry(countryKey) {
 }
 
 function showCities(countryKey) {
-    // Remove old city labels
     const oldCityLabels = labelGroup.children.filter(child => child.userData && child.userData.isCityLabel);
     oldCityLabels.forEach(label => labelGroup.remove(label));
 
@@ -892,9 +911,9 @@ function showCountryInfo(countryKey) {
     modal.classList.add('open');
 }
 
-/* =========================================================
-   WORLD CLICK HANDLER
-   ========================================================== */
+// =========================================================
+// WORLD CLICK HANDLER
+// =========================================================
 
 function handleWorldClick(event) {
     if (isZooming) return;
@@ -987,9 +1006,9 @@ function handleWorldClick(event) {
     }
 }
 
-/* =========================================================
-   UNIT CREATION (Same as V1)
-   ========================================================== */
+// =========================================================
+// UNIT CREATION
+// =========================================================
 
 function create3DTank(color) {
     const group = new THREE.Group();
@@ -1157,6 +1176,10 @@ function create3DAircraft(color) {
     return group;
 }
 
+// =========================================================
+// UNIT MANAGEMENT
+// =========================================================
+
 function create3DUnit(name, type, x, z, friendly = true, country = "BANGLADESH") {
     const group = new THREE.Group();
     const color = friendly ? 0x447744 : 0x884444;
@@ -1261,9 +1284,9 @@ function deployInitialForces() {
     create3DUnit("German Infantry", "INFANTRY", -12, 10, false, "GERMANY");
 }
 
-/* =========================================================
-   COMBAT SYSTEM
-   ========================================================== */
+// =========================================================
+// COMBAT SYSTEM
+// =========================================================
 
 function getTerrainModifier(unit) {
     let modifier = 1;
@@ -1398,9 +1421,9 @@ function destroyUnit(unit, killer = null) {
     }
 }
 
-/* =========================================================
-   ECONOMY, PRODUCTION, RESEARCH
-   ========================================================== */
+// =========================================================
+// ECONOMY, PRODUCTION, RESEARCH
+// =========================================================
 
 function updateEconomy(dt) {
     if (paused) return;
@@ -1509,9 +1532,9 @@ function applyTechnology(key) {
     }
 }
 
-/* =========================================================
-   DIPLOMACY, INTEL, MISC FUNCTIONS
-   ========================================================== */
+// =========================================================
+// DIPLOMACY, INTEL, MISC FUNCTIONS
+// =========================================================
 
 function improveDiplomacy(country) {
     if (political < 15) { toast("Need political power"); return; }
@@ -1667,9 +1690,9 @@ function trainUnitFromCity(cityId, unitType) {
     updateAllUI();
 }
 
-/* =========================================================
-   AUTOSAVE
-   ========================================================== */
+// =========================================================
+// AUTOSAVE
+// =========================================================
 
 function autosave() {
     try {
@@ -1739,9 +1762,9 @@ function loadCampaign() {
     } catch (e) { /* silent fail */ }
 }
 
-/* =========================================================
-   MOVEMENT & AI
-   ========================================================== */
+// =========================================================
+// MOVEMENT & AI
+// =========================================================
 
 function updateUnitMovement(dt) {
     for (const unit of units) {
@@ -1803,9 +1826,9 @@ function enemyAI(dt) {
     processAI(dt, units, nation, diplomacy);
 }
 
-/* =========================================================
-   UI FUNCTIONS
-   ========================================================== */
+// =========================================================
+// UI FUNCTIONS
+// =========================================================
 
 function setupUI() {
     // Panel buttons
@@ -2358,9 +2381,9 @@ function toast(message) {
     toastEl._timeout = setTimeout(() => { toastEl.classList.remove('show'); }, 2500);
 }
 
-/* =========================================================
-   EXPOSE FUNCTIONS TO WINDOW
-   ========================================================== */
+// =========================================================
+// EXPOSE FUNCTIONS TO WINDOW
+// =========================================================
 
 window.zoomToCountry = zoomToCountry;
 window.highlightCountry = highlightCountry;
@@ -2395,9 +2418,9 @@ window.formAlliance = (c1, c2) => {
     }
 };
 
-/* =========================================================
-   GAME LOOP
-   ========================================================== */
+// =========================================================
+// GAME LOOP
+// =========================================================
 
 function loop(timestamp) {
     const dt = Math.min(clock.getDelta(), 0.05);
@@ -2491,9 +2514,9 @@ function loop(timestamp) {
     requestAnimationFrame(loop);
 }
 
-/* =========================================================
-   START
-   ========================================================== */
+// =========================================================
+// START
+// =========================================================
 
 init().catch(error => {
     console.error('Failed to initialize game:', error);
