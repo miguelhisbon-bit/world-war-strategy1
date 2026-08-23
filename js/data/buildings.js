@@ -65,6 +65,24 @@ export const BUILDINGS = {
         buildTime: 22,
         production: { air: 2 },
         description: 'Allows aircraft to operate from this state'
+    },
+    HARBOR: {
+        id: 'HARBOR',
+        name: 'Harbor',
+        icon: '⛵',
+        cost: { money: 900, steel: 400 },
+        buildTime: 25,
+        production: { naval: 2 },
+        description: 'Allows naval operations from this state'
+    },
+    MARKET: {
+        id: 'MARKET',
+        name: 'Market',
+        icon: '🏪',
+        cost: { money: 300, steel: 80 },
+        buildTime: 12,
+        production: { money: 8 },
+        description: 'Increases trade and money income'
     }
 };
 
@@ -102,4 +120,16 @@ export function getBuildingProduction(buildingId, level = 1) {
     }
     
     return production;
+}
+
+export function getBuildingDescription(buildingId) {
+    const building = BUILDINGS[buildingId];
+    if (!building) return null;
+    return building.description;
+}
+
+export function getBuildingIcon(buildingId) {
+    const building = BUILDINGS[buildingId];
+    if (!building) return null;
+    return building.icon;
 }
