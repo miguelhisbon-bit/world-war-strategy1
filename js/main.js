@@ -169,6 +169,7 @@ const buildingQueue = [];
 
 async function init() {
     try {
+        console.log('🚀 Starting game initialization...');
         loading(10, "Initializing global command system...");
         setup3D();
         loading(20, "Generating world terrain...");
@@ -204,8 +205,9 @@ async function init() {
         }, 650);
 
         requestAnimationFrame(loop);
+        console.log('✅ Game initialized successfully!');
     } catch (error) {
-        console.error('Init error:', error);
+        console.error('❌ Init error:', error);
         const status = $("loadingStatus");
         if (status) {
             status.textContent = '❌ Error: ' + error.message;
@@ -654,6 +656,437 @@ function createStateBorderData() {
 }
 
 // =========================================================
+// FIXED: create3DInfantry (CapsuleGeometry replaced)
+// =========================================================
+
+function create3DInfantry(color) {
+    const group = new THREE.Group();
+    const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xccaa88, roughness: 0.8 });
+    const gunMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5 });
+
+    // FIXED: Replaced CapsuleGeometry with CylinderGeometry + SphereGeometry
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.6, 8), bodyMat);
+    body.position.y = 1.0;
+    body.castShadow = true;
+    group.add(body);
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), skinMat);
+    head.position.y = 1.6;
+    head.castShadow = true;
+    group.add(head);
+
+    const helmet = new THREE.Mesh(
+        new THREE.SphereGeometry(0.22, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.5),
+        new THREE.MeshStandardMaterial({ color: 0x445544, roughness: 0.5 })
+    );
+    helmet.position.y = 1.7;
+    group.add(helmet);
+
+    for (let side of [-1, 1]) {
+        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.4, 4), bodyMat);
+        arm.position.set(side * 0.4, 1.2, 0);
+        arm.rotation.z = side * 0.3;
+        group.add(arm);
+    }
+
+    for (let side of [-1, 1]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.5, 4), bodyMat);
+        leg.position.set(side * 0.15, 0.35, 0);
+        group.add(leg);
+    }
+
+    const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.6, 4), gunMat);
+    gun.rotation.x = Math.PI / 2;
+    gun.position.set(0.4, 1.2, 0.4);
+    group.add(gun);
+
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.15), new THREE.MeshStandardMaterial({ color: 0x445544 }));
+    pack.position.set(0, 0.9, -0.25);
+    group.add(pack);
+
+    return group;
+}
+
+// =========================================================
+// FIXED: create3DTank, create3DArtillery, create3DAircraft
+// =========================================================
+
+function create3DTank(color) {
+    const group = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.3 });
+    const trackMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 2.0), mat);
+    body.position.y = 0.8;
+    body.castShadow = true;
+    group.add(body);
+
+    const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.0, 0.6, 12), mat);
+    turret.position.y = 1.6;
+    turret.castShadow = true;
+    group.add(turret);
+
+    const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 2.0), new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.6 }));
+    barrel.position.set(0, 1.65, 1.4);
+    group.add(barrel);
+
+    for (let side of [-1, 1]) {
+        const track = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 2.2), trackMat);
+        track.position.set(side * 1.8, 0.3, 0);
+        group.add(track);
+        for (let i = -0.8; i <= 0.8; i += 0.4) {
+            const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.15, 8), new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.8 }));
+            wheel.rotation.x = Math.PI / 2;
+            wheel.position.set(side * 1.7, 0.4, i);
+            group.add(wheel);
+        }
+    }
+
+    const hatch = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), new THREE.MeshStandardMaterial({ color: 0x444444 }));
+    hatch.position.set(0.3, 1.9, 0.2);
+    group.add(hatch);
+
+    return group;
+}
+
+function create3DArtillery(color) {
+    const group = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.2 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.7 });
+
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.3, 1.2), mat);
+    base.position.y = 0.3;
+    base.castShadow = true;
+    group.add(base);
+
+    for (let side of [-1, 1]) {
+        const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 8, 12), new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 }));
+        wheel.position.set(side * 0.7, 0.3, 0.5);
+        wheel.rotation.y = Math.PI / 2;
+        group.add(wheel);
+    }
+
+    const carriage = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.8), mat);
+    carriage.position.y = 0.6;
+    group.add(carriage);
+
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 1.8, 8), metalMat);
+    barrel.rotation.x = Math.PI / 2 * 0.3;
+    barrel.position.set(0, 0.8, 1.2);
+    group.add(barrel);
+
+    const breech = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), metalMat);
+    breech.position.set(0, 0.8, 0.3);
+    group.add(breech);
+
+    const shield = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 0.05), new THREE.MeshStandardMaterial({ color: 0x555555 }));
+    shield.position.set(0, 0.8, 0.7);
+    group.add(shield);
+
+    return group;
+}
+
+function create3DAircraft(color) {
+    const group = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.3, metalness: 0.7 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x88ccff, transparent: true, opacity: 0.4 });
+
+    const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.15, 2.8, 8), mat);
+    fuse.rotation.x = Math.PI / 2;
+    fuse.castShadow = true;
+    group.add(fuse);
+
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.05, 0.6), mat);
+    wing.position.y = 0;
+    wing.castShadow = true;
+    group.add(wing);
+
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.05), mat);
+    tail.position.set(-1.4, 0.2, 0);
+    group.add(tail);
+    const tailVertical = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 0.3), mat);
+    tailVertical.position.set(-1.4, 0.2, 0);
+    group.add(tailVertical);
+
+    const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), glassMat);
+    cockpit.position.set(0.8, 0.2, 0);
+    cockpit.scale.set(1, 1, 0.6);
+    group.add(cockpit);
+
+    const propGroup = new THREE.Group();
+    const prop = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.02, 0.1), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+    prop.position.x = 1.4;
+    propGroup.add(prop);
+    const prop2 = prop.clone();
+    prop2.rotation.y = Math.PI / 2;
+    propGroup.add(prop2);
+    group.add(propGroup);
+    group.userData.propeller = propGroup;
+
+    for (let side of [-1, 1]) {
+        const gear = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.2, 4), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+        gear.position.set(side * 0.4, -0.2, -0.1);
+        group.add(gear);
+    }
+
+    return group;
+}
+
+// =========================================================
+// FIXED: create3DUnit (with crypto.randomUUID fallback)
+// =========================================================
+
+function create3DUnit(name, type, x, z, friendly = true, country = "BANGLADESH") {
+    const group = new THREE.Group();
+    const color = friendly ? 0x447744 : 0x884444;
+
+    let model;
+    switch(type) {
+        case 'TANK': model = create3DTank(color); break;
+        case 'ARTILLERY': model = create3DArtillery(color); break;
+        case 'AIR': model = create3DAircraft(color); break;
+        default: model = create3DInfantry(color);
+    }
+    group.add(model);
+
+    const hpBar = new THREE.Group();
+    const bg = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.15), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 }));
+    bg.position.y = 0;
+    hpBar.add(bg);
+    const hpFill = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.1), new THREE.MeshBasicMaterial({ color: 0x55dd55 }));
+    hpFill.position.y = 0;
+    hpBar.add(hpFill);
+    hpBar.position.y = type === 'AIR' ? 9.5 : 3.0;
+    group.add(hpBar);
+    group.userData.hpBar = hpBar;
+    group.userData.hpFill = hpFill;
+
+    const flagDiv = document.createElement('div');
+    const countryData = nation[country] || nation["BANGLADESH"];
+    flagDiv.textContent = friendly ? countryData.flag : '🔴';
+    flagDiv.style.cssText = 'font-size:14px;text-shadow:0 0 10px rgba(0,0,0,0.8);';
+    const flagLabel = new CSS2DObject(flagDiv);
+    flagLabel.position.set(0, type === 'AIR' ? 11 : 4.5, 0);
+    group.add(flagLabel);
+    group.userData.flagLabel = flagLabel;
+
+    group.position.set(x, type === 'AIR' ? 8 : 0, z);
+    group.castShadow = true;
+    unitGroup.add(group);
+
+    // FIXED: crypto.randomUUID fallback
+    let id;
+    try {
+        id = crypto.randomUUID();
+    } catch (e) {
+        id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    }
+
+    const unit = {
+        id: id,
+        name, type, friendly, country,
+        object: group,
+        hp: 100, maxHp: 100,
+        organization: type === 'AIR' ? 88 : 100,
+        maxOrganization: type === 'AIR' ? 88 : 100,
+        morale: type === 'TANK' ? 82 : 85,
+        strength: type === 'TANK' ? 85 : type === 'AIR' ? 75 : 70,
+        maxStrength: type === 'TANK' ? 85 : type === 'AIR' ? 75 : 70,
+        readiness: 96, supply: 92,
+        attack: type === 'TANK' ? 24 : type === 'ARTILLERY' ? 28 : type === 'AIR' ? 30 : 16,
+        defense: type === 'TANK' ? 20 : type === 'ARTILLERY' ? 12 : 17,
+        speed: type === 'TANK' ? 18 : type === 'ARTILLERY' ? 8 : type === 'AIR' ? 35 : 12,
+        state: "READY",
+        destination: null,
+        kills: 0,
+        experience: 0,
+        entrenchment: 0,
+        selected: false,
+        city: null,
+        supplyLine: null
+    };
+
+    group.userData.unit = unit;
+    units.push(unit);
+    updateUnitHPBar(unit);
+    return unit;
+}
+
+function updateUnitHPBar(unit) {
+    if (!unit || !unit.object.userData.hpFill) return;
+    const hpPercent = Math.max(0, unit.hp / unit.maxHp);
+    const fill = unit.object.userData.hpFill;
+    fill.scale.x = hpPercent;
+    fill.material.color.setHex(hpPercent > 0.6 ? 0x55dd55 : hpPercent > 0.3 ? 0xdddd55 : 0xdd5555);
+}
+
+function deployInitialForces() {
+    units.length = 0;
+    create3DUnit("1st Infantry Div", "INFANTRY", -6, -22, true, "BANGLADESH");
+    create3DUnit("2nd Infantry Div", "INFANTRY", 2, -26, true, "BANGLADESH");
+    create3DUnit("Armored Brigade", "TANK", -4, -18, true, "BANGLADESH");
+    create3DUnit("Artillery Reg", "ARTILLERY", -10, -24, true, "BANGLADESH");
+    create3DUnit("Air Wing", "AIR", -2, -30, true, "BANGLADESH");
+    create3DUnit("Pakistani Infantry", "INFANTRY", 28, 16, true, "PAKISTAN");
+    create3DUnit("Pakistani Armor", "TANK", 32, 20, true, "PAKISTAN");
+    create3DUnit("Turkish Infantry", "INFANTRY", -58, 42, true, "TURKEY");
+    create3DUnit("Turkish Artillery", "ARTILLERY", -62, 38, true, "TURKEY");
+    create3DUnit("Iranian Infantry", "INFANTRY", 16, 32, true, "IRAN");
+    create3DUnit("Iranian Armor", "TANK", 20, 36, true, "IRAN");
+    create3DUnit("Saudi Infantry", "INFANTRY", 16, 16, true, "SAUDI");
+    create3DUnit("Egyptian Infantry", "INFANTRY", -28, 10, true, "EGYPT");
+    create3DUnit("Palestinian Defense", "INFANTRY", -4, 28, true, "PALESTINE");
+    create3DUnit("Indian Infantry", "INFANTRY", 8, -12, false, "INDIA");
+    create3DUnit("Indian Armor", "TANK", 14, -8, false, "INDIA");
+    create3DUnit("Chinese Infantry", "INFANTRY", 52, 4, false, "CHINA");
+    create3DUnit("Chinese Armor", "TANK", 58, 8, false, "CHINA");
+    create3DUnit("Russian Infantry", "INFANTRY", 32, 68, false, "RUSSIA");
+    create3DUnit("US Infantry", "INFANTRY", -132, -32, false, "USA");
+    create3DUnit("US Armor", "TANK", -128, -38, false, "USA");
+    create3DUnit("UK Infantry", "INFANTRY", -124, 32, false, "UK");
+    create3DUnit("French Infantry", "INFANTRY", -48, 38, false, "FRANCE");
+    create3DUnit("German Infantry", "INFANTRY", -12, 10, false, "GERMANY");
+}
+
+// =========================================================
+// COMBAT SYSTEM
+// =========================================================
+
+function getTerrainModifier(unit) {
+    let modifier = 1;
+    if (unit.state === "DEFENDING") modifier += 0.18 + unit.entrenchment / 500;
+    if (weather === "RAIN") modifier *= 0.9;
+    if (weather === "SNOW") modifier *= 0.78;
+    if (unit.supply < 30) modifier *= 0.72;
+    if (unit.organization < 30) modifier *= 0.75;
+    return modifier;
+}
+
+function getTechAttackBonus(unit) {
+    let bonus = 1;
+    if (unit.type === "INFANTRY" && tech.INFANTRY.completed) bonus *= 1.08;
+    if (unit.type === "TANK" && tech.ARMOR.completed) bonus *= 1.10;
+    if (unit.type === "AIR" && tech.AIR.completed) bonus *= 1.12;
+    if (unit.type === "ARTILLERY" && tech.ARTILLERY.completed) bonus *= 1.08;
+    return bonus;
+}
+
+function executeAttack(attacker, defender) {
+    if (!attacker || !defender || defender.state === "DESTROYED") return;
+    if (!attacker.friendly) return;
+
+    const distance = attacker.object.position.distanceTo(defender.object.position);
+    let maxRange = 35;
+    if (attacker.type === 'ARTILLERY') maxRange = 80;
+    if (attacker.type === 'AIR') maxRange = 100;
+    
+    if (distance > maxRange) { toast("Target is out of range"); return; }
+    if (attacker.supply < 15) { toast("Insufficient supply"); return; }
+
+    attacker.supply = Math.max(0, attacker.supply - 6);
+    
+    let attackPower = (attacker.attack * (attacker.strength / 100) * (attacker.organization / 100) *
+        (attacker.morale / 100) * getTerrainModifier(attacker) * getTechAttackBonus(attacker)) + Math.random() * 8;
+    
+    if (attacker.type === 'ARTILLERY' && defender.state === 'DEFENDING') attackPower *= 1.3;
+    
+    const defensePower = (defender.defense * (defender.strength / 100) * (defender.organization / 100) *
+        (defender.morale / 100) * getTerrainModifier(defender)) + Math.random() * 7;
+
+    let damage = Math.max(3, attackPower - defensePower * 0.55);
+    if (weather === "SNOW") damage *= 0.82;
+
+    defender.hp = Math.max(0, defender.hp - damage);
+    defender.organization = Math.max(0, defender.organization - damage * 0.48);
+    defender.morale = Math.max(0, defender.morale - damage * 0.22);
+    attacker.organization = Math.max(0, attacker.organization - Math.max(1, damage * 0.12));
+    attacker.experience = Math.min(100, attacker.experience + damage * 0.08);
+    
+    updateUnitHPBar(defender);
+    updateUnitHPBar(attacker);
+
+    addBattleLog(`${attacker.name} attacked ${defender.name} for ${Math.round(damage)} damage`);
+
+    if (defender.hp <= 0 || defender.organization <= 0) {
+        destroyUnit(defender, attacker);
+    } else {
+        defender.state = "UNDER_ATTACK";
+        attacker.state = "ATTACKING";
+        createExplosion(defender.object.position);
+        toast(`${attacker.name} dealt ${Math.round(damage)} damage`);
+        addNotification(`⚔️ ${attacker.name} attacked ${defender.name}`, NOTIFICATION_TYPES.WARNING);
+    }
+    updateUnitPanel();
+    updateAllUI();
+}
+
+function executeAirstrike(aircraft, target) {
+    if (aircraft.supply < 20) { toast("Air unit needs supply"); return; }
+    aircraft.supply -= 20;
+    let damage = 18 + Math.random() * 18;
+    damage *= aircraft.readiness / 100;
+    damage *= getTechAttackBonus(aircraft);
+    if (weather === "RAIN") damage *= 0.72;
+    if (weather === "SNOW") damage *= 0.55;
+
+    target.hp = Math.max(0, target.hp - damage);
+    target.organization = Math.max(0, target.organization - damage * 0.7);
+    target.morale = Math.max(0, target.morale - damage * 0.35);
+    aircraft.experience = Math.min(100, aircraft.experience + 1);
+    createExplosion(target.object.position);
+    updateUnitHPBar(target);
+    addBattleLog(`Airstrike hit ${target.name} for ${Math.round(damage)} damage`);
+    toast(`Airstrike hit ${target.name}`);
+    addNotification(`✈️ Airstrike hit ${target.name}`, NOTIFICATION_TYPES.DANGER);
+
+    if (target.hp <= 0 || target.organization <= 0) {
+        destroyUnit(target, aircraft);
+    }
+    updateUnitPanel();
+    updateAllUI();
+}
+
+function createExplosion(position) {
+    const count = 12;
+    for (let i = 0; i < count; i++) {
+        const mesh = new THREE.Mesh(
+            new THREE.SphereGeometry(0.2 + Math.random() * 0.6, 6, 6),
+            new THREE.MeshBasicMaterial({
+                color: new THREE.Color().setHSL(0.08 + Math.random() * 0.08, 1, 0.4 + Math.random() * 0.4),
+                transparent: true,
+                opacity: 0.9
+            })
+        );
+        mesh.position.copy(position);
+        mesh.position.y += 0.5 + Math.random() * 1.5;
+        const dir = new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3).normalize();
+        mesh.userData = { life: 0.3 + Math.random() * 0.4, velocity: dir.multiplyScalar(2 + Math.random() * 5) };
+        fxGroup.add(mesh);
+    }
+}
+
+function destroyUnit(unit, killer = null) {
+    unit.state = "DESTROYED";
+    unit.hp = 0;
+    unit.organization = 0;
+    unit.object.visible = false;
+    if (killer) {
+        killer.kills++;
+        killer.experience = Math.min(100, killer.experience + 8);
+    }
+    createExplosion(unit.object.position);
+    addBattleLog(`${unit.name} destroyed`);
+    toast(`${unit.name} destroyed`);
+    addNotification(`💀 ${unit.name} destroyed!`, NOTIFICATION_TYPES.DANGER);
+    if (selectedUnit === unit) {
+        selectedUnit = null;
+        const panel = $("unitPanel");
+        if (panel) panel.classList.remove("open");
+    }
+}
+
+// =========================================================
 // ZOOM & HIGHLIGHT FUNCTIONS
 // =========================================================
 
@@ -1003,421 +1436,6 @@ function handleWorldClick(event) {
 
     if (selectedUnit) {
         deselectUnit();
-    }
-}
-
-// =========================================================
-// UNIT CREATION
-// =========================================================
-
-function create3DTank(color) {
-    const group = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.3 });
-    const trackMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
-
-    const body = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 2.0), mat);
-    body.position.y = 0.8;
-    body.castShadow = true;
-    group.add(body);
-
-    const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.0, 0.6, 12), mat);
-    turret.position.y = 1.6;
-    turret.castShadow = true;
-    group.add(turret);
-
-    const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 2.0), new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.6 }));
-    barrel.position.set(0, 1.65, 1.4);
-    group.add(barrel);
-
-    for (let side of [-1, 1]) {
-        const track = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 2.2), trackMat);
-        track.position.set(side * 1.8, 0.3, 0);
-        group.add(track);
-        for (let i = -0.8; i <= 0.8; i += 0.4) {
-            const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.15, 8), new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.8 }));
-            wheel.rotation.x = Math.PI / 2;
-            wheel.position.set(side * 1.7, 0.4, i);
-            group.add(wheel);
-        }
-    }
-
-    const hatch = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), new THREE.MeshStandardMaterial({ color: 0x444444 }));
-    hatch.position.set(0.3, 1.9, 0.2);
-    group.add(hatch);
-
-    return group;
-}
-
-function create3DInfantry(color) {
-    const group = new THREE.Group();
-    const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0xccaa88, roughness: 0.8 });
-    const gunMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5 });
-
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.6, 6, 8), bodyMat);
-    body.position.y = 1.0;
-    body.castShadow = true;
-    group.add(body);
-
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), skinMat);
-    head.position.y = 1.6;
-    head.castShadow = true;
-    group.add(head);
-
-    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), new THREE.MeshStandardMaterial({ color: 0x445544, roughness: 0.5 }));
-    helmet.position.y = 1.7;
-    group.add(helmet);
-
-    for (let side of [-1, 1]) {
-        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.4, 4), bodyMat);
-        arm.position.set(side * 0.4, 1.2, 0);
-        arm.rotation.z = side * 0.3;
-        group.add(arm);
-    }
-
-    for (let side of [-1, 1]) {
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.5, 4), bodyMat);
-        leg.position.set(side * 0.15, 0.35, 0);
-        group.add(leg);
-    }
-
-    const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.6, 4), gunMat);
-    gun.rotation.x = Math.PI / 2;
-    gun.position.set(0.4, 1.2, 0.4);
-    group.add(gun);
-
-    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.15), new THREE.MeshStandardMaterial({ color: 0x445544 }));
-    pack.position.set(0, 0.9, -0.25);
-    group.add(pack);
-
-    return group;
-}
-
-function create3DArtillery(color) {
-    const group = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.2 });
-    const metalMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.7 });
-
-    const base = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.3, 1.2), mat);
-    base.position.y = 0.3;
-    base.castShadow = true;
-    group.add(base);
-
-    for (let side of [-1, 1]) {
-        const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 8, 12), new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 }));
-        wheel.position.set(side * 0.7, 0.3, 0.5);
-        wheel.rotation.y = Math.PI / 2;
-        group.add(wheel);
-    }
-
-    const carriage = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.8), mat);
-    carriage.position.y = 0.6;
-    group.add(carriage);
-
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 1.8, 8), metalMat);
-    barrel.rotation.x = Math.PI / 2 * 0.3;
-    barrel.position.set(0, 0.8, 1.2);
-    group.add(barrel);
-
-    const breech = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), metalMat);
-    breech.position.set(0, 0.8, 0.3);
-    group.add(breech);
-
-    const shield = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 0.05), new THREE.MeshStandardMaterial({ color: 0x555555 }));
-    shield.position.set(0, 0.8, 0.7);
-    group.add(shield);
-
-    return group;
-}
-
-function create3DAircraft(color) {
-    const group = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.3, metalness: 0.7 });
-    const glassMat = new THREE.MeshStandardMaterial({ color: 0x88ccff, transparent: true, opacity: 0.4 });
-
-    const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.15, 2.8, 8), mat);
-    fuse.rotation.x = Math.PI / 2;
-    fuse.castShadow = true;
-    group.add(fuse);
-
-    const wing = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.05, 0.6), mat);
-    wing.position.y = 0;
-    wing.castShadow = true;
-    group.add(wing);
-
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.05), mat);
-    tail.position.set(-1.4, 0.2, 0);
-    group.add(tail);
-    const tailVertical = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 0.3), mat);
-    tailVertical.position.set(-1.4, 0.2, 0);
-    group.add(tailVertical);
-
-    const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), glassMat);
-    cockpit.position.set(0.8, 0.2, 0);
-    cockpit.scale.set(1, 1, 0.6);
-    group.add(cockpit);
-
-    const propGroup = new THREE.Group();
-    const prop = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.02, 0.1), new THREE.MeshStandardMaterial({ color: 0x222222 }));
-    prop.position.x = 1.4;
-    propGroup.add(prop);
-    const prop2 = prop.clone();
-    prop2.rotation.y = Math.PI / 2;
-    propGroup.add(prop2);
-    group.add(propGroup);
-    group.userData.propeller = propGroup;
-
-    for (let side of [-1, 1]) {
-        const gear = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.2, 4), new THREE.MeshStandardMaterial({ color: 0x222222 }));
-        gear.position.set(side * 0.4, -0.2, -0.1);
-        group.add(gear);
-    }
-
-    return group;
-}
-
-// =========================================================
-// UNIT MANAGEMENT
-// =========================================================
-
-function create3DUnit(name, type, x, z, friendly = true, country = "BANGLADESH") {
-    const group = new THREE.Group();
-    const color = friendly ? 0x447744 : 0x884444;
-
-    let model;
-    switch(type) {
-        case 'TANK': model = create3DTank(color); break;
-        case 'ARTILLERY': model = create3DArtillery(color); break;
-        case 'AIR': model = create3DAircraft(color); break;
-        default: model = create3DInfantry(color);
-    }
-    group.add(model);
-
-    const hpBar = new THREE.Group();
-    const bg = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.15), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 }));
-    bg.position.y = 0;
-    hpBar.add(bg);
-    const hpFill = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.1), new THREE.MeshBasicMaterial({ color: 0x55dd55 }));
-    hpFill.position.y = 0;
-    hpBar.add(hpFill);
-    hpBar.position.y = type === 'AIR' ? 9.5 : 3.0;
-    group.add(hpBar);
-    group.userData.hpBar = hpBar;
-    group.userData.hpFill = hpFill;
-
-    const flagDiv = document.createElement('div');
-    const countryData = nation[country] || nation["BANGLADESH"];
-    flagDiv.textContent = friendly ? countryData.flag : '🔴';
-    flagDiv.style.cssText = 'font-size:14px;text-shadow:0 0 10px rgba(0,0,0,0.8);';
-    const flagLabel = new CSS2DObject(flagDiv);
-    flagLabel.position.set(0, type === 'AIR' ? 11 : 4.5, 0);
-    group.add(flagLabel);
-    group.userData.flagLabel = flagLabel;
-
-    group.position.set(x, type === 'AIR' ? 8 : 0, z);
-    group.castShadow = true;
-    unitGroup.add(group);
-
-    const unit = {
-        id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
-        name, type, friendly, country,
-        object: group,
-        hp: 100, maxHp: 100,
-        organization: type === 'AIR' ? 88 : 100,
-        maxOrganization: type === 'AIR' ? 88 : 100,
-        morale: type === 'TANK' ? 82 : 85,
-        strength: type === 'TANK' ? 85 : type === 'AIR' ? 75 : 70,
-        maxStrength: type === 'TANK' ? 85 : type === 'AIR' ? 75 : 70,
-        readiness: 96, supply: 92,
-        attack: type === 'TANK' ? 24 : type === 'ARTILLERY' ? 28 : type === 'AIR' ? 30 : 16,
-        defense: type === 'TANK' ? 20 : type === 'ARTILLERY' ? 12 : 17,
-        speed: type === 'TANK' ? 18 : type === 'ARTILLERY' ? 8 : type === 'AIR' ? 35 : 12,
-        state: "READY",
-        destination: null,
-        kills: 0,
-        experience: 0,
-        entrenchment: 0,
-        selected: false,
-        city: null,
-        supplyLine: null
-    };
-
-    group.userData.unit = unit;
-    units.push(unit);
-    updateUnitHPBar(unit);
-    return unit;
-}
-
-function updateUnitHPBar(unit) {
-    if (!unit || !unit.object.userData.hpFill) return;
-    const hpPercent = Math.max(0, unit.hp / unit.maxHp);
-    const fill = unit.object.userData.hpFill;
-    fill.scale.x = hpPercent;
-    fill.material.color.setHex(hpPercent > 0.6 ? 0x55dd55 : hpPercent > 0.3 ? 0xdddd55 : 0xdd5555);
-}
-
-function deployInitialForces() {
-    units.length = 0;
-    create3DUnit("1st Infantry Div", "INFANTRY", -6, -22, true, "BANGLADESH");
-    create3DUnit("2nd Infantry Div", "INFANTRY", 2, -26, true, "BANGLADESH");
-    create3DUnit("Armored Brigade", "TANK", -4, -18, true, "BANGLADESH");
-    create3DUnit("Artillery Reg", "ARTILLERY", -10, -24, true, "BANGLADESH");
-    create3DUnit("Air Wing", "AIR", -2, -30, true, "BANGLADESH");
-    create3DUnit("Pakistani Infantry", "INFANTRY", 28, 16, true, "PAKISTAN");
-    create3DUnit("Pakistani Armor", "TANK", 32, 20, true, "PAKISTAN");
-    create3DUnit("Turkish Infantry", "INFANTRY", -58, 42, true, "TURKEY");
-    create3DUnit("Turkish Artillery", "ARTILLERY", -62, 38, true, "TURKEY");
-    create3DUnit("Iranian Infantry", "INFANTRY", 16, 32, true, "IRAN");
-    create3DUnit("Iranian Armor", "TANK", 20, 36, true, "IRAN");
-    create3DUnit("Saudi Infantry", "INFANTRY", 16, 16, true, "SAUDI");
-    create3DUnit("Egyptian Infantry", "INFANTRY", -28, 10, true, "EGYPT");
-    create3DUnit("Palestinian Defense", "INFANTRY", -4, 28, true, "PALESTINE");
-    create3DUnit("Indian Infantry", "INFANTRY", 8, -12, false, "INDIA");
-    create3DUnit("Indian Armor", "TANK", 14, -8, false, "INDIA");
-    create3DUnit("Chinese Infantry", "INFANTRY", 52, 4, false, "CHINA");
-    create3DUnit("Chinese Armor", "TANK", 58, 8, false, "CHINA");
-    create3DUnit("Russian Infantry", "INFANTRY", 32, 68, false, "RUSSIA");
-    create3DUnit("US Infantry", "INFANTRY", -132, -32, false, "USA");
-    create3DUnit("US Armor", "TANK", -128, -38, false, "USA");
-    create3DUnit("UK Infantry", "INFANTRY", -124, 32, false, "UK");
-    create3DUnit("French Infantry", "INFANTRY", -48, 38, false, "FRANCE");
-    create3DUnit("German Infantry", "INFANTRY", -12, 10, false, "GERMANY");
-}
-
-// =========================================================
-// COMBAT SYSTEM
-// =========================================================
-
-function getTerrainModifier(unit) {
-    let modifier = 1;
-    if (unit.state === "DEFENDING") modifier += 0.18 + unit.entrenchment / 500;
-    if (weather === "RAIN") modifier *= 0.9;
-    if (weather === "SNOW") modifier *= 0.78;
-    if (unit.supply < 30) modifier *= 0.72;
-    if (unit.organization < 30) modifier *= 0.75;
-    return modifier;
-}
-
-function getTechAttackBonus(unit) {
-    let bonus = 1;
-    if (unit.type === "INFANTRY" && tech.INFANTRY.completed) bonus *= 1.08;
-    if (unit.type === "TANK" && tech.ARMOR.completed) bonus *= 1.10;
-    if (unit.type === "AIR" && tech.AIR.completed) bonus *= 1.12;
-    if (unit.type === "ARTILLERY" && tech.ARTILLERY.completed) bonus *= 1.08;
-    return bonus;
-}
-
-function executeAttack(attacker, defender) {
-    if (!attacker || !defender || defender.state === "DESTROYED") return;
-    if (!attacker.friendly) return;
-
-    const distance = attacker.object.position.distanceTo(defender.object.position);
-    let maxRange = 35;
-    if (attacker.type === 'ARTILLERY') maxRange = 80;
-    if (attacker.type === 'AIR') maxRange = 100;
-    
-    if (distance > maxRange) { toast("Target is out of range"); return; }
-    if (attacker.supply < 15) { toast("Insufficient supply"); return; }
-
-    attacker.supply = Math.max(0, attacker.supply - 6);
-    
-    let attackPower = (attacker.attack * (attacker.strength / 100) * (attacker.organization / 100) *
-        (attacker.morale / 100) * getTerrainModifier(attacker) * getTechAttackBonus(attacker)) + Math.random() * 8;
-    
-    if (attacker.type === 'ARTILLERY' && defender.state === 'DEFENDING') attackPower *= 1.3;
-    
-    const defensePower = (defender.defense * (defender.strength / 100) * (defender.organization / 100) *
-        (defender.morale / 100) * getTerrainModifier(defender)) + Math.random() * 7;
-
-    let damage = Math.max(3, attackPower - defensePower * 0.55);
-    if (weather === "SNOW") damage *= 0.82;
-
-    defender.hp = Math.max(0, defender.hp - damage);
-    defender.organization = Math.max(0, defender.organization - damage * 0.48);
-    defender.morale = Math.max(0, defender.morale - damage * 0.22);
-    attacker.organization = Math.max(0, attacker.organization - Math.max(1, damage * 0.12));
-    attacker.experience = Math.min(100, attacker.experience + damage * 0.08);
-    
-    updateUnitHPBar(defender);
-    updateUnitHPBar(attacker);
-
-    addBattleLog(`${attacker.name} attacked ${defender.name} for ${Math.round(damage)} damage`);
-
-    if (defender.hp <= 0 || defender.organization <= 0) {
-        destroyUnit(defender, attacker);
-    } else {
-        defender.state = "UNDER_ATTACK";
-        attacker.state = "ATTACKING";
-        createExplosion(defender.object.position);
-        toast(`${attacker.name} dealt ${Math.round(damage)} damage`);
-        addNotification(`⚔️ ${attacker.name} attacked ${defender.name}`, NOTIFICATION_TYPES.WARNING);
-    }
-    updateUnitPanel();
-    updateAllUI();
-}
-
-function executeAirstrike(aircraft, target) {
-    if (aircraft.supply < 20) { toast("Air unit needs supply"); return; }
-    aircraft.supply -= 20;
-    let damage = 18 + Math.random() * 18;
-    damage *= aircraft.readiness / 100;
-    damage *= getTechAttackBonus(aircraft);
-    if (weather === "RAIN") damage *= 0.72;
-    if (weather === "SNOW") damage *= 0.55;
-
-    target.hp = Math.max(0, target.hp - damage);
-    target.organization = Math.max(0, target.organization - damage * 0.7);
-    target.morale = Math.max(0, target.morale - damage * 0.35);
-    aircraft.experience = Math.min(100, aircraft.experience + 1);
-    createExplosion(target.object.position);
-    updateUnitHPBar(target);
-    addBattleLog(`Airstrike hit ${target.name} for ${Math.round(damage)} damage`);
-    toast(`Airstrike hit ${target.name}`);
-    addNotification(`✈️ Airstrike hit ${target.name}`, NOTIFICATION_TYPES.DANGER);
-
-    if (target.hp <= 0 || target.organization <= 0) {
-        destroyUnit(target, aircraft);
-    }
-    updateUnitPanel();
-    updateAllUI();
-}
-
-function createExplosion(position) {
-    const count = 12;
-    for (let i = 0; i < count; i++) {
-        const mesh = new THREE.Mesh(
-            new THREE.SphereGeometry(0.2 + Math.random() * 0.6, 6, 6),
-            new THREE.MeshBasicMaterial({
-                color: new THREE.Color().setHSL(0.08 + Math.random() * 0.08, 1, 0.4 + Math.random() * 0.4),
-                transparent: true,
-                opacity: 0.9
-            })
-        );
-        mesh.position.copy(position);
-        mesh.position.y += 0.5 + Math.random() * 1.5;
-        const dir = new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3).normalize();
-        mesh.userData = { life: 0.3 + Math.random() * 0.4, velocity: dir.multiplyScalar(2 + Math.random() * 5) };
-        fxGroup.add(mesh);
-    }
-}
-
-function destroyUnit(unit, killer = null) {
-    unit.state = "DESTROYED";
-    unit.hp = 0;
-    unit.organization = 0;
-    unit.object.visible = false;
-    if (killer) {
-        killer.kills++;
-        killer.experience = Math.min(100, killer.experience + 8);
-    }
-    createExplosion(unit.object.position);
-    addBattleLog(`${unit.name} destroyed`);
-    toast(`${unit.name} destroyed`);
-    addNotification(`💀 ${unit.name} destroyed!`, NOTIFICATION_TYPES.DANGER);
-    if (selectedUnit === unit) {
-        selectedUnit = null;
-        const panel = $("unitPanel");
-        if (panel) panel.classList.remove("open");
     }
 }
 
@@ -2354,7 +2372,6 @@ function updateAllUI() {
     const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
     $('gameDate').textContent = `${year} • ${monthNames[month-1]} ${String(day).padStart(2,'0')}`;
     
-    // Update war status
     const warStatus = $('warStatus');
     if (wars.length > 0) {
         warStatus.style.display = 'inline-block';
@@ -2363,7 +2380,6 @@ function updateAllUI() {
         warStatus.style.display = 'none';
     }
     
-    // Update supply status
     const supplyStatus = $('supplyStatus');
     const avgSupply = units.filter(u => u.state !== 'DESTROYED').reduce((sum, u) => sum + u.supply, 0) / 
                       Math.max(1, units.filter(u => u.state !== 'DESTROYED').length);
@@ -2519,7 +2535,7 @@ function loop(timestamp) {
 // =========================================================
 
 init().catch(error => {
-    console.error('Failed to initialize game:', error);
+    console.error('❌ Failed to initialize game:', error);
     const status = $("loadingStatus");
     if (status) {
         status.textContent = '❌ Error: ' + error.message;
@@ -2528,6 +2544,6 @@ init().catch(error => {
 });
 
 console.log('🌍 WORLD WAR V2 — Complete!');
-console.log('📦 Version: V2.0.0');
-console.log('📁 All systems loaded');
+console.log('📦 Version: V2.0.1 (Fixed)');
+console.log('✅ All systems loaded');
 console.log('🎮 Click a country to zoom and manage cities!');
