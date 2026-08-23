@@ -2,6 +2,9 @@
 // VICTORY CONDITIONS
 // =========================================================
 
+import { cityManager } from './cityManager.js';
+import { economyState } from './economy.js';
+
 export const victoryConditions = {
     military: {
         name: 'Military Victory',
@@ -29,7 +32,7 @@ export function checkVictoryConditions(units, nation, diplomacy, wars) {
     const results = {};
     let victory = null;
     
-    const totalCities = Object.keys(window.cityManager || {}).length;
+    const totalCities = Object.keys(cityManager || {}).length;
     const controlledCities = units
         .filter(u => u.friendly && u.state !== 'DESTROYED')
         .length * 2;
@@ -37,12 +40,12 @@ export function checkVictoryConditions(units, nation, diplomacy, wars) {
     victoryConditions.military.achieved = militaryProgress >= 60;
     results.military = { achieved: victoryConditions.military.achieved, progress: militaryProgress };
     
-    const gdp = window.economyState?.gdp || 0;
+    const gdp = economyState?.money || 0;
     const economicProgress = Math.min(100, (gdp / 1000000) * 100);
     victoryConditions.economic.achieved = economicProgress >= 100;
     results.economic = { achieved: victoryConditions.economic.achieved, progress: economicProgress };
     
-    const allCountries = Object.keys(nation);
+    const allCountries = Object.keys(nation || {});
     const alliedCountries = allCountries.filter(c => {
         const val = diplomacy[c] || 0;
         return val >= 75;
