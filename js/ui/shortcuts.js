@@ -1,5 +1,5 @@
 // =========================================================
-// KEYBOARD SHORTCUTS — V2
+// KEYBOARD SHORTCUTS
 // =========================================================
 
 export const SHORTCUTS = {
@@ -52,7 +52,6 @@ export function handleKeyPress(event) {
             triggerCommand('speedBtn');
             break;
         case SHORTCUTS.SPEED_DOWN:
-            // Custom speed down
             if (window.speed > 1) {
                 window.speed = window.speed / 2;
                 const speedBtn = document.getElementById('speedBtn');
@@ -84,56 +83,9 @@ function triggerCommand(elementId) {
     const element = document.getElementById(elementId);
     if (element) {
         element.click();
-        // Visual feedback
         element.style.transform = 'scale(0.9)';
         setTimeout(() => {
             element.style.transform = '';
         }, 200);
     }
-}
-
-export function getShortcutString(command) {
-    const shortcuts = {
-        'moveCommand': 'M',
-        'attackCommand': 'A',
-        'defendCommand': 'D',
-        'holdCommand': 'H',
-        'retreatCommand': 'R',
-        'airstrikeCommand': 'S',
-        'pauseBtn': 'Space',
-        'speedBtn': '=',
-        'zoomIn': ']',
-        'zoomOut': '[',
-        'resetCamera': '0',
-        'topDown': 'T',
-        'zoomToCountry': 'Z'
-    };
-    return shortcuts[command] || '';
-}
-
-export function showShortcutsHelp() {
-    const help = [
-        '🎮 Keyboard Shortcuts:',
-        '━━━━━━━━━━━━━━━━━━━',
-        'M - Move',
-        'A - Attack',
-        'D - Defend',
-        'H - Hold',
-        'R - Retreat',
-        'S - Airstrike',
-        'Space - Pause',
-        '= - Speed Up',
-        '- - Speed Down',
-        '] - Zoom In',
-        '[ - Zoom Out',
-        '0 - Reset Camera',
-        'T - Top View',
-        'Z - Zoom to Country'
-    ].join('\n');
-    
-    if (window.toast) {
-        window.toast('⌨️ Shortcuts: M,A,D,H,R,S,Space');
-    }
-    console.log(help);
-    return help;
 }
