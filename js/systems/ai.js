@@ -1,5 +1,5 @@
 // =========================================================
-// AI SYSTEM — V2 (Enhanced Intelligence)
+// AI SYSTEM
 // =========================================================
 
 let aiDifficulty = 'MEDIUM';
@@ -32,17 +32,13 @@ export function processAI(dt, units, nation, diplomacy) {
     
     const difficulty = AI_DIFFICULTIES[aiDifficulty] || AI_DIFFICULTIES.MEDIUM;
     
-    // AI Economy (simplified)
     if (Math.random() < 0.01 * dt * difficulty.aggression) {
-        // AI builds units
         buildAIUnit(aiUnits, playerUnits, difficulty);
     }
     
-    // AI Movement
     for (const unit of aiUnits) {
         if (unit.state === 'DESTROYED') continue;
         
-        // Find nearest player unit
         let nearest = null;
         let minDist = Infinity;
         for (const player of playerUnits) {
@@ -55,22 +51,17 @@ export function processAI(dt, units, nation, diplomacy) {
         
         if (!nearest) continue;
         
-        // AI Decision making
         const attackRange = unit.type === 'ARTILLERY' ? 60 : unit.type === 'AIR' ? 80 : 30;
         
         if (minDist < attackRange) {
-            // Attack
             if (Math.random() < 0.03 * dt * difficulty.aggression) {
                 unit.state = 'ATTACKING';
-                // Execute attack
                 executeAIAttack(unit, nearest, difficulty);
             }
         } else if (minDist < 150) {
-            // Move towards enemy
             unit.destination = nearest.object.position.clone();
             unit.state = 'MOVING';
         } else {
-            // Patrol
             if (!unit.destination || Math.random() < 0.01 * dt) {
                 const angle = Math.random() * Math.PI * 2;
                 const dist = 30 + Math.random() * 50;
@@ -86,13 +77,11 @@ export function processAI(dt, units, nation, diplomacy) {
 }
 
 function buildAIUnit(aiUnits, playerUnits, difficulty) {
-    // AI builds units based on difficulty
     const unitTypes = ['INFANTRY', 'TANK', 'ARTILLERY', 'AIR'];
     const weights = [0.4, 0.25, 0.2, 0.15];
     
-    // Adjust weights based on difficulty
     if (difficulty.aggression > 0.7) {
-        weights[1] = 0.35; // More tanks
+        weights[1] = 0.35;
         weights[0] = 0.25;
     }
     
@@ -108,7 +97,6 @@ function buildAIUnit(aiUnits, playerUnits, difficulty) {
         }
     }
     
-    // Find a place to spawn
     const spawnUnit = window.create3DUnit;
     if (spawnUnit) {
         const angle = Math.random() * Math.PI * 2;
@@ -116,7 +104,6 @@ function buildAIUnit(aiUnits, playerUnits, difficulty) {
         const x = Math.cos(angle) * dist;
         const z = Math.sin(angle) * dist;
         
-        // Spawn enemy unit
         const unit = spawnUnit(
             `AI ${selectedType} ${Math.floor(Math.random() * 100)}`,
             selectedType,
@@ -127,18 +114,16 @@ function buildAIUnit(aiUnits, playerUnits, difficulty) {
         );
         
         if (unit) {
-            // Boost stats based on difficulty
             unit.attack *= difficulty.attackBonus;
             unit.defense *= difficulty.defenseBonus;
             unit.hp *= difficulty.defenseBonus;
             unit.maxHp = unit.hp;
-            updateUnitHPBar(unit);
+            if (window.updateUnitHPBar) window.updateUnitHPBar(unit);
         }
     }
 }
 
 function executeAIAttack(attacker, defender, difficulty) {
-    // Calculate damage with difficulty bonuses
     let damage = attacker.attack * (0.5 + Math.random() * 0.5);
     damage *= difficulty.attackBonus;
     
@@ -146,22 +131,8 @@ function executeAIAttack(attacker, defender, difficulty) {
     defender.organization = Math.max(0, defender.organization - damage * 0.3);
     
     if (defender.hp <= 0 || defender.organization <= 0) {
-        // Destroy defender
         if (window.destroyUnit) window.destroyUnit(defender, attacker);
     } else {
-        // Damage feedback
         if (window.toast) window.toast(`AI ${attacker.name} attacked!`);
     }
 }
-
-function updateUnitHPBar(unit) {
-    // Helper function to update HP bar
-    if (window.updateUnitHPBar) window.updateUnitHPBar(unit);
-}
-
-// Export AI functions
-export const AI = {
-    setDifficulty: setAIDifficulty,
-    getDifficulty: getAIDifficulty,
-    process: processAI
-};
