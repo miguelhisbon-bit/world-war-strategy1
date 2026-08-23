@@ -17,8 +17,7 @@ import {
 import { getDiplomacyState, formAlliance, breakAlliance, isAllied, declareWar, proposePeace } from './systems/diplomacy.js';
 import { processEconomy, tradeResource, takeLoan, economyState } from './systems/economy.js';
 import { 
-    createSupplyLine, updateSupplyLines, getSupplyStatus, 
-    getUnitsInSupply, supplyLines 
+    createSupplyLine, updateSupplyLines, getSupplyStatus, supplyLines 
 } from './systems/supply.js';
 import { 
     getCity, updateCity, trainUnitInCity, buildInCity,
