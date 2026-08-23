@@ -1,5 +1,5 @@
 // =========================================================
-// UNITS DATA (Expanded for V2)
+// UNITS DATA
 // =========================================================
 
 export const UNITS_DATA = {
@@ -21,7 +21,7 @@ export const UNITS_DATA = {
             supply: 0.35
         },
         description: 'Basic ground troops, versatile in all terrain',
-        counters: { TANK: 0.5, ARTILLERY: 1.2, AIR: 0.7, MECHANIZED: 0.8 }
+        counters: { TANK: 0.5, ARTILLERY: 1.2, AIR: 0.7 }
     },
     
     TANK: {
@@ -42,7 +42,7 @@ export const UNITS_DATA = {
             supply: 0.65
         },
         description: 'Heavy armor with powerful attack',
-        counters: { INFANTRY: 1.5, ARTILLERY: 0.8, AIR: 1.2, MECHANIZED: 0.9 }
+        counters: { INFANTRY: 1.5, ARTILLERY: 0.8, AIR: 1.2 }
     },
     
     ARTILLERY: {
@@ -63,7 +63,7 @@ export const UNITS_DATA = {
             supply: 0.5
         },
         description: 'Long-range fire support',
-        counters: { INFANTRY: 0.6, TANK: 1.3, AIR: 0.9, MECHANIZED: 0.7 }
+        counters: { INFANTRY: 0.6, TANK: 1.3, AIR: 0.9 }
     },
     
     AIR: {
@@ -84,49 +84,7 @@ export const UNITS_DATA = {
             supply: 0.9
         },
         description: 'Air superiority and ground attack',
-        counters: { INFANTRY: 1.4, TANK: 0.7, ARTILLERY: 1.1, MECHANIZED: 1.3 }
-    },
-    
-    MECHANIZED: {
-        id: 'MECHANIZED',
-        name: 'Mechanized Infantry',
-        icon: '🚛',
-        type: 'MECHANIZED',
-        cost: { money: 600, steel: 60, manpower: 80 },
-        buildTime: 22,
-        stats: {
-            attack: 20,
-            defense: 16,
-            speed: 20,
-            hp: 110,
-            organization: 92,
-            morale: 80,
-            strength: 80,
-            supply: 0.55
-        },
-        description: 'Fast-moving infantry with armor support',
-        counters: { INFANTRY: 1.2, TANK: 0.6, ARTILLERY: 0.9, AIR: 0.8 }
-    },
-    
-    NAVAL: {
-        id: 'NAVAL',
-        name: 'Naval Ship',
-        icon: '🚢',
-        type: 'NAVAL',
-        cost: { money: 1200, steel: 120, manpower: 40 },
-        buildTime: 35,
-        stats: {
-            attack: 25,
-            defense: 22,
-            speed: 15,
-            hp: 150,
-            organization: 90,
-            morale: 85,
-            strength: 80,
-            supply: 0.7
-        },
-        description: 'Naval unit for sea control',
-        counters: { INFANTRY: 0.3, TANK: 0.4, ARTILLERY: 0.5, AIR: 0.6, MECHANIZED: 0.3 }
+        counters: { INFANTRY: 1.4, TANK: 0.7, ARTILLERY: 1.1 }
     }
 };
 
@@ -150,16 +108,6 @@ export const UNIT_UPGRADES = {
         { level: 1, cost: { money: 350, steel: 35 }, bonus: { attack: 5, speed: 5 } },
         { level: 2, cost: { money: 700, steel: 70 }, bonus: { attack: 10, speed: 10 } },
         { level: 3, cost: { money: 1400, steel: 140 }, bonus: { attack: 20, speed: 15 } }
-    ],
-    MECHANIZED: [
-        { level: 1, cost: { money: 250, steel: 25 }, bonus: { attack: 3, defense: 2 } },
-        { level: 2, cost: { money: 500, steel: 50 }, bonus: { attack: 6, defense: 4 } },
-        { level: 3, cost: { money: 1000, steel: 100 }, bonus: { attack: 12, defense: 8 } }
-    ],
-    NAVAL: [
-        { level: 1, cost: { money: 400, steel: 40 }, bonus: { attack: 5, defense: 3 } },
-        { level: 2, cost: { money: 800, steel: 80 }, bonus: { attack: 10, defense: 6 } },
-        { level: 3, cost: { money: 1600, steel: 160 }, bonus: { attack: 20, defense: 12 } }
     ]
 };
 
@@ -173,10 +121,6 @@ export function getUnitCost(unitId) {
 
 export function getUnitCounters(unitId) {
     return UNITS_DATA[unitId]?.counters || null;
-}
-
-export function getUnitDescription(unitId) {
-    return UNITS_DATA[unitId]?.description || null;
 }
 
 export function getUpgradeCost(unitId, level) {
@@ -193,8 +137,4 @@ export function getUpgradeBonus(unitId, level) {
 
 export function getUnitBuildTime(unitId) {
     return UNITS_DATA[unitId]?.buildTime || 20;
-}
-
-export function getAllUnitTypes() {
-    return Object.keys(UNITS_DATA);
 }
