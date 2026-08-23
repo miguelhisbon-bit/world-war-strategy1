@@ -184,7 +184,7 @@ const researchQueue = [];
 const researchedTechs = {};
 
 // =========================================================
-// INITIALIZATION
+// INITIALIZATION — FIXED
 // =========================================================
 
 async function init() {
@@ -216,29 +216,24 @@ async function init() {
         loading(100, "Ready!");
         autosave();
 
-        // FIXED: Loading screen hide with proper delay
-        setTimeout(() => {
-            const loadingScreen = $("loadingScreen");
-            if (loadingScreen) {
-                loadingScreen.classList.add("hidden");
-                console.log('✅ Loading screen hidden');
-            }
-        }, 650);
+        // FIXED: Hide loading screen
+        const loadingScreen = $("loadingScreen");
+        if (loadingScreen) {
+            loadingScreen.classList.add("hidden");
+            console.log('✅ Loading screen hidden');
+        }
 
-        // FIXED: Start game loop
+        // FIXED: Start game loop correctly
         console.log('🚀 Starting game loop...');
-        loop(0);
+        gameLoop();
         
     } catch (error) {
         console.error('❌ Init error:', error);
-        console.error('❌ Stack:', error.stack);
         const status = $("loadingStatus");
         if (status) { 
             status.textContent = '❌ Error: ' + error.message; 
             status.style.color = '#e45d5d'; 
         }
-        const bar = $("loadingProgress");
-        if (bar) bar.style.background = '#e45d5d';
     }
 }
 
@@ -384,6 +379,10 @@ function setupScene() {
         renderer.setSize(innerWidth, innerHeight);
         if (labelRenderer) labelRenderer.setSize(innerWidth, innerHeight);
     });
+
+    // Expose for minimap
+    window.camera = camera;
+    window.controls = controls;
 
     console.log('✅ Scene setup complete');
 }
@@ -1909,7 +1908,7 @@ function handleMinimapClick(event) {
 // GAME LOOP — FIXED
 // =========================================================
 
-function loop(timestamp) {
+function gameLoop() {
     const dt = Math.min(clock ? clock.getDelta() : 0.016, 0.05);
 
     if (!paused) {
@@ -2015,7 +2014,7 @@ function loop(timestamp) {
     controls.update();
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
-    requestAnimationFrame(loop);
+    requestAnimationFrame(gameLoop);
 }
 
 // =========================================================
