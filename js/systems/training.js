@@ -1,5 +1,5 @@
 // =========================================================
-// TRAINING SYSTEM — V2
+// TRAINING SYSTEM
 // =========================================================
 
 import { UNITS_DATA } from '../data/units.js';
@@ -36,9 +36,7 @@ export function processTraining(dt, units, nation) {
         item.status = 'TRAINING';
         
         if (item.progress >= item.totalTime) {
-            // Training complete
             item.status = 'COMPLETED';
-            // Spawn unit
             const unit = spawnTrainedUnit(item, units, nation);
             if (unit) {
                 trainingQueue.splice(i, 1);
@@ -48,15 +46,12 @@ export function processTraining(dt, units, nation) {
 }
 
 function spawnTrainedUnit(item, units, nation) {
-    // Find city location
     const cityData = window.cityManager ? window.cityManager[item.cityId] : null;
     if (!cityData) return null;
     
-    // Find country position
     const countryData = nation[item.country];
     if (!countryData) return null;
     
-    // Get position from country mesh
     const mesh = window.countryMeshMap ? window.countryMeshMap[item.country] : null;
     if (!mesh) return null;
     
@@ -71,11 +66,9 @@ function spawnTrainedUnit(item, units, nation) {
     center.x /= count;
     center.z /= count;
     
-    // Add random offset
     const offsetX = (Math.random() - 0.5) * 10;
     const offsetZ = (Math.random() - 0.5) * 10;
     
-    // Create unit
     const unitName = `${item.unitType} (${item.cityId})`;
     const unit = window.create3DUnit ? 
         window.create3DUnit(unitName, item.unitType, center.x + offsetX, center.z + offsetZ, true, item.country) :
@@ -83,7 +76,6 @@ function spawnTrainedUnit(item, units, nation) {
     
     if (unit) {
         unit.city = item.cityId;
-        // Add to units array
         if (units) units.push(unit);
         return unit;
     }
@@ -108,11 +100,4 @@ export function cancelTraining(trainingId) {
     if (index === -1) return false;
     trainingQueue.splice(index, 1);
     return true;
-}
-
-export function getTrainingProgress() {
-    return trainingQueue.map(item => ({
-        ...item,
-        progressPercent: Math.round((item.progress / item.totalTime) * 100)
-    }));
 }
