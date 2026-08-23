@@ -369,14 +369,12 @@ export function getStateById(stateId) {
 }
 
 export function getCityById(cityId) {
-    // City is same as state in our data model
     return getStateById(cityId);
 }
 
 export function getCitiesByState(stateId) {
     const state = getStateById(stateId);
     if (!state) return [];
-    // In our model, each state is a city
     return [{ ...state }];
 }
 
