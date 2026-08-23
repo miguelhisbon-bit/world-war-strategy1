@@ -228,7 +228,6 @@ export const TECH_TREE = {
     }
 };
 
-// Helper function to get all techs
 export function getAllTechs() {
     const allTechs = {};
     for (const category of Object.values(TECH_TREE)) {
@@ -239,11 +238,24 @@ export function getAllTechs() {
     return allTechs;
 }
 
-// Helper function to check if tech is available
 export function isTechAvailable(techId, researchedTechs) {
     const allTechs = getAllTechs();
     const tech = allTechs[techId];
     if (!tech) return false;
     if (researchedTechs[techId]) return false;
     return tech.requires.every(req => researchedTechs[req]);
+}
+
+export function getTechCost(techId) {
+    const allTechs = getAllTechs();
+    const tech = allTechs[techId];
+    if (!tech) return null;
+    return tech.cost;
+}
+
+export function getTechBonus(techId) {
+    const allTechs = getAllTechs();
+    const tech = allTechs[techId];
+    if (!tech) return null;
+    return tech.bonus;
 }
