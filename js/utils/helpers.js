@@ -1,5 +1,5 @@
 // =========================================================
-// HELPER FUNCTIONS
+// HELPER FUNCTIONS (Enhanced for V2)
 // =========================================================
 
 export function random(min, max) {
@@ -134,4 +134,34 @@ export function debounce(func, delay) {
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(this, args), delay);
     };
+}
+
+export function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+}
+
+export function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export function deepClone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+}
+
+export function isEmpty(obj) {
+    return Object.keys(obj).length === 0;
+}
+
+export function getNestedValue(obj, path) {
+    return path.split('.').reduce((current, key) => current?.[key], obj);
+}
+
+export function setNestedValue(obj, path, value) {
+    const keys = path.split('.');
+    const lastKey = keys.pop();
+    const target = keys.reduce((current, key) => {
+        if (!current[key]) current[key] = {};
+        return current[key];
+    }, obj);
+    target[lastKey] = value;
 }
