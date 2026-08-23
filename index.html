@@ -1,65 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#080c10">
+  <meta name="description" content="WORLD WAR V3 real-time strategy command system">
+  <title>WORLD WAR V3 — Real-Time Strategy</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="game">
+    <canvas id="gameCanvas" aria-label="World War 3D globe"></canvas>
 
+    <!-- Loading / startup recovery -->
+    <section id="loadingScreen" aria-live="polite">
+      <div class="loading-background" aria-hidden="true">
+        <div class="smoke smoke1"></div>
+        <div class="smoke smoke2"></div>
+        <div class="smoke smoke3"></div>
+        <div class="loading-tank"></div>
+        <div class="loading-soldier soldier1"></div>
+        <div class="loading-soldier soldier2"></div>
+        <div class="loading-explosion exp1"></div>
+        <div class="loading-explosion exp2"></div>
+      </div>
+      <div class="loading-content">
+        <div class="loading-eyebrow">GLOBAL COMMAND SYSTEM</div>
+        <h1>WORLD WAR <span>V3</span></h1>
+        <div class="loading-subtitle">REAL-TIME STRATEGY</div>
+        <div id="loadingStatus" class="loading-status">Initializing command system...</div>
+        <div class="loading-bar"><div id="loadingProgress"></div></div>
+        <div id="loadingTip" class="loading-tip">Loading world map...</div>
+      </div>
+    </section>
 
+    <!-- Top command bar -->
+    <header id="topBar">
+      <div class="brand">
+        <div class="brand-mark">W</div>
+        <div>
+          <div class="brand-title">WORLD WAR</div>
+          <div class="brand-subtitle">V3 • COMMAND</div>
+        </div>
+      </div>
 
+      <button class="country-display" type="button" onclick="window.openPanel('overview')" title="Current command country">
+        <span id="countryFlag">🇧🇩</span>
+        <span id="countryName">Bangladesh</span>
+      </button>
 
+      <div class="resources" aria-label="Resources">
+        <div class="resource"><span>💰</span><b id="money">12500</b></div>
+        <div class="resource"><span>🛢️</span><b id="oil">850</b></div>
+        <div class="resource"><span>⚙️</span><b id="steel">1250</b></div>
+        <div class="resource"><span>🌾</span><b id="food">1600</b></div>
+        <div class="resource"><span>👥</span><b id="manpower">85000</b></div>
+      </div>
 
+      <div class="date-control">
+        <span id="gameDate">1940 • JAN 01</span>
+        <button id="pauseBtn" type="button" title="Pause / resume">⏸</button>
+        <button id="speedBtn" type="button" title="Game speed">1×</button>
+      </div>
+    </header>
 
+    <!-- Left navigation -->
+    <nav id="leftPanel" aria-label="Command sections">
+      <button class="panel-button active" data-panel="overview" type="button"><span>🌍</span><small>World</small></button>
+      <button class="panel-button" data-panel="army" type="button"><span>🪖</span><small>Army</small></button>
+      <button class="panel-button" data-panel="economy" type="button"><span>💰</span><small>Economy</small></button>
+      <button class="panel-button" data-panel="production" type="button"><span>🏭</span><small>Production</small></button>
+      <button class="panel-button" data-panel="research" type="button"><span>🔬</span><small>Research</small></button>
+      <button class="panel-button" data-panel="diplomacy" type="button"><span>🤝</span><small>Diplomacy</small></button>
+      <button class="panel-button" data-panel="intel" type="button"><span>🕵️</span><small>Intel</small></button>
+      <button class="panel-button" data-panel="city" type="button"><span>🏙️</span><small>Cities</small></button>
+      <button class="panel-button" data-panel="supply" type="button"><span>📦</span><small>Supply</small></button>
+      <button class="panel-button" data-panel="settings" type="button"><span>⚙️</span><small>Settings</small></button>
+    </nav>
 
+    <!-- Main information panel -->
+    <aside id="mainPanel">
+      <div class="panel-header">
+        <div>
+          <div id="panelKicker" class="panel-kicker">STRATEGIC COMMAND V3</div>
+          <h2 id="panelTitle">World Overview</h2>
+          <div id="selectedCountryDisplay"></div>
+          <div id="selectedCityDisplay"></div>
+        </div>
+        <button id="closePanel" type="button" aria-label="Close panel">×</button>
+      </div>
+      <div id="panelContent"></div>
+    </aside>
 
-GLOBAL COMMAND SYSTEM
-WORLD WAR V3
-REAL-TIME STRATEGY
-Loading world map...
+    <!-- Unit command panel -->
+    <aside id="unitPanel">
+      <div class="unit-header">
+        <div>
+          <div class="unit-type" id="selectedUnitType">UNIT SELECTED</div>
+          <h2 id="selectedUnitName">Select an army</h2>
+          <div id="unitLocation">—</div>
+        </div>
+        <button id="closeUnit" type="button" aria-label="Close unit panel">×</button>
+      </div>
+      <div id="unitStats"></div>
+      <div class="command-grid">
+        <button class="command-btn" id="moveCommand" type="button"><span>📍</span>MOVE</button>
+        <button class="command-btn" id="attackCommand" type="button"><span>⚔️</span>ATTACK</button>
+        <button class="command-btn" id="defendCommand" type="button"><span>🛡️</span>DEFEND</button>
+        <button class="command-btn" id="holdCommand" type="button"><span>⏸</span>HOLD</button>
+        <button class="command-btn danger" id="retreatCommand" type="button"><span>↩️</span>RETREAT</button>
+        <button class="command-btn" id="airstrikeCommand" type="button"><span>✈️</span>AIRSTRIKE</button>
+      </div>
+    </aside>
 
-TIP: Click any country to zoom & manage cities
-W
-WORLD WAR
-V3 • COMMAND
-🇧🇩 Bangladesh
-💰12500
-🛢️850
-⚙️1250
-🌾1600
-👥85000
-1940 • JAN 01
-⏸ 1×
-🌍World 🪖Army 💰Economy 🏭Production 🔬Research 🤝Diplomacy 🕵️Intel 🏙️Cities 📦Supply ⚙️Settings
-STRATEGIC COMMAND
-World Overview
+    <!-- Quick actions -->
+    <div id="quickActions" style="position:absolute;z-index:30;left:91px;bottom:55px;display:flex;gap:6px;align-items:center;">
+      <button id="quickFactory" type="button">🏭 BUILD</button>
+      <button id="quickReinforce" type="button">🪖 REINFORCE</button>
+    </div>
 
+    <!-- Camera controls -->
+    <div id="cameraControls" aria-label="Camera controls">
+      <button id="zoomIn" type="button" title="Zoom in">＋</button>
+      <button id="zoomOut" type="button" title="Zoom out">−</button>
+      <button id="resetCamera" type="button" title="Reset camera">⌖</button>
+      <button id="topDown" type="button" title="Top view">⬇</button>
+    </div>
 
-×
+    <!-- Minimap -->
+    <section id="miniMap">
+      <div class="mini-title">GLOBAL MAP</div>
+      <div class="mini-map-body"><canvas id="miniMapCanvas" width="185" height="105"></canvas></div>
+    </section>
 
-NO UNIT SELECTED
-Select an army
+    <!-- Notifications / toast -->
+    <div id="notificationCenter"></div>
+    <div id="toast" role="status" aria-live="polite"></div>
 
-×
+    <!-- Bottom status -->
+    <footer id="bottomStatus">
+      <div><span class="status-dot"></span>All systems operational</div>
+      <div id="warStatus" class="war-status" style="display:none;">AT WAR</div>
+      <div id="battleStatus">NO ACTIVE BATTLE</div>
+      <div id="supplyStatus">📦 Supply: 100%</div>
+    </footer>
 
-📍MOVE ⚔️ATTACK 🛡️DEFEND ⏸HOLD ↩️RETREAT ✈️AIRSTRIKE
-⚡ Quick Actions: 🏭 BUILD 🪖 REINFORCE
-👆Tap unit to select • Tap terrain to move • Click country to zoom
-＋ − ⌖ ⬇ 🎯
-GLOBAL MAP
+    <!-- Country info -->
+    <div id="countryInfoModal" class="modal">
+      <div class="modal-box">
+        <button id="closeCountryInfo" class="modal-close" type="button" aria-label="Close">×</button>
+        <div id="infoCountryKicker" class="panel-kicker">COUNTRY DETAILS</div>
+        <h2 id="infoCountryTitle">Country Name</h2>
+        <div id="infoCountryContent"></div>
+      </div>
+    </div>
 
-All systems operational
-NO ACTIVE BATTLE
-📦 Supply: 100%
+    <!-- City info -->
+    <div id="cityInfoModal" class="modal">
+      <div class="modal-box">
+        <button id="closeCityInfo" class="modal-close" type="button" aria-label="Close">×</button>
+        <div id="infoCityKicker" class="panel-kicker">CITY DETAILS</div>
+        <h2 id="infoCityTitle">City Name</h2>
+        <div id="infoCityContent"></div>
+      </div>
+    </div>
 
+    <!-- Nation selector -->
+    <div id="countryModal" class="modal">
+      <div class="modal-box">
+        <button class="modal-close" type="button" aria-label="Close" onclick="this.closest('.modal').classList.remove('open')">×</button>
+        <div class="panel-kicker">SELECT NATION</div>
+        <h2>Choose Your Country</h2>
+        <div id="countryGrid" class="country-grid"></div>
+      </div>
+    </div>
 
-×
-SELECT NATION
-Choose Your Country
+    <!-- Tutorial -->
+    <section id="tutorial">
+      <div class="tutorial-box">
+        <div class="tutorial-icon">🎖️</div>
+        <div>
+          <div class="panel-kicker">FIELD MANUAL V3</div>
+          <h2 id="tutorialTitle">Welcome, Commander</h2>
+          <p id="tutorialText">Click any country to zoom in and manage cities. Train units, build supply lines, and conquer the world!</p>
+        </div>
+        <button id="tutorialNext" type="button">NEXT</button>
+      </div>
+    </section>
 
-×
-COUNTRY DETAILS
-Country Name
+    <!-- Victory -->
+    <div id="victoryScreen" class="modal">
+      <div class="modal-box">
+        <div id="victoryIcon">🏆</div>
+        <div class="panel-kicker">CAMPAIGN COMPLETE</div>
+        <h2 id="victoryTitle">VICTORY!</h2>
+        <p id="victoryMessage">You have conquered the world!</p>
+        <button class="action-btn success" type="button" onclick="location.reload()">↻ PLAY AGAIN</button>
+      </div>
+    </div>
+  </div>
 
-×
-CITY DETAILS
-City Name
-
-🎖️
-FIELD MANUAL V3
-Welcome, Commander
-Click any country to zoom in and manage cities. Train units, build supply lines, and conquer the world!
-NEXT
+  <noscript>
+    <div style="padding:20px;font-family:sans-serif;background:#080c10;color:#fff;">JavaScript is required to run WORLD WAR V3.</div>
+  </noscript>
+  <script>
+    // If the ES module fails before it can execute, never leave the user on a
+    // permanent loading screen. This also catches missing local files and
+    // unavailable Three.js imports on GitHub Pages.
+    window.setTimeout(function () {
+      if (window.__WWV3_MODULE_STARTED || window.__WWV3_BOOTED) return;
+      var screen = document.getElementById("loadingScreen");
+      var status = document.getElementById("loadingStatus");
+      var tip = document.getElementById("loadingTip");
+      if (screen) screen.classList.remove("hidden");
+      if (status) {
+        status.textContent = "Startup module failed to load.";
+        status.style.color = "#e45d5d";
+      }
+      if (tip) {
+        tip.innerHTML = "Check that the complete project was uploaded. <button type=\"button\" onclick=\"location.reload()\" style=\"margin-left:8px;padding:6px 12px;border-radius:5px;border:1px solid #777;background:#222;color:#fff;cursor:pointer;\">RELOAD</button>";
+      }
+    }, 8000);
+  </script>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
