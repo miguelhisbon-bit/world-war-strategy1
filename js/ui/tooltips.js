@@ -1,13 +1,11 @@
 // =========================================================
-// TOOLTIP SYSTEM — V2
+// TOOLTIPS
 // =========================================================
 
 let tooltipElement = null;
 let tooltipTimeout = null;
-let currentTooltipTarget = null;
 
 export function initTooltips() {
-    // Create tooltip element
     tooltipElement = document.createElement('div');
     tooltipElement.style.cssText = `
         position: fixed;
@@ -33,11 +31,9 @@ export function showTooltip(target, content, event) {
         clearTimeout(tooltipTimeout);
     }
     
-    currentTooltipTarget = target;
     tooltipElement.innerHTML = content;
     tooltipElement.style.opacity = '1';
     
-    // Position tooltip near cursor
     if (event) {
         const x = event.clientX + 15;
         const y = event.clientY + 15;
@@ -53,7 +49,6 @@ export function hideTooltip() {
     
     tooltipTimeout = setTimeout(() => {
         tooltipElement.style.opacity = '0';
-        currentTooltipTarget = null;
     }, 300);
 }
 
