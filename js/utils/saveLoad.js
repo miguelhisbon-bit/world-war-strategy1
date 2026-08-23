@@ -2,7 +2,7 @@
 // SAVE / LOAD SYSTEM
 // =========================================================
 
-export const SAVE_KEY = 'worldWarSaveV2';
+export const SAVE_KEY = 'worldWarSaveV3';
 export const AUTOSAVE_INTERVAL = 30000;
 
 export function saveGame(gameData) {
@@ -10,7 +10,7 @@ export function saveGame(gameData) {
         const saveData = {
             ...gameData,
             savedAt: Date.now(),
-            version: '2.0.0'
+            version: '3.0.0'
         };
         localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
         return true;
@@ -26,8 +26,8 @@ export function loadGame() {
         if (!raw) return null;
         
         const data = JSON.parse(raw);
-        if (data.version !== '2.0.0') {
-            console.warn('Save version mismatch. Expected 2.0.0, got', data.version);
+        if (data.version !== '3.0.0') {
+            console.warn('Save version mismatch. Expected 3.0.0, got', data.version);
         }
         
         return data;
@@ -39,7 +39,7 @@ export function loadGame() {
 
 export function deleteSave() {
     localStorage.removeItem(SAVE_KEY);
-    console.log('🗑️ V2 Save deleted');
+    console.log('🗑️ Save deleted');
 }
 
 export function hasSave() {
@@ -83,7 +83,7 @@ export function exportSave() {
     
     const a = document.createElement('a');
     a.href = url;
-    a.download = `worldWarSaveV2_${Date.now()}.json`;
+    a.download = `worldWarSaveV3_${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -95,7 +95,7 @@ export function importSave(file) {
             const data = e.target.result;
             JSON.parse(data);
             localStorage.setItem(SAVE_KEY, data);
-            console.log('✅ V2 Save imported successfully!');
+            console.log('✅ Save imported successfully!');
             return true;
         } catch (error) {
             console.error('Import failed:', error);
