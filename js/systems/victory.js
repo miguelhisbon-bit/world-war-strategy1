@@ -1,5 +1,5 @@
 // =========================================================
-// VICTORY CONDITIONS — V2
+// VICTORY CONDITIONS
 // =========================================================
 
 export const victoryConditions = {
@@ -29,22 +29,19 @@ export function checkVictoryConditions(units, nation, diplomacy, wars) {
     const results = {};
     let victory = null;
     
-    // Military Victory
     const totalCities = Object.keys(window.cityManager || {}).length;
     const controlledCities = units
         .filter(u => u.friendly && u.state !== 'DESTROYED')
-        .length * 2; // Simplified
+        .length * 2;
     const militaryProgress = Math.min(100, (controlledCities / Math.max(1, totalCities)) * 100);
     victoryConditions.military.achieved = militaryProgress >= 60;
     results.military = { achieved: victoryConditions.military.achieved, progress: militaryProgress };
     
-    // Economic Victory
     const gdp = window.economyState?.gdp || 0;
     const economicProgress = Math.min(100, (gdp / 1000000) * 100);
     victoryConditions.economic.achieved = economicProgress >= 100;
     results.economic = { achieved: victoryConditions.economic.achieved, progress: economicProgress };
     
-    // Diplomatic Victory
     const allCountries = Object.keys(nation);
     const alliedCountries = allCountries.filter(c => {
         const val = diplomacy[c] || 0;
@@ -54,14 +51,12 @@ export function checkVictoryConditions(units, nation, diplomacy, wars) {
     victoryConditions.diplomatic.achieved = diplomaticProgress >= 80;
     results.diplomatic = { achieved: victoryConditions.diplomatic.achieved, progress: diplomaticProgress };
     
-    // Research Victory
     const techKeys = Object.keys(window.tech || {});
     const completedTechs = techKeys.filter(key => window.tech[key]?.completed);
     const researchProgress = Math.min(100, (completedTechs.length / Math.max(1, techKeys.length)) * 100);
     victoryConditions.research.achieved = researchProgress >= 100;
     results.research = { achieved: victoryConditions.research.achieved, progress: researchProgress };
     
-    // Check if any victory achieved
     for (const [key, value] of Object.entries(results)) {
         if (value.achieved) {
             victory = {
@@ -97,22 +92,4 @@ export function getVictoryStatus() {
             achieved: value.achieved
         }))
     };
-}
-
-export function resetVictoryConditions() {
-    for (const key of Object.keys(victoryConditions)) {
-        victoryConditions[key].achieved = false;
-    }
-}
-
-export function getVictoryProgress() {
-    const progress = {};
-    for (const [key, value] of Object.entries(victoryConditions)) {
-        progress[key] = {
-            name: value.name,
-            achieved: value.achieved,
-            description: value.description
-        };
-    }
-    return progress;
 }
