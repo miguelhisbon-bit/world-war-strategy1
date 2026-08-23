@@ -1,26 +1,21 @@
 // =========================================================
-// BATTLE SYSTEM
+// BATTLE SYSTEM (Enhanced for V2)
 // =========================================================
 
 import { UNITS_DATA } from '../data/units.js';
+import { TERRAIN_EFFECTS, WEATHER_EFFECTS } from './terrain.js';
 
-export const TERRAIN_EFFECTS = {
-    PLAIN: { attackModifier: 1.0, defenseModifier: 1.0 },
-    FOREST: { attackModifier: 0.8, defenseModifier: 1.2 },
-    MOUNTAIN: { attackModifier: 0.6, defenseModifier: 1.4 },
-    CITY: { attackModifier: 0.7, defenseModifier: 1.5 },
-    RIVER: { attackModifier: 0.5, defenseModifier: 1.3 },
-    DESERT: { attackModifier: 0.9, defenseModifier: 0.9 },
-    SNOW: { attackModifier: 0.7, defenseModifier: 0.8 }
-};
-
-export const WEATHER_EFFECTS = {
-    CLEAR: { attackModifier: 1.0, defenseModifier: 1.0 },
-    RAIN: { attackModifier: 0.85, defenseModifier: 0.9 },
-    SNOW: { attackModifier: 0.7, defenseModifier: 0.75 },
-    FOG: { attackModifier: 0.6, defenseModifier: 0.8 },
-    STORM: { attackModifier: 0.5, defenseModifier: 0.6 }
-};
+export function getTerrainModifier(unit, terrain = 'PLAIN') {
+    let modifier = 1;
+    if (unit.state === 'DEFENDING') modifier += 0.18 + unit.entrenchment / 500;
+    if (terrain === 'FOREST') modifier *= 0.9;
+    if (terrain === 'MOUNTAIN') modifier *= 0.8;
+    if (terrain === 'CITY') modifier *= 1.1;
+    if (terrain === 'RIVER') modifier *= 0.85;
+    if (unit.supply < 30) modifier *= 0.72;
+    if (unit.organization < 30) modifier *= 0.75;
+    return modifier;
+}
 
 export function getCounterBonus(attackerType, defenderType) {
     const attackerData = UNITS_DATA[attackerType];
@@ -142,4 +137,16 @@ export function findNearestEnemy(unit, enemyUnits, maxRange = 100) {
     }
     
     return nearest;
+}
+
+export function findEnemiesInRange(unit, enemyUnits, range = 50) {
+    const enemies = [];
+    for (const enemy of enemyUnits) {
+        if (enemy.state === 'DESTROYED') continue;
+        const dist = unit.object.position.distanceTo(enemy.object.position);
+        if (dist <= range) {
+            enemies.push({ unit: enemy, distance: dist });
+        }
+    }
+    return enemies.sort((a, b) => a.distance - b.distance);
 }
