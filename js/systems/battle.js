@@ -4,7 +4,6 @@
 
 import { UNITS_DATA } from '../data/units.js';
 
-// Terrain effects on combat
 export const TERRAIN_EFFECTS = {
     PLAIN: { attackModifier: 1.0, defenseModifier: 1.0 },
     FOREST: { attackModifier: 0.8, defenseModifier: 1.2 },
@@ -15,7 +14,6 @@ export const TERRAIN_EFFECTS = {
     SNOW: { attackModifier: 0.7, defenseModifier: 0.8 }
 };
 
-// Weather effects on combat
 export const WEATHER_EFFECTS = {
     CLEAR: { attackModifier: 1.0, defenseModifier: 1.0 },
     RAIN: { attackModifier: 0.85, defenseModifier: 0.9 },
@@ -24,50 +22,38 @@ export const WEATHER_EFFECTS = {
     STORM: { attackModifier: 0.5, defenseModifier: 0.6 }
 };
 
-// Unit counter system
 export function getCounterBonus(attackerType, defenderType) {
     const attackerData = UNITS_DATA[attackerType];
     if (!attackerData) return 1.0;
     return attackerData.counters[defenderType] || 1.0;
 }
 
-// Calculate battle damage
 export function calculateBattleDamage(attacker, defender, terrain = 'PLAIN', weather = 'CLEAR') {
-    // Base attack power
     let attackPower = attacker.attack * (attacker.strength / 100) * (attacker.organization / 100);
     attackPower *= (attacker.morale / 100);
     
-    // Terrain effects
     const terrainEffect = TERRAIN_EFFECTS[terrain] || TERRAIN_EFFECTS.PLAIN;
     attackPower *= terrainEffect.attackModifier;
     
-    // Weather effects
     const weatherEffect = WEATHER_EFFECTS[weather] || WEATHER_EFFECTS.CLEAR;
     attackPower *= weatherEffect.attackModifier;
     
-    // Counter bonus
     const counterBonus = getCounterBonus(attacker.type, defender.type);
     attackPower *= counterBonus;
     
-    // Base defense
     let defensePower = defender.defense * (defender.strength / 100) * (defender.organization / 100);
     defensePower *= (defender.morale / 100);
     defensePower *= terrainEffect.defenseModifier;
     defensePower *= weatherEffect.defenseModifier;
     
-    // Entrenchment bonus
     if (defender.state === 'DEFENDING') {
         defensePower *= (1 + defender.entrenchment / 200);
     }
     
-    // Calculate damage
     let damage = Math.max(1, attackPower - defensePower * 0.4);
-    damage += Math.random() * 5; // Random variance
+    damage += Math.random() * 5;
     
-    // Organization damage
     let orgDamage = damage * 0.5;
-    
-    // Morale damage
     let moraleDamage = damage * 0.2;
     
     return {
@@ -82,27 +68,21 @@ export function calculateBattleDamage(attacker, defender, terrain = 'PLAIN', wea
     };
 }
 
-// Execute a battle
 export function executeBattle(attacker, defender, terrain = 'PLAIN', weather = 'CLEAR') {
     if (!attacker || !defender || defender.state === 'DESTROYED') return null;
     if (attacker.supply < 15) return { error: 'Insufficient supply' };
     
-    // Calculate damage
     const result = calculateBattleDamage(attacker, defender, terrain, weather);
     
-    // Apply damage
     defender.hp = Math.max(0, defender.hp - result.damage);
     defender.organization = Math.max(0, defender.organization - result.orgDamage);
     defender.morale = Math.max(0, defender.morale - result.moraleDamage);
     
-    // Attacker loses some organization
     attacker.organization = Math.max(0, attacker.organization - Math.round(result.damage * 0.15));
     attacker.supply = Math.max(0, attacker.supply - 5);
     
-    // Experience gain
     attacker.experience = Math.min(100, attacker.experience + result.damage * 0.1);
     
-    // Check if defender is destroyed
     const destroyed = defender.hp <= 0 || defender.organization <= 0;
     
     return {
@@ -116,7 +96,6 @@ export function executeBattle(attacker, defender, terrain = 'PLAIN', weather = '
     };
 }
 
-// Generate battle report
 export function generateBattleReport(attacker, defender, result, terrain, weather) {
     if (!result) return null;
     
@@ -149,7 +128,6 @@ export function generateBattleReport(attacker, defender, result, terrain, weathe
     return report;
 }
 
-// Find nearest enemy
 export function findNearestEnemy(unit, enemyUnits, maxRange = 100) {
     let nearest = null;
     let minDist = Infinity;
