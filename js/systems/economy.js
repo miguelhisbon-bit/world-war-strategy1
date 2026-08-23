@@ -3,9 +3,8 @@
 // =========================================================
 
 import { BUILDINGS } from '../data/buildings.js';
-import { TECH_TREE } from '../data/techTree.js';
+import { getAllTechs } from '../data/techTree.js';
 
-// Player economy state
 export const economyState = {
     money: 12500,
     oil: 850,
@@ -20,7 +19,6 @@ export const economyState = {
     inflation: 0
 };
 
-// Production multipliers
 export const productionMultipliers = {
     food: 1.0,
     steel: 1.0,
@@ -29,27 +27,23 @@ export const productionMultipliers = {
     manpower: 1.0
 };
 
-// Building queue
 export const buildingQueue = [];
+export const researchQueue = [];
+export const factories = { civilian: 18, military: 14, naval: 5 };
 
 export function addBuildingToQueue(stateId, buildingId, level = 1) {
     const building = BUILDINGS[buildingId];
     if (!building) return false;
     
-    // Check if can afford
     const cost = getBuildingCost(buildingId, level);
     for (const [resource, amount] of Object.entries(cost)) {
-        if (economyState[resource] < amount) {
-            return false;
-        }
+        if (economyState[resource] < amount) return false;
     }
     
-    // Deduct resources
     for (const [resource, amount] of Object.entries(cost)) {
         economyState[resource] -= amount;
     }
     
-    // Add to queue
     buildingQueue.push({
         stateId,
         buildingId,
@@ -61,13 +55,22 @@ export function addBuildingToQueue(stateId, buildingId, level = 1) {
     return true;
 }
 
+function getBuildingCost(buildingId, level) {
+    const building = BUILDINGS[buildingId];
+    if (!building) return null;
+    const cost = {};
+    for (const [key, value] of Object.entries(building.cost)) {
+        cost[key] = Math.round(value * level);
+    }
+    return cost;
+}
+
 export function processBuildingQueue(dt) {
     for (let i = buildingQueue.length - 1; i >= 0; i--) {
         const item = buildingQueue[i];
         item.progress += dt;
         
         if (item.progress >= item.totalTime) {
-            // Building complete
             completeBuilding(item);
             buildingQueue.splice(i, 1);
         }
@@ -78,42 +81,35 @@ function completeBuilding(item) {
     const building = BUILDINGS[item.buildingId];
     if (!building) return;
     
-    // Add production
     const production = getBuildingProduction(item.buildingId, item.level);
     for (const [resource, amount] of Object.entries(production)) {
-        economyState[resource] += amount * 10; // Initial production bonus
+        economyState[resource] += amount * 10;
     }
-    
-    // Apply bonus
-    if (building.bonus) {
-        // Apply special bonuses
-    }
-    
-    // Notify
-    console.log(`✅ ${building.name} Level ${item.level} completed in ${item.stateId}`);
 }
 
-// Technology research
-export const researchQueue = [];
+function getBuildingProduction(buildingId, level) {
+    const building = BUILDINGS[buildingId];
+    if (!building) return null;
+    const production = {};
+    for (const [key, value] of Object.entries(building.production)) {
+        production[key] = Math.round(value * level);
+    }
+    return production;
+}
 
 export function addResearchToQueue(techId) {
     const allTechs = getAllTechs();
     const tech = allTechs[techId];
     if (!tech) return false;
     
-    // Check if can afford
     for (const [resource, amount] of Object.entries(tech.cost)) {
-        if (economyState[resource] < amount) {
-            return false;
-        }
+        if (economyState[resource] < amount) return false;
     }
     
-    // Deduct resources
     for (const [resource, amount] of Object.entries(tech.cost)) {
         economyState[resource] -= amount;
     }
     
-    // Add to queue
     researchQueue.push({
         techId,
         progress: 0,
@@ -129,7 +125,6 @@ export function processResearchQueue(dt) {
         item.progress += dt;
         
         if (item.progress >= item.totalTime) {
-            // Research complete
             completeResearch(item);
             researchQueue.splice(i, 1);
         }
@@ -141,7 +136,6 @@ function completeResearch(item) {
     const tech = allTechs[item.techId];
     if (!tech) return;
     
-    // Apply bonus
     for (const [bonusType, value] of Object.entries(tech.bonus)) {
         if (bonusType === 'factories') {
             factories.military += value;
@@ -150,42 +144,29 @@ function completeResearch(item) {
         } else if (bonusType === 'moneyIncome') {
             productionMultipliers.money += value / 100;
         } else if (bonusType === 'intel') {
-            intel = Math.min(100, intel + value);
+            economyState.intel = Math.min(100, (economyState.intel || 0) + value);
         } else if (bonusType === 'counterIntel') {
-            counterIntel = Math.min(100, counterIntel + value);
-        } else if (bonusType === 'infantryAttack') {
-            // Add to tech bonus
+            economyState.counterIntel = Math.min(100, (economyState.counterIntel || 0) + value);
         }
     }
-    
-    console.log(`🔬 Research complete: ${tech.name}`);
 }
 
-// Process economy each tick
 export function processEconomy(dt) {
-    // Base income
     const baseIncome = 10 * dt;
     economyState.money += baseIncome * productionMultipliers.money;
     
-    // Building production
-    // This would check all buildings and add production
-    
-    // Tax income
     const taxIncome = (economyState.money * economyState.tax / 100) * dt;
     economyState.money += taxIncome;
     
-    // Stability affects production
     const stabilityBonus = economyState.stability / 100;
     economyState.money *= (1 + stabilityBonus * 0.1);
     
-    // Debt interest
     if (economyState.debt > 0) {
         const interest = economyState.debt * 0.05 * dt;
         economyState.money -= interest;
     }
 }
 
-// Trade
 export function tradeResource(resource, amount, price) {
     if (economyState[resource] < amount) return false;
     economyState[resource] -= amount;
@@ -193,7 +174,6 @@ export function tradeResource(resource, amount, price) {
     return true;
 }
 
-// Emergency loan
 export function takeLoan(amount) {
     economyState.money += amount;
     economyState.debt += amount;
