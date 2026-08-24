@@ -2,6 +2,11 @@
 // WORLD WAR V3 — GLOBE MAP + ALL SYSTEMS WORKABLE (FIXED)
 // =========================================================
 
+// Startup watchdog flag. The HTML shell uses this to detect module/import failures
+// that happen before init() can run (for example a missing JS file or CDN failure).
+window.__WWV3_MODULE_STARTED = true;
+window.__WWV3_BOOTED = false;
+
 import * as THREE from "three";
 window.THREE = THREE;
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -222,6 +227,8 @@ async function init() {
         updateAllUI();
         loading(100, "Ready!");
         autosave();
+
+        window.__WWV3_BOOTED = true;
 
         // FIXED: Hide loading screen
         const loadingScreen = $("loadingScreen");
